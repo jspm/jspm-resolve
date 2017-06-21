@@ -147,8 +147,7 @@ Valid package names satisfy the JS regular expression:
 /^[a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(\/[-_\.a-zA-Z\d]+)*@[^\/\\]+$/
 ```
 
-Any instances of `\` or `/` in versions can be supported, but require being URL encoded within the canonical form.
-All other encodings, except for these two, should be unescaped when in this canonical form.
+Any characters are supported in versions except for `\` and `/`.
 
 Note that each registry can have its own more restrictive requirements for sanitization of package names and versions,
 through the registry `parse` implementation.
@@ -182,25 +181,25 @@ To convert a package between these forms, the following methods are defined:
 > 1. Let _path_ be the substring of _canonical_ from the first index after the package name regular expression match.
 > 1. If _path_ is defined and _path_ does not start with _"/"_ then,
 >    1. Return _undefined_.
-> 1. Set _version_ to the result of _decodeURIComponent_ applied to _version_, with the exception of _"/"_ and _"\\"_ characters remaining as their encoded URI components _"%2F"_ and _"%5C"_ respectively.
-> 1. If _version_ contains any instance of _"/"_ or _"\\"_, then replace these characters with their URL encodings.
+> 1. Set _version_ to the result of _decodeURIComponent_ applied to _version_.
+> 1. Assert _version_ does not contain any instance of _"/"_ or _"\\"_.
+> 1. Set _path_ to the result of _decodeURI_ applied to _path_.
 > 1. Return the string _"${registry}:${name}@${version}$path"_
 
-> **PACKAGE_TO_URL(name: String, jspmPackagesUrl: String): String**
+> **PACKAGE_TO_URL(name: String, path: String, jspmPackagesUrl: String): String**
 > 1. Assert _jspmPackagesUrl_ is a valid URL.
 > 1. Assert _jspmPackagesUrl_ ends with the string _"/jspm_packages/"_.
-> 1. Let _packageName_ be the unique substring of _name_ starting from the first index that satisfies the package name regular expression.
-> 1. Assert _packageName_ is defined.
-> 1. Let _packagePath_ be the substring of _name_ starting from the index of the length of _packageName_.
-> 1. Assert _packagePath_ is empty or it does not start with _"/"_.
-> 1. Replace in _packageName_ the first _":"_ character with _"/"_.
-> 1. Replace in _packageName_ the substring from the last index of _"@"_ in _packageName_ to the end of _packageName_ with the result of _encodeURIComponent_ method applied to that substring, with the exception of not encoding any instance of _"%"_ that is followed by either the characters _"2F"_ or _"5C"_.
-> 1. Return the result of the URL resolution of _"${packageName}${packagePath}"_ to _jspmPackagesUrl_.
+> 1. Assert _name_ satisfies the valid package name regular expression.
+> 1. Assert _path_ is empty or it does not start with _"/"_.
+> 1. Replace in _name_ the first _":"_ character with _"/"_.
+> 1. Let _versionIndex_ be the first _"@"_ in _packageName_ that does not immediately follow the first _"/"_ character in _packageName_.
+> 1. Replace in _name_ the substring from _versionIndex_  to the end of _packageName_ with the result of _encodeURIComponent_ method applied to that substring.
+> 1. Return the result of the URL resolution of _"${name}${path}"_ to _jspmPackagesUrl_, with URL encoding handled as defined by this resolution.
 
 The parse functions return undefined if not a valid package canonical name form, while the package to URL function must
 always be called against a valid package canonical name form.
 
-These methods are designed to work on paths within the canonicals (`PACKAGE_TO_URL(npm:@scope/x@v/y.js)` -> `file:///path/to/jspm_packages/npm/@scope/x@v/y.js`).
+These methods are designed to work on paths within the canonicals (`PACKAGE_TO_URL(npm:@scope/x@v, /y.js)` -> `file:///path/to/jspm_packages/npm/@scope/x@v/y.js`).
 
 Escaping of path segments other than the encoding of the package version is entirely delegated to the URL resolver.
 
@@ -221,7 +220,7 @@ This can be handled by a get configuration function along the following lines:
 >       1. Let _parsedPackage_ be the value of _PARSE_PACKAGE_URL(path, config.jspmPackagesUrl)_.
 >       1. If _parsedPackage_ is not _undefined_ and _parsedPackage.path_ is equal to the empty string then,
 >          1. Continue the loop.
->    1. Let _jspmConfigPath_ be set to _"${path}/json.json"_.
+>    1. Let _jspmConfigPath_ be set to _"${path}/jspm.json"_.
 >    1. Let _jspmConfig_ be set to _undefined_.
 >    1. Let _baseUrl_ be set to _path_.
 >    1. Let _jspmPackagesUrl_ be set to _"${path}/jspm_packages/"_.
@@ -230,9 +229,9 @@ This can be handled by a get configuration function along the following lines:
 >       1. Set _pjson_ to the output of the JSON parser applied to the contents of _"${path}/package.json"_, continuing on abrupt completion.
 >       1. If _pjson?.configFiles?.jspm_ is a relative URL without backtracking,
 >          1. Set _jspmConfigPath_ to the URL resolution of _pjson.configFiles.jspm_ to _path_.
->       1. If _pjson?.directories?.lib is a relative URL without backtracking,
+>       1. If _pjson?.directories?.lib is a relative path without backtracking,
 >          1. Set _baseUrl_ to the URL resolution of _pjson.directories.lib_ to _path_.
->       1. If _pjson?.directories?.dist is a relative URL without backtracking,
+>       1. If _pjson?.directories?.dist is a relative path without backtracking,
 >          1. If the environment conditional _production_ is _true_,
 >             1. Set _baseUrl_ to the URL resolution of _pjson.directories.dist_ to _path_.
 >       1. If _baseUrl_ has a trailing _"/"_, then remove it.
@@ -264,10 +263,6 @@ Applying the map is then the process of adding back the subpath after the match 
 > 1. Assert _IS_RELATIVE(name)_ or _IS_PLAIN(name)_.
 > 1. Let _match_ be set to _undefined_.
 > 1. Let _parentNames_ be the set of parent names of _name_, including _name_ itself, in descending order (each item without the last separated segment from the previous one and without a trailing separator).
-> 1. If the last item of _parentNames_ is the string _"."_ then,
->    1. If this is the only item of _parentNames_ then,
->       1. Return _resolveMap["."]_ if set or _undefined_.
->    1. Otherwise, remove the last item from _parentNames_.
 > 1. For each _parentName_ of _parentNames_,
 >    1. If _resolveMap_ has an entry for _parentName_ then,
 >       1. Set _match_ to _parentName_.
@@ -279,7 +274,7 @@ Applying the map is then the process of adding back the subpath after the match 
 > 1. If _replacement_ is an _Object_ then,
 >    1. For each property _condition_ of _replacement_,
 >       1. If _condition_ is the name of an environment conditional that is _true_.
->          1. Let _replacement_ be the value of _replacement[condition]_.
+>          1. Set _replacement_ to the value of _replacement[condition]_.
 >          1. Assert _replacement_ is a _string_.
 >          1. Break the loop.
 >    1. If _replacement_ is not a _string_,
@@ -294,11 +289,24 @@ Applying the map is then the process of adding back the subpath after the match 
 
 ### Extension and Directory Index Handling
 
-Like the NodeJS module resolution, jspm 2.0 supports automatic extension and directory index handling through the following:
+Like the NodeJS module resolution, jspm 2.0 supports automatic extension and directory index handling.
+
+There is one exception added to this which is that if a path ends in a `/` character it is allowed not to resolve at all,
+in order to support directory resolution utility functions.
+
+The full algorithm applied to a URL, with this directory addition is:
 
 > **FILE_RESOLVE(url: string)**
 > 1. Assert _url_ is a valid URL.
 > 1. If _url_ is not using the _"file:"_ protocol then,
+>    1. Return _url_.
+> 1. If _url_ ends with the character _"/"_ then,
+>    1. If the file at _"${url}index.js"_ exists,
+>       1. Return _"${url}index.js"_.
+>    1. If the file at _"${url}index.json"_ exists,
+>       1. Return _"${url}index.json"_.
+>    1. If the file at _"${url}index.node"_ exists,
+>       1. Return _"${url}index.node"_.
 >    1. Return _url_.
 > 1. If the file at _url_ exists,
 >    1. Return _url_.
@@ -343,6 +351,8 @@ When handling conditional resolution, the environment conditional state is requi
 
 Where `production` and `dev` must be mutually exclusive, while `browser` and `node` can intersect for environments like Electron.
 
+Escaping is handled by running URI percent encoding on the input string as part of the standard URI encoding in URL resolutions. When converting between a URL and a package name form like `registry:name@version[/path]`, escaping is handled similarly.
+
 The resolution algorithm breaks down into the following high-level process to get the fully resolved URL:
 
 > **JSPM_RESOLVE(name: string, parentUrl: string)**
@@ -359,7 +369,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >          1. Let _mapped_ be the value of _APPLY_MAP(name, parentPackageMap)_
 >          1. If _mapped_ is not _undefined_ then,
 >             1. If _mapped_ starts with _"./"_ then,
->                1. Let _parentPackageUrl_ be the result of _PACKAGE_TO_URL(parentPackage.name, jspmPackagesUrl)_.
+>                1. Let _parentPackageUrl_ be the result of _PACKAGE_TO_URL(parentPackage.name, parentPackage.path, jspmPackagesUrl)_.
 >                1. Let _resolved_ be the URL resolution of _name_ to _parentPackageUrl_.
 >                1. Return _FILE_RESOLVE(resolved)_.
 >             1. Otherwise, set _name_ to _mapped_.
@@ -376,14 +386,14 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Let _resolved_ be equal to _undefined_.
 > 1. If _resolvedPackage_ is _undefined_ then,
 >    1. Set _resolved_ to the result of the URL resolution of _name_ to _parentUrl_.
->    1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_URL(resolved)_.
+>    1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_URL(resolved, jspmPackagesUrl)_.
 > 1. If _resolvedPackage_ is not _undefined_ then,
 >    1. Let _resolvedPackageMap_ be the value of _jspmConfig.dependencies[resolvedPackage.name]?.map_.
 >    1. If _resolvedPackageMap_ is not _undefined_ then,
 >       1. Let _relPath_ be the string _"."_ concatenated with _resolvedPackage.path_.
 >       1. Let _mapped_ be the value of _APPLY_MAP(relPath, resolvedPackageMap)_.
 >       1. If _mapped_ is not _undefined_ then,
->          1. Let _resolvedPackageUrl_ be the result of _PACKAGE_TO_URL(resolvedPackage.name, jspmPackagesUrl)_.
+>          1. Let _resolvedPackageUrl_ be the result of _PACKAGE_TO_URL(resolvedPackage.name, resolvedPackage.path, jspmPackagesUrl)_.
 >          1. Let _resolved_ be the URL resolution of _mapped_ to _resolvedPackageUrl_.
 >          1. Return _FILE_RESOLVE(resolved)_.
 > 1. Otherwise, if _resolved_ starts with _baseUrl_ and either has the same length as _baseUrl_ or has a _"/"_ at the index of the length of _baseUrl_ then,
@@ -394,4 +404,4 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Return _FILE_RESOLVE(resolved)_.
 > 1. Return _FILE_RESOLVE(resolved)_.
 
-The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm, as applied to file URLs.
+The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of handling the browserify "browser" field when resolving in the browser environment. Unlike jspm packages, module names ending in `/` get no special treatment through `NODE_RESOLVE` and will throw a not found error even if the package exists.

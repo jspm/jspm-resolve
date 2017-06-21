@@ -1,0 +1,27 @@
+{
+  "name": "jspm-resolve",
+  "version": "3.0.0",
+  "description": "jspm 2.0 NodeJS resolver",
+  "main": "resolve.js",
+  "scripts": {
+    "test": "mocha -u tdd -R dot"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jspm/resolve.git"
+  },
+  "keywords": [
+    "jspm",
+    "resolver"
+  ],
+  "author": "Guy Bedford",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/jspm/resolve/issues"
+  },
+  "homepage": "https://github.com/jspm/resolve#readme",
+  "dependencies": {
+    "browser-resolve": "^1.11.2",
+    "resolve": "^1.3.3"
+  }
+}
