@@ -4,7 +4,7 @@
   "description": "jspm 2.0 NodeJS resolver",
   "main": "resolve.js",
   "scripts": {
-    "test": "mocha -u tdd -R dot"
+    "test": "mocha -u tdd"
   },
   "repository": {
     "type": "git",

@@ -4,8 +4,13 @@
     "a/c": "./b",
     "./rel": "./d",
     "pkg": "ra:pkg@version",
+    "pkg2": "ra:pkg@version2",
     "p": "pkg",
-    "./fail": "fail"
+    "./fail": "fail",
+    "c": {
+      "browser": "./c-browser",
+      "node": "./c-node"
+    }
   },
   "dependencies": {
     "ra:pkg@version": {
@@ -13,7 +18,17 @@
         "x": "./y",
         "./z": "./a",
         "p": "a",
+        "c": {
+          "browser": "./c-browser",
+          "node": "./c-node"
+        },
         "./fail": "fail"
+      }
+    },
+    "ra:pkg@version2": {
+      "map": {
+        ".": "./a",
+        "./a": "./b"
       }
     }
   }

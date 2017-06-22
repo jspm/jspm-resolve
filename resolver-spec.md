@@ -263,10 +263,15 @@ Applying the map is then the process of adding back the subpath after the match 
 > 1. Assert _IS_RELATIVE(name)_ or _IS_PLAIN(name)_.
 > 1. Let _match_ be set to _undefined_.
 > 1. Let _parentNames_ be the set of parent names of _name_, including _name_ itself, in descending order (each item without the last separated segment from the previous one and without a trailing separator).
-> 1. For each _parentName_ of _parentNames_,
->    1. If _resolveMap_ has an entry for _parentName_ then,
->       1. Set _match_ to _parentName_.
->       1. Break the loop.
+> 1. If the last item of _parentNames_ is the string _"."_ then,
+>    1. If this is the only item of _parentNames_ and _resolveMap["."]_ is not _undefined_ then,
+>       1. Set _match_ to _"."_.
+>    1. Otherwise, remove the last item from _parentNames_.
+> 1. If _match_ is not _undefined_ then,
+>    1. For each _parentName_ of _parentNames_,
+>       1. If _resolveMap_ has an entry for _parentName_ then,
+>          1. Set _match_ to _parentName_.
+>          1. Break the loop.
 > 1. If _match_ is _undefined_ then,
 >    1. Return _undefined_.
 > 1. Assert _IS_RELATIVE(match)_ or _IS_PLAIN(match)_.
@@ -282,6 +287,7 @@ Applying the map is then the process of adding back the subpath after the match 
 > 1. Otherwise, assert _replacement_ is a _string_.
 > 1. If _IS_RELATIVE(match)_ then,
 >    1. Assert _IS_RELATIVE(replacement)_.
+>    1. Assert _replacement_ contains no _".."_ or _"."_ path segments from after the second character index.
 > 1. Otherwise,
 >    1. Assert _IS_RELATIVE(replacement)_ or _IS_PLAIN(replacement)_ or _PARSE_PACKAGE_CANONICAL(replacement)_ is not _undefined_.
 > 1. Return _replacement_ concatenated with the substring of _name_ from the index at the length of _match_ to the end of the string.

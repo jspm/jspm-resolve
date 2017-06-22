@@ -4,9 +4,13 @@ const URL = require('url').URL;
 const jspmResolve = require('../resolve.js');
 
 const fixturesUrl = new URL('file:' + path.resolve(__dirname, 'fixtures') + '/').href;
+const nodeUrl = new URL('file:' + path.resolve(__dirname, '../node_modules'));
+const sfUrl = fixturesUrl + 'standard-cases/';
+const pUrl = sfUrl + 'jspm_packages/';
+const pkgUrl = jspmResolve.sync('pkg/', sfUrl);
+const pkg2Url = jspmResolve.sync('ra:pkg@version2/', sfUrl);
 
 suite('Standard Cases', () => {
-  const sfUrl = fixturesUrl + 'standard-cases/';
 
   test('Extension cases', async () => {
     var resolved = await jspmResolve('./b', sfUrl);
@@ -53,8 +57,6 @@ suite('Standard Cases', () => {
     }
   });
 
-  const pUrl = sfUrl + 'jspm_packages/';
-
   test('Package loading', async () => {
     var resolved = await jspmResolve('ra:pkg@version', sfUrl);
     assert.equal(resolved.href, pUrl + 'ra/pkg@version/index.js');
@@ -84,8 +86,6 @@ suite('Standard Cases', () => {
   });
 
   test('Package-relative loading', async () => {
-    const pkgUrl = await jspmResolve('pkg/', sfUrl);
-
     var resolved = await jspmResolve('./a', pkgUrl);
     assert.equal(resolved.href, pkgUrl + 'a.json');
 
@@ -124,10 +124,44 @@ suite('Standard Cases', () => {
       assert(true);
     }
   });
+
+  test('Cross-package resolves', async () => {
+    var resolved = await jspmResolve('ra:pkg@version2', sfUrl);
+    assert.equal(resolved.href, pkg2Url + 'a.js');
+
+    var resolved = await jspmResolve('pkg2/a', sfUrl);
+    assert.equal(resolved.href, pkg2Url + 'b.js');
+  });
+
+  test('Conditional maps', async () => {
+    var resolved = await jspmResolve('c', sfUrl);
+    assert.equal(resolved.href, sfUrl + 'c-node.js');
+
+    var resolved = await jspmResolve('c', sfUrl, { browser: true });
+    assert.equal(resolved.href, sfUrl + 'c-browser.js');
+
+    var resolved = await jspmResolve('c/a', sfUrl);
+    assert.equal(resolved.href, sfUrl + 'c-node/a.js');
+
+    var resolved = await jspmResolve('c', pkgUrl);
+    assert.equal(resolved.href, pkgUrl + 'c-node.js');
+  });
+
+  test('Node Resolution fallback', async () => {
+    var resolved = await jspmResolve('resolve', sfUrl);
+    assert.equal(resolved.href, nodeUrl + '/resolve/index.js');
+
+    try {
+      var resolved = jspmResolve.sync('fs', sfUrl);
+      assert(false);
+    }
+    catch (e) {
+      assert(e);
+    }
+  });
 });
 
 suite('Standard Cases Sync', () => {
-  const sfUrl = fixturesUrl + 'standard-cases/';
 
   test('Extension cases', () => {
     var resolved = jspmResolve.sync('./b', sfUrl);
@@ -174,8 +208,6 @@ suite('Standard Cases Sync', () => {
     }
   });
 
-  const pUrl = sfUrl + 'jspm_packages/';
-
   test('Package loading', () => {
     var resolved = jspmResolve.sync('ra:pkg@version', sfUrl);
     assert.equal(resolved.href, pUrl + 'ra/pkg@version/index.js');
@@ -205,8 +237,6 @@ suite('Standard Cases Sync', () => {
   });
 
   test('Package-relative loading', () => {
-    const pkgUrl = jspmResolve.sync('pkg/', sfUrl);
-
     var resolved = jspmResolve.sync('./a', pkgUrl);
     assert.equal(resolved.href, pkgUrl + 'a.json');
 
@@ -243,6 +273,41 @@ suite('Standard Cases Sync', () => {
     }
     catch (e) {
       assert(true);
+    }
+  });
+
+  test('Cross-package resolves', async () => {
+    var resolved = jspmResolve.sync('ra:pkg@version2', sfUrl);
+    assert.equal(resolved.href, pkg2Url + 'a.js');
+
+    var resolved = jspmResolve.sync('pkg2/a', sfUrl);
+    assert.equal(resolved.href, pkg2Url + 'b.js');
+  });
+
+  test('Conditional maps', () => {
+    var resolved = jspmResolve.sync('c', sfUrl);
+    assert.equal(resolved.href, sfUrl + 'c-node.js');
+
+    var resolved = jspmResolve.sync('c', sfUrl, { browser: true });
+    assert.equal(resolved.href, sfUrl + 'c-browser.js');
+
+    var resolved = jspmResolve.sync('c/a', sfUrl);
+    assert.equal(resolved.href, sfUrl + 'c-node/a.js');
+
+    var resolved = jspmResolve.sync('c', pkgUrl);
+    assert.equal(resolved.href, pkgUrl + 'c-node.js');
+  });
+
+  test('Node Resolution fallback', () => {
+    var resolved = jspmResolve.sync('resolve', sfUrl);
+    assert.equal(resolved.href, nodeUrl + '/resolve/index.js');
+
+    try {
+      var resolved = jspmResolve.sync('fs', sfUrl);
+      assert(false);
+    }
+    catch (e) {
+      assert(e);
     }
   });
 });

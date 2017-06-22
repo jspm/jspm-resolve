@@ -165,7 +165,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
     if (!(config = await jspmResolve.getJspmConfig(parentUrl)))
       return await nodeModuleResolve(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
   }
   // /, ./, ../
   else if (name[0] === '/' || name[0] === '.' && (name[1] === '/' || name[1] === '.' && name[2] === '/')) {
@@ -173,7 +173,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
     if (!(config = await jspmResolve.getJspmConfig(resolvedUrl)))
       return await nodeModuleResolve(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // URL
@@ -181,7 +181,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
     if (!(config = await jspmResolve.getJspmConfig(resolvedUrl)))
       return await nodeModuleResolve(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // Plain name
@@ -189,7 +189,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
     if (!(config = await jspmResolve.getJspmConfig(parentUrl)))
       return await nodeModuleResolve(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
     let stillPlain = true;
 
     // parent plain map
@@ -279,7 +279,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     if (!(config = jspmResolve.getJspmConfigSync(parentUrl)))
       return nodeModuleResolveSync(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
   }
   // /, ./, ../
   else if (name[0] === '/' || name[0] === '.' && (name[1] === '/' || name[1] === '.' && name[2] === '/')) {
@@ -287,7 +287,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     if (!(config = jspmResolve.getJspmConfigSync(resolvedUrl)))
       return nodeModuleResolveSync(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // URL
@@ -295,7 +295,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     if (!(config = jspmResolve.getJspmConfigSync(resolvedUrl)))
       return nodeModuleResolveSync(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // Plain name
@@ -303,7 +303,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     if (!(config = jspmResolve.getJspmConfigSync(parentUrl)))
       return nodeModuleResolveSync(name, parentUrl, env);
     jspmPackagesUrl = config.jspmPackagesUrl;
-    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+    baseUrl = ('dev' in env ? env.dev : true) ? config.baseUrlDev : config.baseUrlProduction;
 
     let stillPlain = true;
 
@@ -374,16 +374,20 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
 async function nodeModuleResolve (name, parentUrl, env) {
   let parentPath = decodeURIComponent(isWindows ? parentUrl.pathname.substr(1) : parentUrl.pathname);
   let resolved = await new Promise((resolve, reject) => {
-    (env.browser ? browserResolve : nodeResolve)(name, {
+    (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve)(name, {
       basedir: path.dirname(parentPath)
     }, (err, resolved) => err ? reject(err) : resolve(resolved));
   });
+  if (resolved[0] !== '/')
+    throw new Error(`Module ${name} not found.`);
   return new URL(resolved, 'file:///');
 }
 
 function nodeModuleResolveSync (name, parentUrl, env) {
   let parentPath = decodeURIComponent(isWindows ? parentUrl.pathname.substr(1) : parentUrl.pathname);
-  let resolved = (env.browser ? browserResolve : nodeResolve).sync(name, { filename: parentPath });
+  let resolved = (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve).sync(name, { filename: parentPath });
+  if (resolved[0] !== '/')
+    throw new Error(`Module ${name} not found.`);
   return new URL(resolved, 'file:///');
 }
 
@@ -637,13 +641,13 @@ class JspmConfig {
 function applyMap (name, parentMap, env) {
   let mapped;
   let separatorIndex = name.length;
+  let match = name.substr(0, separatorIndex);
   do {
-    let match = name.substr(0, separatorIndex);
     let replacement = parentMap[match];
     if (replacement) {
       if (typeof replacement !== 'string') {
         for (let c in replacement) {
-          if (env[c] === true) {
+          if ((c in env ? env[c] : defaultEnv[c]) === true) {
             replacement = replacement[c];
             break;
           }
@@ -652,6 +656,9 @@ function applyMap (name, parentMap, env) {
       return replacement + name.substr(match.length);
     }
     separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
+    match = name.substr(0, separatorIndex);
+    if (match === '.')
+      break;
   }
   while (separatorIndex !== -1)
 }
