@@ -322,7 +322,7 @@ The full algorithm applied to a URL, with this directory addition is:
 >    1. Return _"${url}/index.json"_.
 > 1. If the file at _"${url}/index.node"_ exists,
 >    1. Return _"${url}/index.node"_.
-> 1. Throw a _"Module not found"_ error.
+> 1. Throw a _Module Not found_ error.
 
 ### Module Resolution Algorithm
 
@@ -418,14 +418,10 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Return _FILE_RESOLVE(resolved)_.
 > 1. Return _FILE_RESOLVE(resolved)_.
 
-The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of handling the browserify "browser" field when resolving in the browser environment. Unlike jspm packages, module names ending in `/` get no special treatment through `NODE_RESOLVE` and will throw a not found error even if the package exists.
+The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of not resolving NodeJS core modules, handling the browserify "browser" field when resolving in the browser environment, and for module names ending in `/`, providing no main file or extension adding for this case resulting in a not found error even if the package exists.
 
-The jspm resolver is thus fully backwards-compatible with Node module resolution, except for the handling
-of trailing `/` characters in requires.
+Full compatility in a module loading pipeline can then be formed with a wrapper along the following lines:
 
-The resolver that should be used for Node-style requires is then formed by adding the following preprocessing step:
-
-> **NODE_JSPM_RESOLVE(name: string, parentUrl: string)**
-> 1. If _name_ ends with a _"/"_ character then,
->    1. Set _name_ to the substring of _name_ to the second last character of _name_.
-> 1. Return _JSPM_RESOLVE(name, parentUrl)_.
+> 1. If _name_ is a core module then return _name_.
+> 1. If _name_ ends with a _"/"_ character then set _name_ to the substring of _name_ up to the second last character.
+> 1. Return the result of _JSPM_RESOLVE(name, parentUrl)_ converted into a file path, propagating any error on abrupt completion.

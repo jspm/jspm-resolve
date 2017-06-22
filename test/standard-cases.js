@@ -303,6 +303,14 @@ suite('Standard Cases Sync', () => {
     assert.equal(resolved, nodeUrl + '/resolve/index.js');
 
     try {
+      var resolved = jspmResolve.sync('resolve/', sfUrl);
+      assert(false);
+    }
+    catch (e) {
+      assert(e);
+    }
+
+    try {
       var resolved = jspmResolve.sync('fs', sfUrl);
       assert(false);
     }

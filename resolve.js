@@ -348,6 +348,8 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
 }
 
 async function nodeModuleResolve (name, parentUrl, env) {
+  if (name[name.length - 1] === '/')
+    throw new Error('Module ${name} not found.');
   let parentPath = decodeURIComponent(isWindows ? parentUrl.pathname.substr(1) : parentUrl.pathname);
   let resolved = await new Promise((resolve, reject) => {
     (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve)(name, {
@@ -358,6 +360,8 @@ async function nodeModuleResolve (name, parentUrl, env) {
 }
 
 function nodeModuleResolveSync (name, parentUrl, env) {
+  if (name[name.length - 1] === '/')
+    throw new Error('Module ${name} not found.');
   let parentPath = decodeURIComponent(isWindows ? parentUrl.pathname.substr(1) : parentUrl.pathname);
   let resolved = (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve).sync(name, { filename: parentPath });
   return new URL(resolved, 'file:').href;
