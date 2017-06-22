@@ -418,7 +418,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Return _FILE_RESOLVE(resolved)_.
 > 1. Return _FILE_RESOLVE(resolved)_.
 
-The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of not resolving NodeJS core modules, handling the browserify "browser" field when resolving in the browser environment, and for module names ending in `/`, providing no main file or extension adding for this case resulting in a not found error even if the package exists.
+The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of not resolving NodeJS core modules, handling the browserify "browser" field when resolving in the browser environment, and for module names ending in `/` to always throw a not found error.
 
 Full compatility in a module loading pipeline can then be formed with a wrapper along the following lines:
 
