@@ -175,6 +175,14 @@ suite('Standard Cases', () => {
     var resolved = await jspmResolve('@empty', sfUrl);
     assert.equal(resolved, undefined);
   });
+
+  test('Cross-project resolution', async () => {
+    var resolved = await jspmResolve(sfUrl + 'sub/c', sfUrl);
+    assert.equal(resolved.href, sfUrl + 'sub/b.js');
+
+    var resolved = await jspmResolve('sr:p@1/main', sfUrl + 'sub/');
+    assert.equal(resolved.href, sfUrl + 'sub/jspm_packages/sr/p@1/main.js');
+  });
 });
 
 suite('Standard Cases Sync', () => {
@@ -341,5 +349,13 @@ suite('Standard Cases Sync', () => {
   test('Empty module', () => {
     var resolved = jspmResolve.sync('@empty', sfUrl);
     assert.equal(resolved, undefined);
+  });
+
+  test('Cross-project resolution', () => {
+    var resolved = jspmResolve.sync(sfUrl + 'sub/c', sfUrl);
+    assert.equal(resolved.href, sfUrl + 'sub/b.js');
+
+    var resolved = jspmResolve.sync('sr:p@1/main', sfUrl + 'sub/');
+    assert.equal(resolved.href, sfUrl + 'sub/jspm_packages/sr/p@1/main.js');
   });
 });
