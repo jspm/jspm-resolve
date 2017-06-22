@@ -356,6 +356,11 @@ Escaping is handled by running URI percent encoding on the input string as part 
 A package name request with only a `/` path will return the package name exactly, not applying the
 main map (`.` map), so that this utility approach can be used to resolve package folders through plain mappings.
 
+There is only one core reserved module name and that is `@empty` which
+when used as a plain name or in maps will return `undefined` from the
+resolver. All other core module name matching needs to be handled outside
+of this resolver.
+
 The resolution algorithm breaks down into the following high-level process to get the fully resolved URL:
 
 > **JSPM_RESOLVE(name: string, parentUrl: string)**
@@ -384,6 +389,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 >             1. Return _FILE_RESOLVE(resolved)_.
 >          1. Otherwise, set _name_ to _mapped_.
 >    1. If _IS_PLAIN(name)_ then,
+>       1. If _name_ is equal to the string _"@empty"_ then,
+>          1. Return _undefined_.
 >       1. Return the result of _NODE_RESOLVE(name, parentUrl)_.
 > 1. Let _resolved_ be equal to _undefined_.
 > 1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_CANONICAL(name)_.
@@ -418,9 +425,9 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Return _FILE_RESOLVE(resolved)_.
 > 1. Return _FILE_RESOLVE(resolved)_.
 
-The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of not resolving NodeJS core modules, handling the browserify "browser" field when resolving in the browser environment, and for module names ending in `/` to always throw a not found error.
+The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of not resolving NodeJS core modules, handling the browserify "browser" field when resolving in the browser environment (including a `false` map returning _undefined_), and for module names ending in `/` to always throw a not found error.
 
-Full compatility in a module loading pipeline can then be formed with a wrapper along the following lines:
+Full compatility in a module loading pipeline would be formed with a wrapper along the following lines:
 
 > 1. If _name_ is a core module then return _name_.
 > 1. If _name_ ends with a _"/"_ character then set _name_ to the substring of _name_ up to the second last character.

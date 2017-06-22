@@ -221,9 +221,12 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
       }
     }
 
-    // node plain resolve fallback
-    if (stillPlain)
+    // node modules fallback
+    if (stillPlain) {
+      if (name === '@empty')
+        return;
       return await nodeModuleResolve(name, parentUrl, env);
+    }
   }
 
   if (resolvedPackage) {
@@ -336,9 +339,12 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
       }
     }
 
-    // node plain resolve fallback
-    if (stillPlain)
+    // node modules fallback
+    if (stillPlain) {
+      if (name === '@empty')
+        return;
       return nodeModuleResolveSync(name, parentUrl, env);
+    }
   }
 
   if (resolvedPackage) {

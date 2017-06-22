@@ -151,13 +151,29 @@ suite('Standard Cases', () => {
     var resolved = await jspmResolve('resolve', sfUrl);
     assert.equal(resolved.href, nodeUrl + '/resolve/index.js');
 
+    var resolved = await jspmResolve('resolve/index', sfUrl);
+    assert.equal(resolved.href, nodeUrl + '/resolve/index.js');
+
     try {
-      var resolved = jspmResolve.sync('fs', sfUrl);
+      var resolved = await jspmResolve('resolve/', sfUrl);
       assert(false);
     }
     catch (e) {
       assert(e);
     }
+
+    try {
+      var resolved = await jspmResolve('fs', sfUrl);
+      assert(false);
+    }
+    catch (e) {
+      assert(e);
+    }
+  });
+
+  test('Empty module', async () => {
+    var resolved = await jspmResolve('@empty', sfUrl);
+    assert.equal(resolved, undefined);
   });
 });
 
@@ -302,6 +318,9 @@ suite('Standard Cases Sync', () => {
     var resolved = jspmResolve.sync('resolve', sfUrl);
     assert.equal(resolved.href, nodeUrl + '/resolve/index.js');
 
+    var resolved = jspmResolve.sync('resolve/index', sfUrl);
+    assert.equal(resolved.href, nodeUrl + '/resolve/index.js');
+
     try {
       var resolved = jspmResolve.sync('resolve/', sfUrl);
       assert(false);
@@ -317,5 +336,10 @@ suite('Standard Cases Sync', () => {
     catch (e) {
       assert(e);
     }
+  });
+
+  test('Empty module', () => {
+    var resolved = jspmResolve.sync('@empty', sfUrl);
+    assert.equal(resolved, undefined);
   });
 });
