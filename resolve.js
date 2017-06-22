@@ -61,71 +61,47 @@ function packageToUrl (pkg, jspmPackagesUrl) {
 
 async function fileResolve (url) {
   if (url.protocol !== 'file:')
-    return url;
+    return url.href;
   if (url.href[url.href.length - 1] === '/')
-    return url;
+    return url.href;
   let path = decodeURIComponent(isWindows ? url.pathname.substr(1) : url.pathname);
   if (await isFile(path))
-    return url;
-  if (await isFile(path + '.js')) {
-    url.href += '.js';
-    return url;
-  }
-  if (await isFile(path + '.json')) {
-    url.href += '.json';
-    return url;
-  }
-  if (await isFile(path + '.node')) {
-    url.href += '.node';
-    return url;
-  }
-  if (await isFile(path + '/index.js')) {
-    url.href += '/index.js';
-    return url;
-  }
-  if (await isFile(path + '/index.json')) {
-    url.href += '/index.json';
-    return url;
-  }
-  if (await isFile(path + '/index.node')) {
-    url.href += '/index.node';
-    return url;
-  }
+    return url.href;
+  if (await isFile(path + '.js'))
+    return url.href + '.js';
+  if (await isFile(path + '.json'))
+    return url.href + '.json';
+  if (await isFile(path + '.node'))
+    return url.href + '.node';
+  if (await isFile(path + '/index.js'))
+    return url.href + '/index.js';
+  if (await isFile(path + '/index.json'))
+    return url.href + '/index.json';
+  if (await isFile(path + '/index.node'))
+    return url.href + '/index.node';
   throw new Error(`Module ${url.href} not found.`);
 }
 
 function fileResolveSync (url) {
   if (url.protocol !== 'file:')
-    return url;
+    return url.href;
   if (url.href[url.href.length - 1] === '/')
-    return url;
+    return url.href;
   let path = decodeURIComponent(isWindows ? url.pathname.substr(1) : url.pathname);
   if (isFileSync(path))
-    return url;
-  if (isFileSync(path + '.js')) {
-    url.href += '.js';
-    return url;
-  }
-  if (isFileSync(path + '.json')) {
-    url.href += '.json';
-    return url;
-  }
-  if (isFileSync(path + '.node')) {
-    url.href += '.node';
-    return url;
-  }
-  if (isFileSync(path + '/index.js')) {
-    url.href += '/index.js';
-    return url;
-  }
-  if (isFileSync(path + '/index.json')) {
-    url.href += '/index.json';
-    return url;
-  }
-  if (isFileSync(path + '/index.node')) {
-    url.href += '/index.node';
-    return url;
-  }
+    return url.href;
+  if (isFileSync(path + '.js'))
+    return url.href + '.js';
+  if (isFileSync(path + '.json'))
+    return url.href + '.json';
+  if (isFileSync(path + '.node'))
+    return url.href + '.node';
+  if (isFileSync(path + '/index.js'))
+    return url.href + '/index.js';
+  if (isFileSync(path + '/index.json'))
+    return url.href + '/index.json';
+  if (isFileSync(path + '/index.node'))
+    return url.href + '/index.node';
   throw new Error(`Module ${url.href} not found.`);
 }
 
@@ -378,17 +354,13 @@ async function nodeModuleResolve (name, parentUrl, env) {
       basedir: path.dirname(parentPath)
     }, (err, resolved) => err ? reject(err) : resolve(resolved));
   });
-  if (resolved[0] !== '/')
-    throw new Error(`Module ${name} not found.`);
-  return new URL(resolved, 'file:///');
+  return new URL(resolved, 'file:').href;
 }
 
 function nodeModuleResolveSync (name, parentUrl, env) {
   let parentPath = decodeURIComponent(isWindows ? parentUrl.pathname.substr(1) : parentUrl.pathname);
   let resolved = (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve).sync(name, { filename: parentPath });
-  if (resolved[0] !== '/')
-    throw new Error(`Module ${name} not found.`);
-  return new URL(resolved, 'file:///');
+  return new URL(resolved, 'file:').href;
 }
 
 

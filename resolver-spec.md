@@ -423,11 +423,9 @@ The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution alg
 The jspm resolver is thus fully backwards-compatible with Node module resolution, except for the handling
 of trailing `/` characters in requires.
 
-The resolver that should be used for Node-style requires is then formed by adding this preprocessing step:
+The resolver that should be used for Node-style requires is then formed by adding the following preprocessing step:
 
-```
 > **NODE_JSPM_RESOLVE(name: string, parentUrl: string)**
 > 1. If _name_ ends with a _"/"_ character then,
 >    1. Set _name_ to the substring of _name_ to the second last character of _name_.
 > 1. Return _JSPM_RESOLVE(name, parentUrl)_.
-```
