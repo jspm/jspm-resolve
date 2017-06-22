@@ -19,14 +19,14 @@ function parsePackageName (name) {
 let packageUrlRegEx = /^([a-z]+\/[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*)@([^\/\\]+)(\/[\s\S]*|$)/;
 function parsePackageUrl (url, jspmPackagesUrl) {
   if (!url.href.startsWith(jspmPackagesUrl.href.substr(0, jspmPackagesUrl.href.length - 1)) ||
-      url.href[jspmPackagesUrl.href.length] !== '/' && url.href.length !== jspmPackagesUrl.href.length - 1)
+      url.href[jspmPackagesUrl.href.length - 1] !== '/' && url.href.length !== jspmPackagesUrl.href.length - 1)
     return;
   let relPackagePath = url.href.substr(jspmPackagesUrl.href.length);
   let packageMatch = relPackagePath.match(packageUrlRegEx);
   if (packageMatch)
     return {
       // here unique space separation is necessary as package name strings are unique identifiers
-      name: packageMatch[1] + '@' + decodeURIComponent(packageMatch[2]),
+      name: packageMatch[1].replace('/', ':') + '@' + decodeURIComponent(packageMatch[2]),
       // decode skipped here as while it breaks formal contract of separate spaces,
       // it doesn't affect outcomes due to idempotency
       // (since encodeURI(decodeURI(x)) === encodeURI(x))
@@ -37,22 +37,22 @@ function parsePackageUrl (url, jspmPackagesUrl) {
 // exactly like parsePackageUrl, but in /-separated unencoded path space
 function parsePackagePath (path, jspmPackagesPath) {
   if (!path.startsWith(jspmPackagesPath.substr(0, jspmPackagesPath.length - 1)) ||
-      path[jspmPackagesPath.length] !== '/' && path.length !== jspmPackagesPath.length - 1)
+      path[jspmPackagesPath.length - 1] !== '/' && path.length !== jspmPackagesPath.length - 1)
     return;
   let relPackagePath = path.substr(jspmPackagesPath.length);
   let packageMatch = relPackagePath.match(packageUrlRegEx);
   if (packageMatch)
     return {
-      name: packageMatch[1] + '@' + packageMatch[2],
+      name: packageMatch[1].replace('/', ':') + '@' + packageMatch[2],
       path: packageMatch[3]
     };
 }
 
 function packageToUrl (pkg, jspmPackagesUrl) {
-  let registryIndex = pkg.indexOf(':');
-  let atIndex = pkg.indexOf('@');
+  let registryIndex = pkg.name.indexOf(':');
+  let atIndex = pkg.name.indexOf('@');
   if (atIndex - 1 === registryIndex)
-    atIndex = pkg.indexOf('@', atIndex + 1);
+    atIndex = pkg.name.indexOf('@', atIndex + 1);
   let relPackagePath = pkg.name.substr(0, registryIndex) + '/' +
       pkg.name.substring(registryIndex + 1, atIndex + 1) +
       encodeURIComponent(pkg.name.substr(atIndex + 1)) + pkg.path;
@@ -62,47 +62,32 @@ function packageToUrl (pkg, jspmPackagesUrl) {
 async function fileResolve (url) {
   if (url.protocol !== 'file:')
     return url;
+  if (url.href[url.href.length - 1] === '/')
+    return url;
   let path = decodeURIComponent(isWindows ? url.pathname.substr(1) : url.pathname);
-  if (path[path.length - 1] === '/') {
-    if (await fileExists(path + 'index.js')) {
-      url.href += 'index.js';
-      return url;
-    }
-    // fail fast
-    let [jsonExists, nodeExists] = Promise.all([fileExists(path + 'index.json'), fileExists(path + 'index.node')]);
-    if (jsonExists) {
-      url.href += 'index.json';
-      return url;
-    }
-    if (nodeExists) {
-      url.href += 'index.node';
-      return url;
-    }
+  if (await isFile(path))
     return url;
-  }
-  if (await fileExists(path))
-    return url;
-  if (await fileExists(path + '.js')) {
+  if (await isFile(path + '.js')) {
     url.href += '.js';
     return url;
   }
-  if (await fileExists(path + '.json')) {
+  if (await isFile(path + '.json')) {
     url.href += '.json';
     return url;
   }
-  if (await fileExists(path + '.node')) {
+  if (await isFile(path + '.node')) {
     url.href += '.node';
     return url;
   }
-  if (await fileExists(path + '/index.js')) {
+  if (await isFile(path + '/index.js')) {
     url.href += '/index.js';
     return url;
   }
-  if (await fileExists(path + '/index.json')) {
+  if (await isFile(path + '/index.json')) {
     url.href += '/index.json';
     return url;
   }
-  if (await fileExists(path + '/index.node')) {
+  if (await isFile(path + '/index.node')) {
     url.href += '/index.node';
     return url;
   }
@@ -110,46 +95,34 @@ async function fileResolve (url) {
 }
 
 function fileResolveSync (url) {
-  if (!url.startsWith('file:'))
+  if (url.protocol !== 'file:')
+    return url;
+  if (url.href[url.href.length - 1] === '/')
     return url;
   let path = decodeURIComponent(isWindows ? url.pathname.substr(1) : url.pathname);
-  if (path[path.length - 1] === '/') {
-    if (fs.existsSync(path + 'index.js')) {
-      url.href += 'index.js';
-      return url;
-    }
-    if (fs.existsSync(path + 'index.json')) {
-      url.href += 'index.json';
-      return url;
-    }
-    if (fs.existsSync(path + 'index.node')) {
-      url.href += 'index.node';
-      return url;
-    }
-  }
-  if (fs.existsSync(path))
+  if (isFileSync(path))
     return url;
-  if (fs.existsSync(path + '.js')) {
+  if (isFileSync(path + '.js')) {
     url.href += '.js';
     return url;
   }
-  if (fs.existsSync(path + '.json')) {
+  if (isFileSync(path + '.json')) {
     url.href += '.json';
     return url;
   }
-  if (fs.existsSync(path + '.node')) {
+  if (isFileSync(path + '.node')) {
     url.href += '.node';
     return url;
   }
-  if (fs.existsSync(path + '/index.js')) {
+  if (isFileSync(path + '/index.js')) {
     url.href += '/index.js';
     return url;
   }
-  if (fs.existsSync(path + '/index.json')) {
+  if (isFileSync(path + '/index.json')) {
     url.href += '/index.json';
     return url;
   }
-  if (fs.existsSync(path + '/index.node')) {
+  if (isFileSync(path + '/index.node')) {
     url.href += '/index.node';
     return url;
   }
@@ -174,7 +147,7 @@ const defaultEnv = {
 module.exports = jspmResolve;
 async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), env = defaultEnv) {
   if (!parentUrl) {
-    parentUrl = new URL('file:' + process.cwd())
+    parentUrl = new URL('file:' + process.cwd());
   }
   else {
     if (typeof parentUrl === 'string')
@@ -185,32 +158,38 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
       throw new RangeError('Only "file:///" URLs are permitted for parent modules in the jspm NodeJS resolver.');
   }
 
-  let config = await jspmResolve.getJspmConfig(parentUrl);
-
-  if (!config)
-    return await nodeModuleResolve(name, parentUrl, env);
-
-  let jspmPackagesUrl = config.jspmPackagesUrl;
-  let baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
-
-  let resolvedUrl;
-  let resolvedPackage = parsePackageName(name);
+  let resolvedUrl, resolvedPackage, config, jspmPackagesUrl, baseUrl;
 
   // exact package request (unencoded URI already)
-  if (resolvedPackage) {
-    // noop
+  if (resolvedPackage = parsePackageName(name)) {
+    if (!(config = await jspmResolve.getJspmConfig(parentUrl)))
+      return await nodeModuleResolve(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
   }
   // /, ./, ../
   else if (name[0] === '/' || name[0] === '.' && (name[1] === '/' || name[1] === '.' && name[2] === '/')) {
     resolvedUrl = new URL(name, parentUrl);
+    if (!(config = await jspmResolve.getJspmConfig(resolvedUrl)))
+      return await nodeModuleResolve(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // URL
   else if (resolvedUrl = tryParseUrl(name)) {
+    if (!(config = await jspmResolve.getJspmConfig(resolvedUrl)))
+      return await nodeModuleResolve(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // Plain name
   else {
+    if (!(config = await jspmResolve.getJspmConfig(parentUrl)))
+      return await nodeModuleResolve(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
     let stillPlain = true;
 
     // parent plain map
@@ -219,7 +198,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
       let mapped = await config.applyParentMap(name, parentPackage.name, env);
       if (mapped) {
         if (mapped.startsWith('./'))
-          return await fileResolve(new URL(name, packageToUrl(parentPackage, jspmPackagesUrl)));
+          return await fileResolve(new URL(mapped, packageToUrl(parentPackage, jspmPackagesUrl)));
 
         name = mapped;
         if (resolvedPackage = parsePackageName(name))
@@ -242,13 +221,21 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
 
     // node plain resolve fallback
     if (stillPlain)
-      return await nodeModuleResolve(name, parentUrl);
+      return await nodeModuleResolve(name, parentUrl, env);
   }
 
   if (resolvedPackage) {
+    if (resolvedPackage.path.length === 1)
+      return packageToUrl(resolvedPackage, jspmPackagesUrl);
+
     let mapped = await config.applyParentMap('.' + resolvedPackage.path, resolvedPackage.name, env);
     if (mapped) {
-      let resolvedPackageUrl = packageToUrl(resolvedPackage.name, resolvedPackage.path, jspmPackagesUrl);
+      if (!mapped.startsWith('./'))
+        throw new RangeError(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
+
+      resolvedPackage.path = '/';
+      let resolvedPackageUrl = packageToUrl(resolvedPackage, jspmPackagesUrl);
+
       // (relative map is always relative)
       return await fileResolve(new URL(mapped, resolvedPackageUrl));
     }
@@ -258,11 +245,14 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
   }
 
   else if (resolvedUrl.href.startsWith(baseUrl.href.substr(0, baseUrl.href.length - 1)) &&
-      (resolvedUrl.href[baseUrl.href.length] === '/' || resolvedUrl.href.length === baseUrl.href.length - 1)) {
+      (resolvedUrl.href[baseUrl.href.length - 1] === '/' || resolvedUrl.href.length === baseUrl.href.length - 1)) {
     let relPath = '.' + resolvedUrl.href.substr(baseUrl.href.length - 1);
     let mapped = await config.applyGlobalMap(relPath, env);
-    if (mapped)
+    if (mapped) {
+      if (!mapped.startsWith('./'))
+        throw new RangeError(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
       return await fileResolve(new URL(mapped, baseUrl));
+    }
   }
 
   return await fileResolve(resolvedUrl);
@@ -271,7 +261,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
 jspmResolve.sync = jspmResolveSync;
 function jspmResolveSync (name, parentUrl, env = defaultEnv) {
   if (!parentUrl) {
-    parentUrl = new URL('file:' + process.cwd())
+    parentUrl = new URL('file:' + process.cwd());
   }
   else {
     if (typeof parentUrl === 'string')
@@ -282,32 +272,39 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
       throw new RangeError('Only "file:///" URLs are permitted for parent modules in the jspm NodeJS resolver.');
   }
 
-  let config = jspmResolve.getJspmConfigSync(parentUrl);
-
-  if (!config)
-    return nodeModuleResolveSync(name, parentUrl, env);
-
-  let jspmPackagesUrl = config.jspmPackagesUrl;
-  let baseUrl = env.dev ? config.jspmPackagesUrlDev : config.jspmPackagesUrlProduction;
-
-  let resolvedUrl;
-  let resolvedPackage = parsePackageName(name);
+  let resolvedUrl, resolvedPackage, config, jspmPackagesUrl, baseUrl;
 
   // exact package request (unencoded URI already)
-  if (resolvedPackage) {
-    // noop
+  if (resolvedPackage = parsePackageName(name)) {
+    if (!(config = jspmResolve.getJspmConfigSync(parentUrl)))
+      return nodeModuleResolveSync(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
   }
   // /, ./, ../
   else if (name[0] === '/' || name[0] === '.' && (name[1] === '/' || name[1] === '.' && name[2] === '/')) {
     resolvedUrl = new URL(name, parentUrl);
+    if (!(config = jspmResolve.getJspmConfigSync(resolvedUrl)))
+      return nodeModuleResolveSync(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // URL
   else if (resolvedUrl = tryParseUrl(name)) {
+    if (!(config = jspmResolve.getJspmConfigSync(resolvedUrl)))
+      return nodeModuleResolveSync(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
     resolvedPackage = parsePackageUrl(resolvedUrl, jspmPackagesUrl);
   }
   // Plain name
   else {
+    if (!(config = jspmResolve.getJspmConfigSync(parentUrl)))
+      return nodeModuleResolveSync(name, parentUrl, env);
+    jspmPackagesUrl = config.jspmPackagesUrl;
+    baseUrl = env.dev ? config.baseUrlDev : config.baseUrlProduction;
+
     let stillPlain = true;
 
     // parent plain map
@@ -316,7 +313,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
       let mapped = config.applyParentMap(name, parentPackage.name, env);
       if (mapped) {
         if (mapped.startsWith('./'))
-          return fileResolveSync(new URL(name, packageToUrl(parentPackage, jspmPackagesUrl)));
+          return fileResolveSync(new URL(mapped, packageToUrl(parentPackage, jspmPackagesUrl)));
 
         name = mapped;
         if (resolvedPackage = parsePackageName(name))
@@ -339,13 +336,19 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
 
     // node plain resolve fallback
     if (stillPlain)
-      return nodeModuleResolveSync(name, parentUrl);
+      return nodeModuleResolveSync(name, parentUrl, env);
   }
 
   if (resolvedPackage) {
+    if (resolvedPackage.path.length === 1)
+      return packageToUrl(resolvedPackage, jspmPackagesUrl);
+
     let mapped = config.applyParentMap('.' + resolvedPackage.path, resolvedPackage.name, env);
     if (mapped) {
-      let resolvedPackageUrl = packageToUrl(resolvedPackage.name, resolvedPackage.path, jspmPackagesUrl);
+      if (!mapped.startsWith('./'))
+        throw new RangeError(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
+      resolvedPackage.path = '/';
+      let resolvedPackageUrl = packageToUrl(resolvedPackage, jspmPackagesUrl);
       // (relative map is always relative)
       return fileResolveSync(new URL(mapped, resolvedPackageUrl));
     }
@@ -354,12 +357,15 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     }
   }
 
-  else if (resolved.href.startsWith(baseUrl.href.substr(0, baseUrl.href.length - 1)) &&
-      (resolved[baseUrl.href.length] === '/' || resolved.length === baseUrl.href.length - 1)) {
-    let relPath = '.' + resolved.href.substr(baseUrl.href.length - 1);
+  else if (resolvedUrl.href.startsWith(baseUrl.href.substr(0, baseUrl.href.length - 1)) &&
+      (resolvedUrl.href[baseUrl.href.length - 1] === '/' || resolvedUrl.href.length === baseUrl.href.length - 1)) {
+    let relPath = '.' + resolvedUrl.href.substr(baseUrl.href.length - 1);
     let mapped = config.applyGlobalMap(relPath, env);
-    if (mapped)
+    if (mapped) {
+      if (!mapped.startsWith('./'))
+        throw new RangeError(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
       return fileResolveSync(new URL(mapped, baseUrl));
+    }
   }
 
   return fileResolveSync(resolvedUrl);
@@ -597,7 +603,7 @@ class JspmConfig {
   constructor (dir, jspmJson, pjson) {
     let basePathDev = dir + '/';
     let basePathProduction = basePathDev;
-    let jspmPackagesPath = dir + 'jspm_packages/';
+    let jspmPackagesPath = dir + '/jspm_packages/';
 
     if (pjson && typeof pjson.directories === 'object') {
       if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..'))
@@ -609,6 +615,7 @@ class JspmConfig {
     }
 
     this.config = jspmJson;
+    this.config.dependencies = this.config.dependencies || {};
     this.jspmPackagesPath = jspmPackagesPath;
     this.jspmPackagesUrl = new URL('file:' + encodeURI(jspmPackagesPath));
     this.baseUrlDev = new URL('file:' + encodeURI(basePathDev));
@@ -649,9 +656,9 @@ function applyMap (name, parentMap, env) {
   while (separatorIndex !== -1)
 }
 
-async function fileExists (path) {
+async function isFile (path) {
   return new Promise((resolve, reject) => {
-    fs.access(path, err => {
+    fs.stat(path, (err, stats) => {
       if (err) {
         if (err.code === 'ENOENT')
           resolve(false);
@@ -659,10 +666,22 @@ async function fileExists (path) {
           reject(err);
       }
       else {
-        resolve(true);
+        resolve(stats.isFile());
       }
     });
   });
+}
+
+function isFileSync (path) {
+  try {
+    var stats = fs.statSync(path);
+  }
+  catch (e) {
+    if (e.code === 'ENOENT')
+      return false;
+    throw e;
+  }
+  return stats.isFile();
 }
 
 // returns undefined if not existing

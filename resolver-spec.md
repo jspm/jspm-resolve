@@ -184,7 +184,7 @@ To convert a package between these forms, the following methods are defined:
 > 1. Set _version_ to the result of _decodeURIComponent_ applied to _version_.
 > 1. Assert _version_ does not contain any instance of _"/"_ or _"\\"_.
 > 1. Set _path_ to the result of _decodeURI_ applied to _path_.
-> 1. Return the string _"${registry}:${name}@${version}$path"_
+> 1. Return the object with a _name_ key of _"${registry}:${name}"_ and a _"path"_ key of _path_.
 
 > **PACKAGE_TO_URL(name: String, path: String, jspmPackagesUrl: String): String**
 > 1. Assert _jspmPackagesUrl_ is a valid URL.
@@ -301,12 +301,6 @@ The full algorithm applied to a URL, with this directory addition is:
 > 1. If _url_ is not using the _"file:"_ protocol then,
 >    1. Return _url_.
 > 1. If _url_ ends with the character _"/"_ then,
->    1. If the file at _"${url}index.js"_ exists,
->       1. Return _"${url}index.js"_.
->    1. If the file at _"${url}index.json"_ exists,
->       1. Return _"${url}index.json"_.
->    1. If the file at _"${url}index.node"_ exists,
->       1. Return _"${url}index.node"_.
 >    1. Return _url_.
 > 1. If the file at _url_ exists,
 >    1. Return _url_.
@@ -353,15 +347,18 @@ Where `production` and `dev` must be mutually exclusive, while `browser` and `no
 
 Escaping is handled by running URI percent encoding on the input string as part of the standard URI encoding in URL resolutions. When converting between a URL and a package name form like `registry:name@version[/path]`, escaping is handled similarly.
 
+A package name request with only a `/` path will return the package name exactly, not applying the
+main map (`.` map), so that this utility approach can be used to resolve package folders through plain mappings.
+
 The resolution algorithm breaks down into the following high-level process to get the fully resolved URL:
 
 > **JSPM_RESOLVE(name: string, parentUrl: string)**
 > 1. Assert _parentUrl_ is a valid URL.
-> 1. Let _config_ be the result of _GET_JSPM_CONFIG(parentUrl)_.
-> 1. If _config_ is undefined then,
->    1. Return the result of _NODE_RESOLVE(name, parentUrl)_.
-> 1. Let _jspmConfig_, _jspmPackagesUrl_, _baseUrl_ be the values of the respective properties of _config_.
-> 1. If _IS_PLAIN(name)_,
+> 1. Let _config_ be set to _undefined_.
+> 1. Let _jspmConfig_, _jspmPackagesUrl_, _baseUrl_ be set to _undefined_.
+> 1. If _IS_PLAIN(name)_ then,
+>    1. Set _config_ to the result of _GET_JSPM_CONFIG(parentUrl)_.
+>    1. Set _jspmConfig_, _jspmPackagesUrl_, _baseUrl_ to the values of the respective properties of _config_.
 >    1. Let _parentPackage_ be the result of _PARSE_PACKAGE_URL(parentUrl, jspmPackagesUrl)_.
 >    1. If _parentPackage_ is not _undefined_ then,
 >       1. Let _parentPackageMap_ be the value of _jspmConfig.dependencies[parentPackage.name]?.map_.
@@ -373,21 +370,32 @@ The resolution algorithm breaks down into the following high-level process to ge
 >                1. Let _resolved_ be the URL resolution of _name_ to _parentPackageUrl_.
 >                1. Return _FILE_RESOLVE(resolved)_.
 >             1. Otherwise, set _name_ to _mapped_.
-> 1. If _IS_PLAIN(name)_ then,
->    1. Let _mapped_ be the value of _APPLY_MAP(name, jspmConfig.map)_.
->    1. If _mapped_ is not _undefined_ then,
->       1. If _mapped_ starts with _"./"_ then,
->          1. Let _resolved_ be the URL resolution of _mapped_ to _"${baseUrl}/"_.
->          1. Return _FILE_RESOLVE(resolved)_.
->       1. Otherwise, set _name_ to _mapped_.
-> 1. If _IS_PLAIN(name)_ then,
->    1. Return _NODE_RESOLVE(name, parentUrl)_.
-> 1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_CANONICAL(name)_.
+>    1. If _IS_PLAIN(name)_ then,
+>       1. Let _mapped_ be the value of _APPLY_MAP(name, jspmConfig.map)_.
+>       1. If _mapped_ is not _undefined_ then,
+>          1. If _mapped_ starts with _"./"_ then,
+>             1. Let _resolved_ be the URL resolution of _mapped_ to _"${baseUrl}/"_.
+>             1. Return _FILE_RESOLVE(resolved)_.
+>          1. Otherwise, set _name_ to _mapped_.
+>    1. If _IS_PLAIN(name)_ then,
+>       1. Return the result of _NODE_RESOLVE(name, parentUrl)_.
 > 1. Let _resolved_ be equal to _undefined_.
+> 1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_CANONICAL(name)_.
 > 1. If _resolvedPackage_ is _undefined_ then,
 >    1. Set _resolved_ to the result of the URL resolution of _name_ to _parentUrl_.
+>    1. Set _config_ to the result of _GET_JSPM_CONFIG(resolved)_.
+>    1. If _config_ is _undefined_ then,
+>       1. Return the result of _NODE_RESOLVE(name, parentUrl)_.
+>    1. Set _jspmConfig_, _jspmPackagesUrl_, _baseUrl_ to the values of the respective properties of _config_.
 >    1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_URL(resolved, jspmPackagesUrl)_.
+> 1. Otherwise if _config_ is _undefined_ then,
+>    1. Set _config_ to the result of _GET_JSPM_CONFIG(parentUrl)_.
+>    1. If _config_ is _undefined_ then,
+>       1. Return the result of _NODE_RESOLVE(name, parentUrl)_.
+>    1. Set _jspmConfig_, _jspmPackagesUrl_, _baseUrl_ to the values of the respective properties of _config_.
 > 1. If _resolvedPackage_ is not _undefined_ then,
+>    1. If _resolvedPackage.path_ is equal to _"/"_ then,
+>       1. Return _resolved_.
 >    1. Let _resolvedPackageMap_ be the value of _jspmConfig.dependencies[resolvedPackage.name]?.map_.
 >    1. If _resolvedPackageMap_ is not _undefined_ then,
 >       1. Let _relPath_ be the string _"."_ concatenated with _resolvedPackage.path_.
@@ -405,3 +413,15 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Return _FILE_RESOLVE(resolved)_.
 
 The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution algorithm as applied to file URLs, with the addition of handling the browserify "browser" field when resolving in the browser environment. Unlike jspm packages, module names ending in `/` get no special treatment through `NODE_RESOLVE` and will throw a not found error even if the package exists.
+
+The jspm resolver is thus fully backwards-compatible with Node module resolution, except for the handling
+of trailing `/` characters in requires.
+
+The resolver that should be used for Node-style requires is then formed by adding this preprocessing step:
+
+```
+> **NODE_JSPM_RESOLVE(name: string, parentUrl: string)**
+> 1. If _name_ ends with a _"/"_ character then,
+>    1. Set _name_ to the substring of _name_ to the second last character of _name_.
+> 1. Return _JSPM_RESOLVE(name, parentUrl)_.
+```

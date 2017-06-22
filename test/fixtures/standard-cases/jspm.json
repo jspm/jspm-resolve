@@ -1,5 +1,20 @@
 {
   "map": {
-    "a": "./b"
+    "a": "./b",
+    "a/c": "./b",
+    "./rel": "./d",
+    "pkg": "ra:pkg@version",
+    "p": "pkg",
+    "./fail": "fail"
+  },
+  "dependencies": {
+    "ra:pkg@version": {
+      "map": {
+        "x": "./y",
+        "./z": "./a",
+        "p": "a",
+        "./fail": "fail"
+      }
+    }
   }
 }
