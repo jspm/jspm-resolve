@@ -200,7 +200,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
     // parent plain map
     let parentPackage = parsePackageUrl(parentUrl, jspmPackagesUrl);
     if (parentPackage) {
-      let mapped = await config.applyParentMap(name, parentPackage.name, env);
+      let mapped = await config.packageResolve(name, parentPackage.name, env);
       if (mapped) {
         if (mapped.startsWith('./'))
           return await fileResolve(new URL(mapped, packageToUrl(parentPackage, jspmPackagesUrl)));
@@ -213,7 +213,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
 
     // global plain map
     if (stillPlain) {
-      let mapped = await config.applyGlobalMap(name, env);
+      let mapped = await config.packageResolve(name, undefined, env);
       if (mapped) {
         if (mapped.startsWith('./'))
           return await fileResolve(new URL(mapped, baseUrl));
@@ -236,7 +236,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
     if (resolvedPackage.path.length === 1)
       return packageToUrl(resolvedPackage, jspmPackagesUrl);
 
-    let mapped = await config.applyParentMap('.' + resolvedPackage.path, resolvedPackage.name, env);
+    let mapped = await config.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
         throw new RangeError(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
@@ -255,7 +255,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
   else if (resolvedUrl.href.startsWith(baseUrl.href.substr(0, baseUrl.href.length - 1)) &&
       (resolvedUrl.href[baseUrl.href.length - 1] === '/' || resolvedUrl.href.length === baseUrl.href.length - 1)) {
     let relPath = '.' + resolvedUrl.href.substr(baseUrl.href.length - 1);
-    let mapped = await config.applyGlobalMap(relPath, env);
+    let mapped = await config.packageResolve(relPath, undefined, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
         throw new RangeError(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
@@ -318,7 +318,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     // parent plain map
     let parentPackage = parsePackageUrl(parentUrl, jspmPackagesUrl);
     if (parentPackage) {
-      let mapped = config.applyParentMap(name, parentPackage.name, env);
+      let mapped = config.packageResolve(name, parentPackage.name, env);
       if (mapped) {
         if (mapped.startsWith('./'))
           return fileResolveSync(new URL(mapped, packageToUrl(parentPackage, jspmPackagesUrl)));
@@ -331,7 +331,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
 
     // global plain map
     if (stillPlain) {
-      let mapped = config.applyGlobalMap(name, env);
+      let mapped = config.packageResolve(name, undefined, env);
       if (mapped) {
         if (mapped.startsWith('./'))
           return fileResolveSync(new URL(mapped, baseUrl));
@@ -354,7 +354,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     if (resolvedPackage.path.length === 1)
       return packageToUrl(resolvedPackage, jspmPackagesUrl);
 
-    let mapped = config.applyParentMap('.' + resolvedPackage.path, resolvedPackage.name, env);
+    let mapped = config.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
         throw new RangeError(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
@@ -371,7 +371,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
   else if (resolvedUrl.href.startsWith(baseUrl.href.substr(0, baseUrl.href.length - 1)) &&
       (resolvedUrl.href[baseUrl.href.length - 1] === '/' || resolvedUrl.href.length === baseUrl.href.length - 1)) {
     let relPath = '.' + resolvedUrl.href.substr(baseUrl.href.length - 1);
-    let mapped = config.applyGlobalMap(relPath, env);
+    let mapped = config.packageResolve(relPath, undefined, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
         throw new RangeError(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
@@ -637,11 +637,9 @@ class JspmConfig {
     this.baseUrlProduction = new URL('file:' + encodeURI(basePathProduction));
   }
 
-  applyGlobalMap (name, env) {
-    return applyMap(name, this.config.map, env);
-  }
-
-  applyParentMap (name, parentPackageName, env) {
+  packageResolve (name, parentPackageName, env) {
+    if (!parentPackageName)
+      return applyMap(name, this.config.map, env);
     let packageConfig = this.config.dependencies[parentPackageName];
     if (!packageConfig || !packageConfig.map)
       return;
