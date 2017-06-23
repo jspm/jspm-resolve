@@ -33,10 +33,7 @@ function parsePackageUrl (url, jspmPackagesUrl) {
     return {
       // here unique space separation is necessary as package name strings are unique identifiers
       name: packageMatch[1].replace('/', ':') + '@' + decodeURIComponent(packageMatch[2]),
-      // decode skipped here as while it breaks formal contract of separate spaces,
-      // it doesn't affect outcomes due to idempotency
-      // (since encodeURI(decodeURI(x)) === encodeURI(x))
-      path: packageMatch[3]
+      path: decodeURI(packageMatch[3])
     };
 }
 
