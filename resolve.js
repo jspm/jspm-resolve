@@ -6,6 +6,12 @@ const nodeResolve = require('resolve');
 
 const isWindows = process.platform === 'win32';
 
+function throwModuleNotFound (name) {
+  let e = new Error(`Module ${name} not found.`);
+  e.code = 'MODULE_NOT_FOUND';
+  throw e;
+}
+
 let packageRegEx = /^([a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^\/\\]+)(\/[\s\S]*|$)/;
 function parsePackageName (name) {
   let packageMatch = name.match(packageRegEx);
@@ -92,7 +98,7 @@ async function fileResolve (url) {
     url.href += '/index.node';
     return url;
   }
-  throw new Error(`Module ${url.href} not found.`);
+  throwModuleNotFound(url.href);
 }
 
 function fileResolveSync (url) {
@@ -128,7 +134,7 @@ function fileResolveSync (url) {
     url.href += '/index.node';
     return url;
   }
-  throw new Error(`Module ${url.href} not found.`);
+  throwModuleNotFound(url.href);
 }
 
 function tryParseUrl (url) {
@@ -155,7 +161,7 @@ async function jspmResolve (name, parentUrl = new URL('file:' + process.cwd()), 
     if (typeof parentUrl === 'string')
       parentUrl = new URL(parentUrl, new URL('file:' + process.cwd()));
     else if (!(parentUrl instanceof URL))
-      throw new Error('parentUrl must be a string or URL instance.');
+      throw new RangeError('parentUrl must be a string or URL instance.');
     if (!parentUrl.href.startsWith('file:///'))
       throw new RangeError('Only "file:///" URLs are permitted for parent modules in the jspm NodeJS resolver.');
   }
@@ -272,7 +278,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
     if (typeof parentUrl === 'string')
       parentUrl = new URL(parentUrl, new URL('file:' + process.cwd()));
     else if (!(parentUrl instanceof URL))
-      throw new Error('parentUrl must be a string or URL instance.');
+      throw new RangeError('parentUrl must be a string or URL instance.');
     if (!parentUrl.href.startsWith('file:///'))
       throw new RangeError('Only "file:///" URLs are permitted for parent modules in the jspm NodeJS resolver.');
   }
@@ -381,7 +387,7 @@ function jspmResolveSync (name, parentUrl, env = defaultEnv) {
 
 async function nodeModuleResolve (name, parentUrl, env) {
   if (name[name.length - 1] === '/')
-    throw new Error('Module ${name} not found.');
+    throwModuleNotFound(name);
   let parentPath = decodeURIComponent(isWindows ? parentUrl.pathname.substr(1) : parentUrl.pathname);
   let resolved = await new Promise((resolve, reject) => {
     (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve)(name, {
@@ -393,7 +399,7 @@ async function nodeModuleResolve (name, parentUrl, env) {
 
 function nodeModuleResolveSync (name, parentUrl, env) {
   if (name[name.length - 1] === '/')
-    throw new Error('Module ${name} not found.');
+    throwModuleNotFound(name);
   let parentPath = decodeURIComponent(isWindows ? parentUrl.pathname.substr(1) : parentUrl.pathname);
   let resolved = (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve).sync(name, { filename: parentPath });
   return new URL(resolved, 'file:');
