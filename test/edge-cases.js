@@ -16,4 +16,5 @@ TODO Edge Cases:
 - mapping into an exact package with a backtrack path
 - all map variations with backtracking segments after the match component
 - trailing / in node_modules should throw
+- empty being returned by mapping cases
  */
