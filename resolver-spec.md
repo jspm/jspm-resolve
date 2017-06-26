@@ -14,7 +14,7 @@ All module names in the WhatWG loader are treated as URLs with the encoding rule
 
 For the purposes of practicality though, the jspm NodeJS resolution algorithm is specified as a specification on paths, just like the NodeJS module resolution algorithm.
 
-The idea here is that normalization from URL into path space is handled as a pre-resolution and post-resolution transform, which is defined in this specification.
+The idea here is that normalization from URL into path space is handled as a pre-resolution transform on the specifier which is defined in the main resolver algorithm here, before returning the correct valid absolute file path for the system.
 
 ### Plain Names
 
@@ -314,14 +314,15 @@ Applying the map is then the process of adding back the subpath after the match 
 
 Like the NodeJS module resolution, jspm 2.0 supports automatic extension and directory index handling.
 
-There is one exception added to this which is that if a path ends in a `/` character it is allowed not to resolve at all,
+There is one exception added to this which is that if a path ends in a separator character it is allowed not to resolve at all,
 in order to support directory resolution utility functions.
 
 The full algorithm applied to a URL, with this directory addition is:
 
 > **FILE_RESOLVE(path: string)**
 > 1. Assert _path_ is a valid file path.
-> 1. If _path_ ends with the character _"/"_ then,
+> 1. Let _sep_ be the environment path separator.
+> 1. If _path_ ends with the character _sep_ then,
 >    1. Return _path_.
 > 1. If the file at _path_ exists,
 >    1. Return _path_.
@@ -331,12 +332,12 @@ The full algorithm applied to a URL, with this directory addition is:
 >    1. Return _"${path}.json"_.
 > 1. If the file at _"${path}.node"_ exists,
 >    1. Return _"${path}.node"_.
-> 1. If the file at _"${path}/index.js"_ exists,
->    1. Return _"${path}/index.js"_.
-> 1. If the file at _"${path}/index.json"_ exists,
->    1. Return _"${path}/index.json"_.
-> 1. If the file at _"${path}/index.node"_ exists,
->    1. Return _"${path}/index.node"_.
+> 1. If the file at _"${path}${sep}index.js"_ exists,
+>    1. Return _"${path}${sep}index.js"_.
+> 1. If the file at _"${path}${sep}index.json"_ exists,
+>    1. Return _"${path}${sep}index.json"_.
+> 1. If the file at _"${path}${sep}index.node"_ exists,
+>    1. Return _"${path}${sep}index.node"_.
 > 1. Throw a _Module Not found_ error.
 
 ### Module Resolution Algorithm
@@ -408,7 +409,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Let _resolved_ be equal to _undefined_.
 > 1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_CANONICAL(name)_.
 > 1. If _resolvedPackage_ is _undefined_ then,
->    1. Replace in _name_ all ocurrences of _"\\"_ with _"/"_.
+>    1. Replace in _name_ all ocurrences of _"\\"_ with _"/"_ (relative paths like _".\\"_ detect as plain names above, thrown as not found before reaching here)
 >    1. If _name_ contains the substring _"%2F"_ or _"%5C"_ then,
 >       1. Throw an _Invalid Module Name_ error.
 >    1. Replace in _name_ all percent-encoded values with their URI-decodings.

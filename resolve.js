@@ -165,9 +165,6 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
   let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
   let isPlain = false;
 
-  if (isWindows)
-    parentPath = parentPath.replace(winSepRegEx, '/');
-
   // PERF: test replacing string single character checks with charCodeAt numeric checks
   // Absolute path
   if (name[0] === '/') {
@@ -184,20 +181,22 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
   }
   // Relative path
   else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
-    resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + name.replace(winSepRegEx, '/'));
+    resolvedPath = resolvePath((
+      isWindows
+      ? parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
+      : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
+    ) + name.replace(winSepRegEx, '/'));
   }
   // Exact package request
-  else if (resolvedPackage = parsePackageName(name.replace(winSepRegEx, '/'))) {
+  else if (resolvedPackage = parsePackageName(name)) {
     // noop
   }
   // URL
   else if (url = tryParseUrl(name)) {
-    if (url.protocol === 'file:') {
+    if (url.protocol === 'file:')
       resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
-    }
-    else {
+    else
       throwInvalidModuleName(name);
-    }
   }
   // Plain name
   else {
@@ -317,7 +316,11 @@ function jspmResolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
   }
   // Relative path
   else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
-    resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + name.replace(winSepRegEx, '/'));
+    resolvedPath = resolvePath((
+      isWindows
+      ? parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
+      : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
+    ) + name.replace(winSepRegEx, '/'));
   }
   // Exact package request
   else if (resolvedPackage = parsePackageName(name)) {
