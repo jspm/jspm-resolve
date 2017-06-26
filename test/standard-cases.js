@@ -13,39 +13,39 @@ suite('Standard Cases', () => {
 
   test('Extension cases', async () => {
     var resolved = await jspmResolve('./b', sfPath);
-    assert.equal(resolved, sfPath + 'b.js');
+    assert.equal(resolved, path.join(sfPath, 'b.js'));
 
     var resolved = await jspmResolve('./b', sfPath + 'sub/');
-    assert.equal(resolved, sfPath + 'sub/b.js');
+    assert.equal(resolved, path.join(sfPath, 'sub', 'b.js'));
 
     var resolved = await jspmResolve('./c', sfPath);
-    assert.equal(resolved, sfPath + 'c.json');
+    assert.equal(resolved, path.join(sfPath, 'c.json'));
 
     var resolved = await jspmResolve('./d', sfPath);
-    assert.equal(resolved, sfPath + 'd/index.js');
+    assert.equal(resolved, path.join(sfPath, 'd', 'index.js'));
 
     var resolved = await jspmResolve('./e', sfPath);
-    assert.equal(resolved, sfPath + 'e/index.json');
+    assert.equal(resolved, path.join(sfPath, 'e', 'index.json'));
   });
 
   test('Global map config', async () => {
     var resolved = await jspmResolve('a', sfPath);
-    assert.equal(resolved, sfPath + 'b.js');
+    assert.equal(resolved, path.join(sfPath, 'b.js'));
 
     var resolved = await jspmResolve('a/', sfPath);
-    assert.equal(resolved, sfPath + 'b/');
+    assert.equal(resolved, path.join(sfPath, 'b') + path.sep);
 
     var resolved = await jspmResolve('a/b', sfPath);
-    assert.equal(resolved, sfPath + 'b/b.js');
+    assert.equal(resolved, path.join(sfPath, 'b', 'b.js'));
 
     var resolved = await jspmResolve('a/c/b', sfPath);
-    assert.equal(resolved, sfPath + 'b/b.js');
+    assert.equal(resolved, path.join(sfPath, 'b', 'b.js'));
 
     var resolved = await jspmResolve('./rel', sfPath);
-    assert.equal(resolved, sfPath + 'd/index.js');
+    assert.equal(resolved, path.join(sfPath, 'd', 'index.js'));
 
-    var resolved = await jspmResolve(sfPath + 'rel', 'file:///');
-    assert.equal(resolved, sfPath + 'd/index.js');
+    var resolved = await jspmResolve(path.join(sfPath, 'rel'), 'file:///');
+    assert.equal(resolved, path.join(sfPath, 'd', 'index.js'));
 
     try {
       var resolved = await jspmResolve('./fail', sfPath);
@@ -58,29 +58,29 @@ suite('Standard Cases', () => {
 
   test('Package loading', async () => {
     var resolved = await jspmResolve('ra:pkg@version', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/index.js');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'index.js'));
 
     var resolved = await jspmResolve('ra:pkg@version/', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version') + path.sep);
 
     var resolved = await jspmResolve('ra:pkg@version/a', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/a.json');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'a.json'));
 
     var resolved = await jspmResolve('pkg', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/index.js');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'index.js'));
 
     var resolved = await jspmResolve('pkg/', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version') + path.sep);
 
     var resolved = await jspmResolve('pkg/a', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/a.json');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'a.json'));
 
     try {
       var resolved = await jspmResolve('p/a', sfPath);
       assert(false);
     }
     catch (e) {
-      assert(e.toString().includes('pkg/a'));
+      assert(e.toString().includes('pkg' + path.sep + 'a'));
     }
   });
 
@@ -95,7 +95,7 @@ suite('Standard Cases', () => {
     assert.equal(resolved, pkgPath + 'a.json');
 
     var resolved = await jspmResolve('./z/a', pkgPath);
-    assert.equal(resolved, pkgPath + 'a/a.js');
+    assert.equal(resolved, path.join(pkgPath, 'a', 'a.js'));
 
     var resolved = await jspmResolve('../z', pkgPath + 'x/y');
     assert.equal(resolved, pkgPath + 'a.json');
@@ -107,13 +107,13 @@ suite('Standard Cases', () => {
     assert.equal(resolved, pkgPath + 'a.json');
 
     var resolved = await jspmResolve(pkgPath + 'z/a');
-    assert.equal(resolved, pkgPath + 'a/a.js');
+    assert.equal(resolved, path.join(pkgPath, 'a', 'a.js'));
 
     var resolved = await jspmResolve('p', pkgPath);
     assert.equal(resolved, sfPath + 'b.js');
 
     var resolved = await jspmResolve('p/b', pkgPath);
-    assert.equal(resolved, sfPath + 'b/b.js');
+    assert.equal(resolved, path.join(sfPath, 'b', 'b.js'));
 
     try {
       var resolved = await jspmResolve('./fail/x', pkgPath);
@@ -140,7 +140,7 @@ suite('Standard Cases', () => {
     assert.equal(resolved, sfPath + 'c-browser.js');
 
     var resolved = await jspmResolve('c/a', sfPath);
-    assert.equal(resolved, sfPath + 'c-node/a.js');
+    assert.equal(resolved, path.join(sfPath, 'c-node', 'a.js'));
 
     var resolved = await jspmResolve('c', pkgPath);
     assert.equal(resolved, pkgPath + 'c-node.js');
@@ -148,10 +148,10 @@ suite('Standard Cases', () => {
 
   test('Node Resolution fallback', async () => {
     var resolved = await jspmResolve('resolve', sfPath);
-    assert.equal(resolved, nodePath + '/resolve/index.js');
+    assert.equal(resolved, path.join(nodePath, 'resolve', 'index.js'));
 
     var resolved = await jspmResolve('resolve/index', sfPath);
-    assert.equal(resolved, nodePath + '/resolve/index.js');
+    assert.equal(resolved, path.join(nodePath, 'resolve', 'index.js'));
 
     try {
       var resolved = await jspmResolve('resolve/', sfPath);
@@ -177,10 +177,10 @@ suite('Standard Cases', () => {
 
   test('Cross-project resolution', async () => {
     var resolved = await jspmResolve(sfPath + 'sub/c', sfPath);
-    assert.equal(resolved, sfPath + 'sub/b.js');
+    assert.equal(resolved, path.join(sfPath, 'sub', 'b.js'));
 
     var resolved = await jspmResolve('sr:p@1/main', sfPath + 'sub/');
-    assert.equal(resolved, sfPath + 'sub/jspm_packages/sr/p@1/main.js');
+    assert.equal(resolved, path.join(sfPath, 'sub', 'jspm_packages', 'sr', 'p@1', 'main.js'));
   });
 });
 
@@ -188,39 +188,39 @@ suite('Standard Cases Sync', () => {
 
   test('Extension cases', () => {
     var resolved = jspmResolve.sync('./b', sfPath);
-    assert.equal(resolved, sfPath + 'b.js');
+    assert.equal(resolved, path.join(sfPath, 'b.js'));
 
     var resolved = jspmResolve.sync('./b', sfPath + 'sub/');
-    assert.equal(resolved, sfPath + 'sub/b.js');
+    assert.equal(resolved, path.join(sfPath, 'sub', 'b.js'));
 
     var resolved = jspmResolve.sync('./c', sfPath);
-    assert.equal(resolved, sfPath + 'c.json');
+    assert.equal(resolved, path.join(sfPath, 'c.json'));
 
     var resolved = jspmResolve.sync('./d', sfPath);
-    assert.equal(resolved, sfPath + 'd/index.js');
+    assert.equal(resolved, path.join(sfPath, 'd', 'index.js'));
 
     var resolved = jspmResolve.sync('./e', sfPath);
-    assert.equal(resolved, sfPath + 'e/index.json');
+    assert.equal(resolved, path.join(sfPath, 'e', 'index.json'));
   });
 
   test('Global map config', () => {
     var resolved = jspmResolve.sync('a', sfPath);
-    assert.equal(resolved, sfPath + 'b.js');
+    assert.equal(resolved, path.join(sfPath, 'b.js'));
 
     var resolved = jspmResolve.sync('a/', sfPath);
-    assert.equal(resolved, sfPath + 'b/');
+    assert.equal(resolved, path.join(sfPath, 'b') + path.sep);
 
     var resolved = jspmResolve.sync('a/b', sfPath);
-    assert.equal(resolved, sfPath + 'b/b.js');
+    assert.equal(resolved, path.join(sfPath, 'b', 'b.js'));
 
     var resolved = jspmResolve.sync('a/c/b', sfPath);
-    assert.equal(resolved, sfPath + 'b/b.js');
+    assert.equal(resolved, path.join(sfPath, 'b', 'b.js'));
 
     var resolved = jspmResolve.sync('./rel', sfPath);
-    assert.equal(resolved, sfPath + 'd/index.js');
+    assert.equal(resolved, path.join(sfPath, 'd', 'index.js'));
 
-    var resolved = jspmResolve.sync(sfPath + 'rel', 'file:///');
-    assert.equal(resolved, sfPath + 'd/index.js');
+    var resolved = jspmResolve.sync(path.join(sfPath, 'rel'), 'file:///');
+    assert.equal(resolved, path.join(sfPath, 'd', 'index.js'));
 
     try {
       var resolved = jspmResolve.sync('./fail', sfPath);
@@ -233,29 +233,29 @@ suite('Standard Cases Sync', () => {
 
   test('Package loading', () => {
     var resolved = jspmResolve.sync('ra:pkg@version', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/index.js');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'index.js'));
 
     var resolved = jspmResolve.sync('ra:pkg@version/', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version') + path.sep);
 
     var resolved = jspmResolve.sync('ra:pkg@version/a', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/a.json');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'a.json'));
 
     var resolved = jspmResolve.sync('pkg', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/index.js');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'index.js'));
 
     var resolved = jspmResolve.sync('pkg/', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version') + path.sep);
 
     var resolved = jspmResolve.sync('pkg/a', sfPath);
-    assert.equal(resolved, pPath + 'ra/pkg@version/a.json');
+    assert.equal(resolved, path.join(pPath, 'ra', 'pkg@version', 'a.json'));
 
     try {
       var resolved = jspmResolve.sync('p/a', sfPath);
       assert(false);
     }
     catch (e) {
-      assert(e.toString().includes('pkg/a'));
+      assert(e.toString().includes('pkg' + path.sep + 'a'));
     }
   });
 
@@ -270,7 +270,7 @@ suite('Standard Cases Sync', () => {
     assert.equal(resolved, pkgPath + 'a.json');
 
     var resolved = jspmResolve.sync('./z/a', pkgPath);
-    assert.equal(resolved, pkgPath + 'a/a.js');
+    assert.equal(resolved, path.join(pkgPath, 'a', 'a.js'));
 
     var resolved = jspmResolve.sync('../z', pkgPath + 'x/y');
     assert.equal(resolved, pkgPath + 'a.json');
@@ -282,13 +282,13 @@ suite('Standard Cases Sync', () => {
     assert.equal(resolved, pkgPath + 'a.json');
 
     var resolved = jspmResolve.sync(pkgPath + 'z/a');
-    assert.equal(resolved, pkgPath + 'a/a.js');
+    assert.equal(resolved, path.join(pkgPath, 'a', 'a.js'));
 
     var resolved = jspmResolve.sync('p', pkgPath);
     assert.equal(resolved, sfPath + 'b.js');
 
     var resolved = jspmResolve.sync('p/b', pkgPath);
-    assert.equal(resolved, sfPath + 'b/b.js');
+    assert.equal(resolved, path.join(sfPath, 'b', 'b.js'));
 
     try {
       var resolved = jspmResolve.sync('./fail/x', pkgPath);
@@ -299,7 +299,7 @@ suite('Standard Cases Sync', () => {
     }
   });
 
-  test('Cross-package resolves', async () => {
+  test('Cross-package resolves', () => {
     var resolved = jspmResolve.sync('ra:pkg@version2', sfPath);
     assert.equal(resolved, pkg2Path + 'a.js');
 
@@ -315,7 +315,7 @@ suite('Standard Cases Sync', () => {
     assert.equal(resolved, sfPath + 'c-browser.js');
 
     var resolved = jspmResolve.sync('c/a', sfPath);
-    assert.equal(resolved, sfPath + 'c-node/a.js');
+    assert.equal(resolved, path.join(sfPath, 'c-node', 'a.js'));
 
     var resolved = jspmResolve.sync('c', pkgPath);
     assert.equal(resolved, pkgPath + 'c-node.js');
@@ -323,10 +323,10 @@ suite('Standard Cases Sync', () => {
 
   test('Node Resolution fallback', () => {
     var resolved = jspmResolve.sync('resolve', sfPath);
-    assert.equal(resolved, nodePath + '/resolve/index.js');
+    assert.equal(resolved, path.join(nodePath, 'resolve', 'index.js'));
 
     var resolved = jspmResolve.sync('resolve/index', sfPath);
-    assert.equal(resolved, nodePath + '/resolve/index.js');
+    assert.equal(resolved, path.join(nodePath, 'resolve', 'index.js'));
 
     try {
       var resolved = jspmResolve.sync('resolve/', sfPath);
@@ -352,9 +352,9 @@ suite('Standard Cases Sync', () => {
 
   test('Cross-project resolution', () => {
     var resolved = jspmResolve.sync(sfPath + 'sub/c', sfPath);
-    assert.equal(resolved, sfPath + 'sub/b.js');
+    assert.equal(resolved, path.join(sfPath, 'sub', 'b.js'));
 
     var resolved = jspmResolve.sync('sr:p@1/main', sfPath + 'sub/');
-    assert.equal(resolved, sfPath + 'sub/jspm_packages/sr/p@1/main.js');
+    assert.equal(resolved, path.join(sfPath, 'sub', 'jspm_packages', 'sr', 'p@1', 'main.js'));
   });
 });

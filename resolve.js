@@ -421,7 +421,7 @@ function nodeModuleResolve (name, parentPath, env) {
     throwModuleNotFound(name);
   return new Promise((resolve, reject) => {
     (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve)(name, {
-      basedir: path.dirname(parentPath)
+      basedir: parentPath.substr(0, parentPath.lastIndexOf(sep))
     }, (err, resolved) => err ? reject(err) : resolve(resolved));
   });
 }
@@ -429,7 +429,9 @@ function nodeModuleResolve (name, parentPath, env) {
 function nodeModuleResolveSync (name, parentPath, env) {
   if (name[name.length - 1] === '/')
     throwModuleNotFound(name);
-  return (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve).sync(name, { filename: parentPath });
+  return (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve).sync(name, {
+    basedir: parentPath.substr(0, parentPath.lastIndexOf(sep))
+  });
 }
 
 
