@@ -246,7 +246,7 @@ This can be handled by a get configuration function along the following lines:
 >       1. Set _jspmConfigPath_ to the path resolution of _pjson.configFiles.jspm_ to _path_.
 >    1. Let _jspmConfig_ be set to _undefined_.
 >    1. If the file at _jspmConfigPath_ exists,
->       1. Set _jspmConfig_ to the output of the JSON parser applied to the contents of _jspmConfigPath_, continuing on abrupt completion.
+>       1. Set _jspmConfig_ to the output of the JSON parser applied to the contents of _jspmConfigPath_, throwing a resolution error on abrupt completion.
 >    1. If _jspmConfig_ is not _undefined_ then,
 >       1. Let _jspmPackagesPath_ be set to the resolved path of _"jspm_packages/"_ within parent folder _path_.
 >       1. Let _basePath_ be set to _path_.
@@ -374,6 +374,8 @@ There is only one core reserved module name and that is `@empty`, which when use
 The resolver will either return undefined or a resolved path string, or throw a _Module Not Found_ or _Invalid Module Name_ error.
 
 Package name requests and plain name requests are both considered unescaped - that is URL decoding will not be applied. URL decoding is only applied to URL-like requests.
+
+The parent pathname is assumed a valid fully-resolved path in the environment, with the exception that `/` in Windows paths is allowed to be converted into `\\` as is the NodeJS convention for resolve. No absolute paths, URLs, URL-encoding, and relative segments are not supported in the parent path.
 
 The resolution algorithm breaks down into the following high-level process to get the fully resolved URL:
 

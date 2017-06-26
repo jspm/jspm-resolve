@@ -47,7 +47,9 @@ function parsePackagePath (path, jspmPackagesPath) {
 }
 function packageToPath (pkg, jspmPackagesPath) {
   let registryIndex = pkg.name.indexOf(':');
-  return jspmPackagesPath + pkg.name.substr(0, registryIndex) + sep + pkg.name.substr(registryIndex + 1).replace('/', sep) + (isWindows ? pkg.path.replace(/\//g, sep) : pkg.path);
+  return jspmPackagesPath + pkg.name.substr(0, registryIndex) + sep +
+      (isWindows ? pkg.name.substr(registryIndex + 1).replace(sepRegEx, sep) : pkg.name.substr(registryIndex + 1)) +
+      (isWindows ? pkg.path.replace(sepRegEx, sep) : pkg.path);
 }
 
 async function fileResolve (path) {
@@ -458,6 +460,8 @@ const dirCache = {};
 
 jspmResolve.getJspmConfig = getJspmConfig;
 async function getJspmConfig (parentPath) {
+  if (isWindows)
+    parentPath = parentPath.replace(sepRegEx, sep);
   let separatorIndex = parentPath.lastIndexOf(sep);
   let rootSeparatorIndex = parentPath.indexOf(sep);
   do {
@@ -561,8 +565,11 @@ async function readJspmConfig (dir, curConfigJspmDir) {
       readJSON(jspmPath)
     ]);
 
-    if (jspmJson)
+    if (jspmMtime) {
+      if (!jspmJson)
+        throw new TypeError(`jspm configuration file ${jspmPath} is not valid JSON.`);
       config = new JspmConfig(dir, jspmJson, pjson);
+    }
   }
 
   dirCache[dir] = { pjsonMtime, jspmPath, jspmMtime, config };
@@ -595,11 +602,13 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
 
     if (!cached || cached.jspmPath !== jspmPath)
       jspmMtime = getMtimeSync(jspmPath);
-    if (jspmMtime)
-      jspmJson = readJSONSync(jspmPath);
 
-    if (jspmJson)
+    if (jspmMtime) {
+      jspmJson = readJSONSync(jspmPath);
+      if (!jspmJson)
+        throw new TypeError(`jspm configuration file ${jspmPath} is not valid JSON.`);
       config = new JspmConfig(dir, jspmJson, pjson);
+    }
   }
 
   dirCache[dir] = { pjsonMtime, jspmPath, jspmMtime, config };

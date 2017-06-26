@@ -7,18 +7,38 @@ const pbPath = fixturesPath + 'project-boundaries' + path.sep;
 suite('jspm project nesting', () => {
   test('Custom project folders', async () => {
     var resolved = await jspmResolve('x', pbPath);
-    assert.equal(resolved, pbPath + 'lib/x.js');
+    assert.equal(resolved, path.join(pbPath, 'lib', 'x.js'));
 
     var resolved = await jspmResolve('x', pbPath, { production: true });
-    assert.equal(resolved, pbPath + 'lib/x.js');
+    assert.equal(resolved, path.join(pbPath, 'lib', 'x.js'));
 
-    var resolved = await jspmResolve('x', pbPath + 'config/');
-    assert.equal(resolved, pbPath + 'lib/x.js');
+    var resolved = await jspmResolve('x', pbPath + 'config' + path.sep);
+    assert.equal(resolved, path.join(pbPath, 'lib', 'x.js'));
+
+    var resolved = await jspmResolve('y', pbPath + 'config' + path.sep);
+    assert.equal(resolved, path.join(pbPath, 'config', 'node_modules', 'y', 'index.js'));
+
+    var resolved = await jspmResolve('y', path.join(pbPath,'config', 'node_modules') + path.sep);
+    assert.equal(resolved, path.join(pbPath, 'config', 'node_modules', 'y', 'index.js'));
+
+    var resolved = await jspmResolve('y', path.join(pbPath,'config', 'node_modules', 'y') + path.sep);
+    assert.equal(resolved, path.join(pbPath, 'config', 'node_modules', 'y', 'custom.js'));
+
+    try {
+      var resolved = await jspmResolve('y', path.join(pbPath,'config', 'node_modules', 'z') + path.sep)
+      assert(false);
+    }
+    catch (e) {
+      assert(e);
+    }
   });
-  //- jspm project nesting
-  //- file directly in jspm_packages
-  //- jspm project in jspm_packages
-  //- package.json, jspm.json directly in package
+
+  test('Basic nesting rules', () => {
+    //- jspm project nesting
+    //- file directly in jspm_packages
+    //- jspm project in jspm_packages
+    //- package.json, jspm.json directly in package
+  });
 });
 
 suite('Invalidation', () => {
