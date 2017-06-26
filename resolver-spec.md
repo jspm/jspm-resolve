@@ -28,7 +28,7 @@ through contextual relative map configuration.
 
 The jspm resolver relies on the ability to know whether a given module path should be treated as a jspm module or a NodeJS module in order to provide full compatibility.
 
-This detection is based on detecting a `jspm.json` jspm configuration as indicating a jspm package boundary, and a `node_modules` folder as indicating a NodeJS package boundary. The jspm package boundary then extends from the `jspm.json` configuration file folder through all subfolders, stopping at any `node_modules` subfolders. When a nested jspm configuration is found, the nested configuration take precedence over the lower-level configuration, only if the nested jspm boundary `package.json` file folder path does not exactly correspond to a package path of the parent project. Modules without any `jspm.json` in all their parent folder paths are treated as NodeJS modules.
+This detection is based on detecting both a `package.json` and a `jspm.json` jspm configuration as indicating a jspm package boundary, and a `node_modules` folder as indicating a NodeJS package boundary. The jspm package boundary then extends from the `package.json` configuration file folder through all subfolders, stopping at any `node_modules` subfolders. When a nested jspm configuration is found, the nested configuration take precedence over the lower-level configuration, only if the nested jspm boundary `package.json` file folder path does not exactly correspond to a package path of the parent project. Modules without a `jspm.json` and `package.json` combination in all their parent folder paths are treated as NodeJS modules.
 
 ### jspm Config File
 
@@ -224,43 +224,41 @@ These methods are designed to work on paths within the canonicals (`PACKAGE_TO_P
 
 ### Reading Configuration
 
-For a given module we need to know its jspm configuration from reading both the `jspm.json` and the `package.json` files.
+For a given module we need to know its jspm configuration from reading both the `package.json` and `jspm.json` files.
 
 This can be handled by a get configuration function along the following lines:
 
 > **GET_JSPM_CONFIG(modulePath: String)**
-> 1. Let _parentPaths_ be the array of parent paths of _modulePath_ ordered by length increasing, excluding a trailing separator.
-> 1. Let _config_ be set to _undefined_.
+> 1. Let _parentPaths_ be the array of parent paths of _modulePath_ ordered by length decreasing, excluding a trailing separator.
 > 1. For each _path_ of _parentPaths_,
 >    1. If the last path segment of _path_ is equal to _"node_modules"_ then,
->       1. Set _config_ to _undefined_.
->       1. Continue the loop.
->    1. If _config_ is not _undefined_ then,
->       1. Let _parsedPackage_ be the value of _PARSE_PACKAGE_PATH(path, config.jspmPackagesPath)_.
->       1. If _parsedPackage_ is not _undefined_ and _parsedPackage.path_ is equal to the empty string then,
+>       1. Return _undefined_.
+>    1. If _path_ contains a _"jspm_packages"_ path segment then,
+>       1. Let _jspmSubpath_ be the substring of _path_ from the first index to the end of the instance of the _"jspm_packages"_ segment.
+>       1. Let _parsedPackage_ be the value of _PARSE_PACKAGE_PATH(path, jspmSubpath)_.
+>       1. If _parsedPackage_ is _undefined_ or _parsedPackage.path_ is equal to the empty string then,
 >          1. Continue the loop.
+>    1. If the file at _"package.json"_ within the folder _path_ does not exist then,
+>       1. Continue the loop.
+>    1. Let _pjson_ be set to the output of the JSON parser applied to the contents of _"package.json"_ in _path_, continuing the loop on abrupt completion for invalid JSON.
 >    1. Let _jspmConfigPath_ be the resolved path of _"jspm.json"_ within parent folder _path_.
+>    1. If _pjson.configFiles?.jspm_ is a relative URL without backtracking,
+>       1. Set _jspmConfigPath_ to the path resolution of _pjson.configFiles.jspm_ to _path_.
 >    1. Let _jspmConfig_ be set to _undefined_.
->    1. Let _basePath_ be set to _path_.
->    1. Let _jspmPackagesPath_ be set to the resolved path of _"jspm_packages/"_ within parent folder _path_.
->    1. Let _pjson_ be set to _undefined_.
->    1. If the file at _"package.json"_ within the folder _path_ exists,
->       1. Set _pjson_ to the output of the JSON parser applied to the contents of _"package.json"_ in _path_, continuing on abrupt completion.
->       1. If _pjson?.configFiles?.jspm_ is a relative URL without backtracking,
->          1. Set _jspmConfigPath_ to the path resolution of _pjson.configFiles.jspm_ to _path_.
->       1. If _pjson?.directories?.lib is a relative path without backtracking,
+>    1. If the file at _jspmConfigPath_ exists,
+>       1. Set _jspmConfig_ to the output of the JSON parser applied to the contents of _jspmConfigPath_, continuing on abrupt completion.
+>    1. If _jspmConfig_ is not _undefined_ then,
+>       1. Let _jspmPackagesPath_ be set to the resolved path of _"jspm_packages/"_ within parent folder _path_.
+>       1. Let _basePath_ be set to _path_.
+>       1. If _pjson.directories?.lib is a relative path without backtracking,
 >          1. Set _basePath_ to the path resolution of _pjson.directories.lib_ to _path_.
->       1. If _pjson?.directories?.dist is a relative path without backtracking,
+>       1. If _pjson.directories?.dist is a relative path without backtracking,
 >          1. If the environment conditional _production_ is _true_,
 >             1. Set _basePath_ to the path resolution of _pjson.directories.dist_ to _path_.
 >       1. If _basePath_ has a trailing path separator, then remove it.
 >       1. If _basePath_ is equal to or a subpath of _jspmPackagesPath_ then,
 >          1. Set _basePath_ to _path_.
->    1. If the file at _jspmConfigPath_ exists,
->       1. Set _jspmConfig_ to the output of the JSON parser applied to the contents of _jspmConfigPath_, continuing on abrupt completion.
->       1. If _jspmConfig_ is not _undefined_ then,
->          1. Set _config_ to the object with values _{ jspmConfig, jspmPackagesPath, basePath }_.
-> 1. Return _config_.
+>       1. Return the object with values _{ jspmConfig, jspmPackagesPath, basePath }_.
 
 The return value of the above method is either `undefined` or an object of the form `{ jspmConfig, jspmPackagesPath, basePath }`.
 

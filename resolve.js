@@ -86,7 +86,7 @@ function fileResolveSync (path) {
     return path + '/index.json';
   if (isFileSync(path + '/index.node'))
     return path + '/index.node';
-  throwModuleNotFound(url.href);
+  throwModuleNotFound(path);
 }
 
 function tryParseUrl (url) {
@@ -211,13 +211,13 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
     }
 
     jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : true) ? config.basePathDev : config.basePathProduction;
+    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
   }
   else {
     if (!(config = await jspmResolve.getJspmConfig(parentPath)))
       return await nodeModuleResolve(name, parentPath, env);
     jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : true) ? config.basePathDev : config.basePathProduction;
+    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
 
     // parent plain map
     let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
@@ -342,13 +342,13 @@ function jspmResolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
     }
 
     jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : true) ? config.basePathDev : config.basePathProduction;
+    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
   }
   else {
     if (!(config = jspmResolve.getJspmConfigSync(parentPath)))
       return nodeModuleResolveSync(name, parentPath, env);
     jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : true) ? config.basePathDev : config.basePathProduction;
+    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
 
     // parent plain map
     let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
@@ -442,149 +442,73 @@ const dirCache = {};
 
 jspmResolve.getJspmConfig = getJspmConfig;
 async function getJspmConfig (parentPath) {
-  let curConfig;
-
-  // walk down through the cache to find our first fresh project config
-  // if a match and fresh then that is the starting point for main config loop
   let separatorIndex = parentPath.lastIndexOf(sep);
   let rootSeparatorIndex = parentPath.indexOf(sep);
-  // if all of the folders we walk down from are cached, then we can use the cached config
-  // otherwise we go through the main loop to evaluate back up from the cached base (if any)
-  let allCached = true;
-  do {
-    let dir = parentPath.substr(0, separatorIndex);
-    let cached = dirCache[dir];
-    if (cached) {
-      if (cached.jspmMtime !== await getMtime(cached.jspmPath) ||
-          cached.pjsonMtime && cached.pjsonMtime !== await getMtime(cached.pjsonPath)) {
-        separatorIndex = rootSeparatorIndex;
-        break;
-      }
-
-      if (cached.config) {
-        curConfig = cached.config;
-
-        if (allCached)
-          return curConfig;
-
-        separatorIndex = parentPath.indexOf(sep, separatorIndex + 1);
-        break;
-      }
-    }
-    else {
-      allCached = false;
-    }
-
-    separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
-  }
-  while (separatorIndex > rootSeparatorIndex); // (dont permit root-level project)
-
-  // main config loop
-  // walk up through the folders, following nesting rules of jspm_packages and node_modules
-  // as well as package.json and jspm.json project configurations
-  // in order to determine the final configuration
   do {
     let dir = parentPath.substr(0, separatorIndex);
 
-    // node_modules acts as a jspm project boundary
-    if (dir.endsWith(sep + 'node_modules')) {
-      curConfig = undefined;
-      continue;
-    }
+    if (dir.endsWith(sep + 'node_modules'))
+      return;
 
     // dont detect jspm projects within the jspm_packages folder until through the
     // package boundary
-    if (curConfig) {
-      if (dir.length === curConfig.jspmPackagesPath.length - 1 && dir.startsWith(curConfig.jspmPackagesPath.substr(0, curConfig.jspmPackagesPath.length - 1))
-          || dir.startsWith(curConfig.jspmPackagesPath)) {
-        let parsedPackage = parsePackagePath(dir, curConfig.jspmPackagesPath);
-        if (!parsedPackage || parsedPackage.path === '')
+    let jspmPackagesIndex = dir.indexOf(sep + 'jspm_packages');
+    if (jspmPackagesIndex !== -1) {
+      let jspmPackagesEnd = jspmPackagesIndex + 14;
+      if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
+        let jspmSubpath = dir.substr(0, jspmPackagesEnd);
+        let parsedPackage = parsePackagePath(dir, jspmSubpath);
+        if (!parsedPackage || parsedPackage.path === '') {
+          separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
           continue;
+        }
       }
     }
 
     // attempt to detect a jspm project rooted in this folder
     // will return undefined if nothing found
-    let dirConfig = await readJspmConfig(dir);
-    if (dirConfig)
-      curConfig = dirConfig;
-  }
-  while ((separatorIndex = parentPath.indexOf(sep, separatorIndex + 1)) !== -1);
+    let config = await readJspmConfig(dir);
+    if (config)
+      return config;
 
-  return curConfig;
+    separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
+  }
+  while (separatorIndex > rootSeparatorIndex)
 }
 jspmResolve.getJspmConfigSync = getJspmConfigSync;
 function getJspmConfigSync (parentPath) {
-  let curConfig;
-
-  // walk down through the cache to find our first fresh project config
-  // if a match and fresh then that is the starting point for main config loop
   let separatorIndex = parentPath.lastIndexOf(sep);
   let rootSeparatorIndex = parentPath.indexOf(sep);
-  // if all of the folders we walk down from are cached, then we can use the cached config
-  // otherwise we go through the main loop to evaluate back up from the cached base (if any)
-  let allCached = true;
-  do {
-    let dir = parentPath.substr(0, separatorIndex);
-    let cached = dirCache[dir];
-    if (cached) {
-      if (cached.jspmMtime !== getMtimeSync(cached.jspmPath) ||
-          cached.pjsonMtime && cached.pjsonMtime !== getMtimeSync(cached.pjsonPath)) {
-        separatorIndex = rootSeparatorIndex;
-        break;
-      }
-
-      if (cached.config) {
-        curConfig = cached.config;
-
-        if (allCached)
-          return curConfig;
-
-        separatorIndex = parentPath.indexOf(sep, separatorIndex + 1);
-        break;
-      }
-    }
-    else {
-      allCached = false;
-    }
-
-    separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
-  }
-  while (separatorIndex > rootSeparatorIndex); // (dont permit root-level project)
-
-  // main config loop
-  // walk up through the folders, following nesting rules of jspm_packages and node_modules
-  // as well as package.json and jspm.json project configurations
-  // in order to determine the final configuration
   do {
     let dir = parentPath.substr(0, separatorIndex);
 
-    // node_modules acts as a jspm project boundary
-    if (dir.endsWith(sep + 'node_modules')) {
-      curConfig = undefined;
-      continue;
-    }
+    if (dir.endsWith(sep + 'node_modules'))
+      return;
 
     // dont detect jspm projects within the jspm_packages folder until through the
     // package boundary
-    if (curConfig) {
-      if (dir.length === curConfig.jspmPackagesPath.length - 1 && dir.startsWith(curConfig.jspmPackagesPath.substr(0, curConfig.jspmPackagesPath.length - 1))
-          || dir.startsWith(curConfig.jspmPackagesPath)) {
-        let parsedPackage = parsePackagePath(dir, curConfig.jspmPackagesPath);
-        if (!parsedPackage || parsedPackage.path === '')
+    let jspmPackagesIndex = dir.indexOf(sep + 'jspm_packages');
+    if (jspmPackagesIndex !== -1) {
+      let jspmPackagesEnd = jspmPackagesIndex + 14;
+      if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
+        let jspmSubpath = dir.substr(0, jspmPackagesEnd);
+        let parsedPackage = parsePackagePath(dir, jspmSubpath);
+        if (!parsedPackage || parsedPackage.path === '') {
+          separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
           continue;
+        }
       }
     }
 
     // attempt to detect a jspm project rooted in this folder
     // will return undefined if nothing found
-    let dirConfig = readJspmConfigSync(dir);
-    if (dirConfig)
-      curConfig = dirConfig;
-  }
-  while ((separatorIndex = parentPath.indexOf(sep, separatorIndex + 1)) !== -1);
+    let config = readJspmConfigSync(dir);
+    if (config)
+      return config;
 
-  return curConfig;
+    separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
+  }
+  while (separatorIndex > rootSeparatorIndex)
 }
 
 /*
@@ -592,66 +516,93 @@ function getJspmConfigSync (parentPath) {
  * So it doesn't matter if it isn't fully fs-optimized
  * Populates dirCache[dir] for what it processes
  */
-async function readJspmConfig (dir) {
-  let jspmPath = dir + '/jspm.json';
-  let pjsonPath = dir + '/package.json';
+async function readJspmConfig (dir, curConfigJspmDir) {
+  let cached = dirCache[dir];
 
-  let [pjsonMtime, pjson] = await Promise.all([getMtime(pjsonPath), readJSON(pjsonPath)]);
+  let pjsonPath = dir + path.sep + 'package.json';
+  let jspmPath = cached ? cached.jspmPath : dir + path.sep + 'jspm.json';
+
+  let pjsonMtime, jspmMtime, pjson, jspmJson, config;
+
+  if (cached) {
+    [pjsonMtime, jspmMtime] = await Promise.all([getMtime(pjsonPath), getMtime(jspmPath)]);
+
+    if (pjsonMtime === cached.pjsonMtime && jspmMtime === cached.jspmMtime)
+      return cached.config;
+  }
+
+  [pjsonMtime, pjson] = await Promise.all([
+    cached ? pjsonMtime : getMtime(pjsonPath),
+    readJSON(pjsonPath)
+  ]);
 
   if (pjson) {
     if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
       jspmPath = path.resolve(dir, pjson.configFiles.jspm);
+
+    [jspmMtime, jspmJson] = await Promise.all([
+      cached && cached.jspmPath === jspmPath ? jspmMtime : getMtime(jspmPath),
+      readJSON(jspmPath)
+    ]);
+
+    if (jspmJson)
+      config = new JspmConfig(dir, jspmJson, pjson);
   }
 
-  let [jspmMtime, jspmJson] = await Promise.all([getMtime(jspmPath), readJSON(jspmPath)]);
+  dirCache[dir] = { pjsonMtime, jspmPath, jspmMtime, config };
 
-  let config;
-  if (jspmJson)
-    config = new JspmConfig(dir, jspmJson, pjson);
-
-  dirCache[dir] = { pjsonPath, pjsonMtime, jspmPath, jspmMtime, config };
-
-  if (config)
-    return config;
+  return config;
 }
 
-function readJspmConfigSync (dir) {
-  let jspmPath = dir + '/jspm.json';
-  let pjsonPath = dir + '/package.json';
+function readJspmConfigSync (dir, curConfigJspmDir) {
+  let cached = dirCache[dir];
 
-  let pjsonMtime = getMtimeSync(pjsonPath);
-  let pjson = pjsonMtime !== undefined && readJSONSync(pjsonPath);
+  let pjsonPath = dir + path.sep + 'package.json';
+  let jspmPath = cached ? cached.jspmPath : dir + path.sep + 'jspm.json';
+
+  let pjsonMtime, jspmMtime, pjson, jspmJson, config;
+
+  pjsonMtime = getMtimeSync(pjsonPath);
+
+  if (cached) {
+    jspmMtime = getMtimeSync(jspmPath);
+    if (pjsonMtime === cached.pjsonMtime && jspmMtime === cached.jspmMtime)
+      return cached.config;
+  }
+
+  if (pjsonMtime)
+    pjson = readJSONSync(pjsonPath);
 
   if (pjson) {
     if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
       jspmPath = path.resolve(dir, pjson.configFiles.jspm);
+
+    if (!cached || cached.jspmPath !== jspmPath)
+      jspmMtime = getMtimeSync(jspmPath);
+    if (jspmMtime)
+      jspmJson = readJSONSync(jspmPath);
+
+    if (jspmJson)
+      config = new JspmConfig(dir, jspmJson, pjson);
   }
 
-  let jspmMtime = getMtimeSync(jspmPath);
-  let jspmJson = jspmMtime !== undefined && readJSONSync(jspmPath);
+  dirCache[dir] = { pjsonMtime, jspmPath, jspmMtime, config };
 
-  let config;
-  if (jspmJson)
-    config = new JspmConfig(dir, jspmJson, pjson);
-
-  dirCache[dir] = { pjsonPath, pjsonMtime, jspmPath, jspmMtime, config };
-
-  if (config)
-    return config;
+  return config;
 }
 
 class JspmConfig {
   constructor (dir, jspmJson, pjson) {
-    this.basePathDev = this.basePathProduction = dir + '/';
+    this.basePathDev = this.basePathProduction = dir + sep;
     this.jspmPackagesPath = dir + '/jspm_packages/';
 
     if (pjson && typeof pjson.directories === 'object') {
       if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..'))
-        this.jspmPackagesPath = path.resolve(dir, pjson.directories.packages);
+        this.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + sep;
       if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..'))
-        this.basePathDev = this.basePathProduction = path.resolve(dir, pjson.directories.lib);
+        this.basePathDev = this.basePathProduction = path.resolve(dir, pjson.directories.lib) + sep;
       if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..'))
-        this.basePathProduction = path.resolve(dir, pjson.directories.dist);
+        this.basePathProduction = path.resolve(dir, pjson.directories.dist) + sep;
     }
 
     this.config = jspmJson;

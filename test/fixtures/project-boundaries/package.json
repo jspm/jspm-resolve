@@ -1,0 +1,9 @@
+{
+  "directories": {
+    "lib": "lib",
+    "dist": "../Blah"
+  },
+  "configFiles": {
+    "jspm": "config/jspm.json"
+  }
+}

@@ -1,6 +1,5 @@
 const assert = require('assert');
 const path = require('path');
-const URL = require('url').URL;
 const jspmResolve = require('../resolve.js');
 
 const fixturesPath = path.resolve(__dirname, 'fixtures') + path.sep;
@@ -45,7 +44,7 @@ suite('Standard Cases', () => {
     var resolved = await jspmResolve('./rel', sfPath);
     assert.equal(resolved, sfPath + 'd/index.js');
 
-    var resolved = await jspmResolve(sfPath + 'rel', new URL('file:///'));
+    var resolved = await jspmResolve(sfPath + 'rel', 'file:///');
     assert.equal(resolved, sfPath + 'd/index.js');
 
     try {
@@ -220,7 +219,7 @@ suite('Standard Cases Sync', () => {
     var resolved = jspmResolve.sync('./rel', sfPath);
     assert.equal(resolved, sfPath + 'd/index.js');
 
-    var resolved = jspmResolve.sync(sfPath + 'rel', new URL('file:///'));
+    var resolved = jspmResolve.sync(sfPath + 'rel', 'file:///');
     assert.equal(resolved, sfPath + 'd/index.js');
 
     try {
