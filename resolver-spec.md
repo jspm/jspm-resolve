@@ -127,7 +127,7 @@ Any error in any operation, including assertion errors, should be fully propagat
 
 Module specifiers are considered relative URLs, so obey URL encoding and normalization rules.
 
-This specification handles resolution in path space, similarly to the NodeJS `path.resolve` function, including handling of `.` and `..` internal segments, allowing both `/` and `\\` as separators in Windows environments with `/` converted into a `\\` on resolution, while only allowing `/` as a separator in posix environments. Valid absolute paths are well-formed file paths of the target file system with the correct separator being used.
+This specification handles resolution in path space, including handling of `.` and `..` internal segments, converting `\\` into `/` for the resolution process, before outputting a valid pathname for the environment with the correct separator at the end of resolution. Valid absolute paths are well-formed file paths of the target file system with the correct separator being used.
 
 The reason for this is that resolution in URL space with mappings results in moving between spaces as maps are in path-space, while resolution is in URL space. The first iteration of the resolver was written entirely in URL space, but converted into path space for performance and simplicity.
 
@@ -463,10 +463,10 @@ The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution alg
 
 * NodeJS core module names should not be resolved, and should throw a _Module Not Found_ error.
 * The browserify "browser" field should be respected when resolving in the browser environment (including a `false` map returning _undefined_).
-* Module names ending in `/` must always throw a not found error.
+* Module names ending in the environment path separator must always throw a not found error.
 
 Full compatility in a module loading pipeline would be formed with a wrapper along the following lines:
 
 > 1. If _name_ is a core module then return _name_.
 > 1. If _name_ ends with a _"/"_ character then set _name_ to the substring of _name_ up to the second last character.
-> 1. Return the result of _JSPM_RESOLVE(name, parentUrl)_ converted into a file path, propagating any error on abrupt completion.
+> 1. Return the result of _JSPM_RESOLVE(name, parentUrl)_, propagating any error on abrupt completion.

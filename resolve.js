@@ -6,6 +6,7 @@ const nodeResolve = require('resolve');
 
 const isWindows = process.platform === 'win32';
 const winSepRegEx = /\\/g;
+const sepRegEx = /\//g;
 const encodedSepRegEx = /%(5C|2F)/gi;
 const sep = path.sep;
 
@@ -50,7 +51,9 @@ function packageToPath (pkg, jspmPackagesPath) {
 }
 
 async function fileResolve (path) {
-  if (path[path.length - 1] === '/')
+  if (isWindows)
+    path = path.replace(sepRegEx, sep);
+  if (path[path.length - 1] === sep)
     return path;
   if (await isFile(path))
     return path;
@@ -60,17 +63,19 @@ async function fileResolve (path) {
     return path + '.json';
   if (await isFile(path + '.node'))
     return path + '.node';
-  if (await isFile(path + '/index.js'))
-    return path + '/index.js';
-  if (await isFile(path + '/index.json'))
-    return path + '/index.json';
-  if (await isFile(path + '/index.node'))
-    return path + '/index.node';
+  if (await isFile(path + sep + 'index.js'))
+    return path + sep + 'index.js';
+  if (await isFile(path + sep + 'index.json'))
+    return path + sep + 'index.json';
+  if (await isFile(path + sep + 'index.node'))
+    return path + sep + 'index.node';
   throwModuleNotFound(path);
 }
 
 function fileResolveSync (path) {
-  if (path[path.length - 1] === '/')
+  if (isWindows)
+    path = path.replace(sepRegEx, sep);
+  if (path[path.length - 1] === sep)
     return path;
   if (isFileSync(path))
     return path;
@@ -80,12 +85,12 @@ function fileResolveSync (path) {
     return path + '.json';
   if (isFileSync(path + '.node'))
     return path + '.node';
-  if (isFileSync(path + '/index.js'))
-    return path + '/index.js';
-  if (isFileSync(path + '/index.json'))
-    return path + '/index.json';
-  if (isFileSync(path + '/index.node'))
-    return path + '/index.node';
+  if (isFileSync(path + sep + 'index.js'))
+    return path + sep + 'index.js';
+  if (isFileSync(path + sep + 'index.json'))
+    return path + sep + 'index.json';
+  if (isFileSync(path + sep + 'index.node'))
+    return path + sep + 'index.node';
   throwModuleNotFound(path);
 }
 
@@ -105,6 +110,7 @@ const defaultEnv = {
 };
 
 // path is an absolute file system path with . and .. segments to be resolved
+// works only with /-separated paths
 // PERF: could we improve perf by only initializing outSegments when finding a '.' or '..' segment,
 // otherwise treating everything up to that point as one big compound segment?
 function resolvePath (path) {
@@ -159,6 +165,9 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
   let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
   let isPlain = false;
 
+  if (isWindows)
+    parentPath = parentPath.replace(winSepRegEx, '/');
+
   // PERF: test replacing string single character checks with charCodeAt numeric checks
   // Absolute path
   if (name[0] === '/') {
@@ -178,15 +187,17 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
     resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + name.replace(winSepRegEx, '/'));
   }
   // Exact package request
-  else if (resolvedPackage = parsePackageName(name)) {
+  else if (resolvedPackage = parsePackageName(name.replace(winSepRegEx, '/'))) {
     // noop
   }
   // URL
   else if (url = tryParseUrl(name)) {
-    if (url.protocol === 'file:')
+    if (url.protocol === 'file:') {
       resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
-    else
+    }
+    else {
       throwInvalidModuleName(name);
+    }
   }
   // Plain name
   else {
@@ -596,7 +607,7 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
 class JspmConfig {
   constructor (dir, jspmJson, pjson) {
     this.basePathDev = this.basePathProduction = dir + sep;
-    this.jspmPackagesPath = dir + '/jspm_packages/';
+    this.jspmPackagesPath = dir + sep + 'jspm_packages' + sep;
 
     if (pjson && typeof pjson.directories === 'object') {
       if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..'))
