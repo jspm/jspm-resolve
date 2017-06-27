@@ -240,13 +240,13 @@ This can be handled by a get configuration function along the following lines:
 >          1. Continue the loop.
 >    1. If the file at _"package.json"_ within the folder _path_ does not exist then,
 >       1. Continue the loop.
->    1. Let _pjson_ be set to the output of the JSON parser applied to the contents of _"package.json"_ in _path_, continuing the loop on abrupt completion for invalid JSON.
+>    1. Let _pjson_ be set to the output of the JSON parser applied to the contents of _"package.json"_ in _path_, throwing a _Configuration Error_ on invalid JSON.
 >    1. Let _jspmConfigPath_ be the resolved path of _"jspm.json"_ within parent folder _path_.
 >    1. If _pjson.configFiles?.jspm_ is a relative URL without backtracking,
 >       1. Set _jspmConfigPath_ to the path resolution of _pjson.configFiles.jspm_ to _path_.
 >    1. Let _jspmConfig_ be set to _undefined_.
 >    1. If the file at _jspmConfigPath_ exists,
->       1. Set _jspmConfig_ to the output of the JSON parser applied to the contents of _jspmConfigPath_, throwing a resolution error on abrupt completion.
+>       1. Set _jspmConfig_ to the output of the JSON parser applied to the contents of _jspmConfigPath_, throwing a _Configuration Error_ on invalid JSON.
 >    1. If _jspmConfig_ is not _undefined_ then,
 >       1. Let _jspmPackagesPath_ be set to the resolved path of _"jspm_packages/"_ within parent folder _path_.
 >       1. Let _basePath_ be set to _path_.
@@ -291,22 +291,25 @@ Applying the map is then the process of adding back the subpath after the match 
 >          1. Break the loop.
 > 1. If _match_ is _undefined_ then,
 >    1. Return _undefined_.
-> 1. Assert _IS_RELATIVE(match)_ or _IS_PLAIN(match)_.
+> 1. If _IS_RELATIVE(match)_ or _IS_PLAIN(match)_ is equal to false then,
+>    1. Throw an _Invalid Configuration_ error.
 > 1. Let _replacement_ be the value of _resolveMap[match]_.
 > 1. If _replacement_ is an _Object_ then,
 >    1. For each property _condition_ of _replacement_,
 >       1. If _condition_ is the name of an environment conditional that is _true_.
 >          1. Set _replacement_ to the value of _replacement[condition]_.
->          1. Assert _replacement_ is a _string_.
+>          1. If _replacement_ is not a _string_ then,
+>             1. Throw an _Invalid Configuration_ error.
 >          1. Break the loop.
 >    1. If _replacement_ is not a _string_,
 >       1. Return _undefined_.
 > 1. Otherwise, assert _replacement_ is a _string_.
 > 1. If _IS_RELATIVE(match)_ then,
->    1. Assert _IS_RELATIVE(replacement)_ or _replacement_ is equal to _"@empty"_.
->    1. Assert _replacement_ contains no _".."_ or _"."_ path segments from after the second character index.
+>    1. If _IS_RELATIVE(replacement)_ is _false_ and _replacement_ is not equal to _"@empty"_, or if _replacement_ contains any _".."_ or _"."_ path segments from after the second character index then,
+>       1. Throw an _Invalid Configuration_ error.
 > 1. Otherwise,
->    1. Assert _IS_RELATIVE(replacement)_ or _IS_PLAIN(replacement)_ or _PARSE_PACKAGE_CANONICAL(replacement)_ is not _undefined_.
+>    1. If _IS_RELATIVE(replacement)_ or _IS_PLAIN(replacement)_ is _true_ or _PARSE_PACKAGE_CANONICAL(replacement)_ is _undefined_ then,
+>    1. Throw an _Invalid Configuration_ error.
 > 1. Return _replacement_ concatenated with the substring of _name_ from the index at the length of _match_ to the end of the string.
 
 
@@ -371,7 +374,7 @@ Package name requests are supported of the form `registry:name@version[/path]`, 
 
 There is only one core reserved module name and that is `@empty`, which when used as a plain name or in maps will return `undefined` from the resolver. All other core module name matching needs to be handled outside of this resolver.
 
-The resolver will either return undefined or a resolved path string, or throw a _Module Not Found_ or _Invalid Module Name_ error.
+The resolver will either return undefined or a resolved path string, or throw a _Module Not Found_, _Invalid Module Name_ or _Invalid Configuration_ error.
 
 Package name requests and plain name requests are both considered unescaped - that is URL decoding will not be applied. URL decoding is only applied to URL-like requests.
 

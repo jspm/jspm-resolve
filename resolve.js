@@ -22,6 +22,12 @@ function throwInvalidModuleName (name) {
   throw e;
 }
 
+function throwInvalidConfig (msg) {
+  let e = new Error(msg);
+  e.code = 'INVALID_CONFIG';
+  throw e;
+}
+
 const packageRegEx = /^([a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^\/\\%]+)(\/[\s\S]*|$)/;
 function parsePackageName (name) {
   let packageMatch = name.match(packageRegEx);
@@ -273,7 +279,7 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
     let mapped = await config.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
-        throw new RangeError(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
+        throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
       resolvedPackage.path = '/';
       // (relative map is always relative)
       return await fileResolve(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
@@ -289,7 +295,7 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
     let mapped = await config.packageResolve(relPath, undefined, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
-        throw new RangeError(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
+        throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
       return await fileResolve(basePath + mapped.substr(2));
     }
   }
@@ -408,7 +414,7 @@ function jspmResolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
     let mapped = config.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
-        throw new RangeError(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
+        throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
       resolvedPackage.path = '/';
       // (relative map is always relative)
       return fileResolveSync(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
@@ -424,7 +430,7 @@ function jspmResolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
     let mapped = config.packageResolve(relPath, undefined, env);
     if (mapped) {
       if (!mapped.startsWith('./'))
-        throw new RangeError(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
+        throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
       return fileResolveSync(basePath + mapped.substr(2));
     }
   }
@@ -556,6 +562,9 @@ async function readJspmConfig (dir, curConfigJspmDir) {
     readJSON(pjsonPath)
   ]);
 
+  if (pjsonMtime && !pjson)
+    throwInvalidConfig(`Package file ${pjsonPath} is not valid JSON.`);
+
   if (pjson) {
     if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
       jspmPath = path.resolve(dir, pjson.configFiles.jspm);
@@ -567,7 +576,7 @@ async function readJspmConfig (dir, curConfigJspmDir) {
 
     if (jspmMtime) {
       if (!jspmJson)
-        throw new TypeError(`jspm configuration file ${jspmPath} is not valid JSON.`);
+        throwInvalidConfig(`jspm configuration file ${jspmPath} is not valid JSON.`);
       config = new JspmConfig(dir, jspmJson, pjson);
     }
   }
@@ -593,8 +602,11 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
       return cached.config;
   }
 
-  if (pjsonMtime)
+  if (pjsonMtime) {
     pjson = readJSONSync(pjsonPath);
+    if (!pjson)
+      throwInvalidConfig(`Package file ${pjsonPath} is not valid JSON.`);
+  }
 
   if (pjson) {
     if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
@@ -606,7 +618,7 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
     if (jspmMtime) {
       jspmJson = readJSONSync(jspmPath);
       if (!jspmJson)
-        throw new TypeError(`jspm configuration file ${jspmPath} is not valid JSON.`);
+        throwInvalidConfig(`jspm configuration file ${jspmPath} is not valid JSON.`);
       config = new JspmConfig(dir, jspmJson, pjson);
     }
   }
