@@ -117,6 +117,8 @@ The following package.json properties affect the resolution process (this is not
 * `directories.dist`: Configures the default `parentUrl` (`baseUrl`) path under the `production` environment conditional. Defaults to the value of `lib`.
 * `configFiles.jspm`: The path to the `jspm.json` file. Defaults to `"jspm.json"`.
 
+The jspm packages folder is taken to be the `jspm_packages` folder within the folder containing the `package.json` file. If this `jspm_packages` folder does not exist, then this folder is set to the system global jspm_packages folder (global cache). This folder is typically located at `~/.jspm/jspm_packages` in posix environments, and at the `%LOCALAPPDATA%\.jspm\jspm_packages` path in Windows, and can be customized by setting the `JSPM_GLOBAL_PATH` environment variable.
+
 ## Algorithms
 
 All URL operations here are handled exactly as in the WhatWG URL specification, including the handling of encodings and errors.
@@ -249,6 +251,8 @@ This can be handled by a get configuration function along the following lines:
 >       1. Set _jspmConfig_ to the output of the JSON parser applied to the contents of _jspmConfigPath_, throwing a _Configuration Error_ on invalid JSON.
 >    1. If _jspmConfig_ is not _undefined_ then,
 >       1. Let _jspmPackagesPath_ be set to the resolved path of _"jspm_packages/"_ within parent folder _path_.
+>       1. If _jspmPackagesPath_ does not exist then,
+>          1. Set _jspmPackagesPath_ to the global environment jspm packages path.
 >       1. Let _basePath_ be set to _path_.
 >       1. If _pjson.directories?.lib is a relative path without backtracking,
 >          1. Set _basePath_ to the path resolution of _pjson.directories.lib_ to _path_.
