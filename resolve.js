@@ -195,16 +195,17 @@ async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) 
       : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
     ) + name.replace(winSepRegEx, '/'));
   }
-  // Exact package request
-  else if (resolvedPackage = parsePackageName(name)) {
-    // noop
-  }
-  // URL
-  else if (url = tryParseUrl(name)) {
-    if (url.protocol === 'file:')
-      resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
-    else
-      throwInvalidModuleName(name);
+  // Exact package request or URL request
+  else if (name.indexOf(':') !== -1) {
+    resolvedPackage = parsePackageName(name);
+    // URL
+    if (!resolvedPackage) {
+      let url = tryParseUrl(name);
+      if (url.protocol === 'file:')
+        resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
+      else
+        throwInvalidModuleName(name);
+    }
   }
   // Plain name
   else {
@@ -330,16 +331,17 @@ function jspmResolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
       : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
     ) + name.replace(winSepRegEx, '/'));
   }
-  // Exact package request
-  else if (resolvedPackage = parsePackageName(name)) {
-    // noop
-  }
-  // URL
-  else if (url = tryParseUrl(name)) {
-    if (url.protocol === 'file:')
-      resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
-    else
-      throwInvalidModuleName(name);
+  // Exact package request or URL request
+  else if (name.indexOf(':') !== -1) {
+    resolvedPackage = parsePackageName(name);
+    // URL
+    if (!resolvedPackage) {
+      let url = tryParseUrl(name);
+      if (url.protocol === 'file:')
+        resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
+      else
+        throwInvalidModuleName(name);
+    }
   }
   // Plain name
   else {
