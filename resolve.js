@@ -110,14 +110,6 @@ function tryParseUrl (url) {
   catch (e) {}
 }
 
-const defaultEnv = {
-  browser: false,
-  node: true,
-  dev: true,
-  production: false,
-  default: true
-};
-
 // path is an absolute file system path with . and .. segments to be resolved
 // works only with /-separated paths
 // PERF: could we improve perf by only initializing outSegments when finding a '.' or '..' segment,
@@ -173,7 +165,7 @@ function nodeModuleResolve (name, parentPath, env) {
   if (name[name.length - 1] === '/')
     throwModuleNotFound(name);
   return new Promise((resolve, reject) => {
-    (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve)(name, {
+    (env.browser ? browserResolve : nodeResolve)(name, {
       basedir: parentPath.substr(0, parentPath.lastIndexOf(sep))
     }, (err, resolved) => err ? reject(err) : resolve(resolved));
   });
@@ -182,17 +174,50 @@ function nodeModuleResolve (name, parentPath, env) {
 function nodeModuleResolveSync (name, parentPath, env) {
   if (name[name.length - 1] === '/')
     throwModuleNotFound(name);
-  return (('browser' in env ? env.browser : false) ? browserResolve : nodeResolve).sync(name, {
+  return (env.browser ? browserResolve : nodeResolve).sync(name, {
     basedir: parentPath.substr(0, parentPath.lastIndexOf(sep))
   });
 }
 
+function setDefaultEnv (env) {
+  let browser = false, node = true, dev = true, production = false;
+
+  if (typeof env.browser === 'boolean') {
+    browser = env.browser;
+    if (typeof env.node !== 'boolean')
+      node = env.node;
+    else
+      node = !browser;
+  }
+  else if (typeof env.node === 'boolean') {
+    node = env.node;
+    browser = !node;
+  }
+  if (typeof env.production === 'boolean') {
+    production = env.production;
+    dev = !production;
+  }
+  if (typeof env.dev === 'boolean') {
+    dev = env.dev;
+    production = !dev;
+  }
+  return { browser, node, dev, production, default: true };
+}
+
+
 class JspmResolver {
-  constructor () {
+  constructor (env) {
+    this.env = setDefaultEnv(env || {});
     this.isWindows = process.platform === 'win32';
+
+    this.resolve = this.resolve.bind(this);
+    this.resolveSync = this.resolveSync.bind(this);
+    this.resolve.sync = this.resolveSync;
   }
 
-  async resolve (name, parentPath = process.cwd(), env = defaultEnv) {
+  async resolve (name, parentPath = process.cwd(), env) {
+    env = env ? setDefaultEnv(env) : this.env;
+
     let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
     let isPlain = false;
     const isWindows = this.isWindows;
@@ -254,13 +279,13 @@ class JspmResolver {
       }
 
       jspmPackagesPath = config.jspmPackagesPath;
-      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+      basePath = env.dev ? config.basePathDev : config.basePathProduction;
     }
     else {
       if (!(config = await this.getJspmConfig(parentPath)))
         return await nodeModuleResolve(name, parentPath, env);
       jspmPackagesPath = config.jspmPackagesPath;
-      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+      basePath = env.dev ? config.basePathDev : config.basePathProduction;
 
       // parent plain map
       let parentPackage = parsePackagePath(parentPath, jspmPackagesPath, isWindows);
@@ -328,7 +353,9 @@ class JspmResolver {
     return await fileResolve(resolvedPath, isWindows, this.isFile);
   }
 
-  resolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
+  resolveSync (name, parentPath = process.cwd(), env) {
+    env = env ? setDefaultEnv(env) : this.env;
+
     let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
     let isPlain = false;
     const isWindows = this.isWindows;
@@ -390,13 +417,13 @@ class JspmResolver {
       }
 
       jspmPackagesPath = config.jspmPackagesPath;
-      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+      basePath = env.dev ? config.basePathDev : config.basePathProduction;
     }
     else {
       if (!(config = this.getJspmConfigSync(parentPath)))
         return nodeModuleResolveSync(name, parentPath, env);
       jspmPackagesPath = config.jspmPackagesPath;
-      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+      basePath = env.dev ? config.basePathDev : config.basePathProduction;
 
       // parent plain map
       let parentPackage = parsePackagePath(parentPath, jspmPackagesPath, isWindows);
@@ -664,7 +691,7 @@ function applyMap (name, parentMap, env) {
     if (replacement) {
       if (typeof replacement !== 'string') {
         for (let c in replacement) {
-          if ((c in env ? env[c] : defaultEnv[c]) === true) {
+          if (env[c] === true) {
             replacement = replacement[c];
             break;
           }
@@ -680,12 +707,10 @@ function applyMap (name, parentMap, env) {
   while (separatorIndex !== -1)
 }
 
-const defaultResolver = new JspmResolver();
-const boundDefaultResolver = defaultResolver.resolve.bind(defaultResolver);
-boundDefaultResolver.sync = defaultResolver.resolveSync.bind(defaultResolver);
-boundDefaultResolver.JspmResolver = JspmResolver;
-boundDefaultResolver.applyMap = applyMap;
-module.exports = boundDefaultResolver;
+const defaultResolve = new JspmResolver().resolve;
+defaultResolve.JspmResolver = JspmResolver;
+defaultResolve.applyMap = applyMap;
+module.exports = defaultResolve;
 
 /*
  * Keyed by '/'-separated unencoded directory path without trailing '/'
