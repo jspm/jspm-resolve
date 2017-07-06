@@ -540,36 +540,11 @@ class JspmResolver {
 
   packageResolve (name, parentPackageName, config, env) {
     if (!parentPackageName)
-      return this.applyMap(name, config.map, env);
+      return applyMap(name, config.map, env);
     let packageConfig = config.dependencies[parentPackageName];
     if (!packageConfig || !packageConfig.map)
       return;
-    return this.applyMap(name, packageConfig.map, env);
-  }
-
-  applyMap (name, parentMap, env) {
-    let mapped;
-    let separatorIndex = name.length;
-    let match = name.substr(0, separatorIndex);
-    do {
-      let replacement = parentMap[match];
-      if (replacement) {
-        if (typeof replacement !== 'string') {
-          for (let c in replacement) {
-            if ((c in env ? env[c] : defaultEnv[c]) === true) {
-              replacement = replacement[c];
-              break;
-            }
-          }
-        }
-        return replacement + name.substr(match.length);
-      }
-      separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
-      match = name.substr(0, separatorIndex);
-      if (match === '.')
-        break;
-    }
-    while (separatorIndex !== -1)
+    return applyMap(name, packageConfig.map, env);
   }
 
   async isFile (path) {
@@ -671,10 +646,36 @@ class JspmResolver {
   }
 }
 
+function applyMap (name, parentMap, env) {
+  let mapped;
+  let separatorIndex = name.length;
+  let match = name.substr(0, separatorIndex);
+  do {
+    let replacement = parentMap[match];
+    if (replacement) {
+      if (typeof replacement !== 'string') {
+        for (let c in replacement) {
+          if ((c in env ? env[c] : defaultEnv[c]) === true) {
+            replacement = replacement[c];
+            break;
+          }
+        }
+      }
+      return replacement + name.substr(match.length);
+    }
+    separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
+    match = name.substr(0, separatorIndex);
+    if (match === '.')
+      break;
+  }
+  while (separatorIndex !== -1)
+}
+
 const defaultResolver = new JspmResolver();
 const boundDefaultResolver = defaultResolver.resolve.bind(defaultResolver);
 boundDefaultResolver.sync = defaultResolver.resolveSync.bind(defaultResolver);
 boundDefaultResolver.JspmResolver = JspmResolver;
+boundDefaultResolver.applyMap = applyMap;
 module.exports = boundDefaultResolver;
 
 /*
