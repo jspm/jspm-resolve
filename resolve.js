@@ -180,28 +180,29 @@ function nodeModuleResolveSync (name, parentPath, env) {
 }
 
 function setDefaultEnv (env) {
-  let browser = false, node = true, dev = true, production = false;
-
   if (typeof env.browser === 'boolean') {
-    browser = env.browser;
     if (typeof env.node !== 'boolean')
-      node = env.node;
-    else
-      node = !browser;
+      env.node = !env.browser;
   }
   else if (typeof env.node === 'boolean') {
-    node = env.node;
-    browser = !node;
+    env.browser = !env.node;
+  }
+  else {
+    env.browser = false;
+    env.node = true;
   }
   if (typeof env.production === 'boolean') {
-    production = env.production;
-    dev = !production;
+    env.dev = !env.production;
   }
-  if (typeof env.dev === 'boolean') {
-    dev = env.dev;
-    production = !dev;
+  else if (typeof env.dev === 'boolean') {
+    env.production = !env.dev;
   }
-  return { browser, node, dev, production, default: true };
+  else {
+    env.dev = true;
+    env.production = false;
+  }
+  env.default = true;
+  return env;
 }
 
 
@@ -691,13 +692,13 @@ function applyMap (name, parentMap, env) {
     if (replacement) {
       if (typeof replacement !== 'string') {
         for (let c in replacement) {
-          if (env[c] === true) {
-            replacement = replacement[c];
-            break;
-          }
+          if (env[c] === true)
+            return replacement[c] + name.substr(match.length);
         }
       }
-      return replacement + name.substr(match.length);
+      else {
+        return replacement + name.substr(match.length);
+      }
     }
     separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
     match = name.substr(0, separatorIndex);

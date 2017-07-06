@@ -139,6 +139,13 @@ suite('Standard Cases', () => {
     var resolved = await jspmResolve('c', sfPath, { browser: true });
     assert.equal(resolved, sfPath + 'c-browser.js');
 
+    try {
+      var resolved = await jspmResolve('c', sfPath, { browser: false, node: false });
+    }
+    catch (e) {
+      assert(e.message.indexOf('Cannot find module \'c\'') !== -1);
+    }
+
     var resolved = await jspmResolve('c/a', sfPath);
     assert.equal(resolved, path.join(sfPath, 'c-node', 'a.js'));
 
@@ -313,6 +320,13 @@ suite('Standard Cases Sync', () => {
 
     var resolved = jspmResolve.sync('c', sfPath, { browser: true });
     assert.equal(resolved, sfPath + 'c-browser.js');
+
+    try {
+      var resolved = jspmResolve.sync('c', sfPath, { browser: false, node: false });
+    }
+    catch (e) {
+      assert(e.message.indexOf('Cannot find module \'c\'') !== -1);
+    }
 
     var resolved = jspmResolve.sync('c/a', sfPath);
     assert.equal(resolved, path.join(sfPath, 'c-node', 'a.js'));
