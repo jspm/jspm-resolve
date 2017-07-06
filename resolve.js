@@ -401,7 +401,7 @@ class JspmResolver {
       // parent plain map
       let parentPackage = parsePackagePath(parentPath, jspmPackagesPath, isWindows);
       if (parentPackage) {
-        let mapped = this.packageResolve(name, parentPackage.name, config, env);
+        let mapped = this.packageResolveSync(name, parentPackage.name, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
             return fileResolveSync(packageToPath(parentPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFileSync);
@@ -414,7 +414,7 @@ class JspmResolver {
 
       // global plain map
       if (isPlain) {
-        let mapped = this.packageResolve(name, undefined, config, env);
+        let mapped = this.packageResolveSync(name, undefined, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
             return fileResolveSync(basePath + mapped.substr(2), isWindows, this.isFileSync);
@@ -437,7 +437,7 @@ class JspmResolver {
       if (resolvedPackage.path.length === 1)
         return packageToPath(resolvedPackage, jspmPackagesPath, isWindows);
 
-      let mapped = this.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, config, env);
+      let mapped = this.packageResolveSync('.' + resolvedPackage.path, resolvedPackage.name, config, env);
       if (mapped) {
         if (!mapped.startsWith('./'))
           throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
@@ -453,7 +453,7 @@ class JspmResolver {
     else if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
         (resolvedPath[basePath.length - 1] === sep || resolvedPath.length === basePath.length - 1)) {
       let relPath = '.' + resolvedPath.substr(basePath.length - 1);
-      let mapped = this.packageResolve(relPath, undefined, config, env);
+      let mapped = this.packageResolveSync(relPath, undefined, config, env);
       if (mapped) {
         if (!mapped.startsWith('./'))
           throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
@@ -539,6 +539,15 @@ class JspmResolver {
   }
 
   packageResolve (name, parentPackageName, config, env) {
+    if (!parentPackageName)
+      return applyMap(name, config.map, env);
+    let packageConfig = config.dependencies[parentPackageName];
+    if (!packageConfig || !packageConfig.map)
+      return;
+    return applyMap(name, packageConfig.map, env);
+  }
+
+  packageResolveSync (name, parentPackageName, config, env) {
     if (!parentPackageName)
       return applyMap(name, config.map, env);
     let packageConfig = config.dependencies[parentPackageName];
