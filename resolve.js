@@ -6,7 +6,6 @@ const fs = require('fs');
 const browserResolve = require('browser-resolve');
 const nodeResolve = require('resolve');
 
-const isWindows = process.platform === 'win32';
 const winSepRegEx = /\\/g;
 const sepRegEx = /\//g;
 const encodedSepRegEx = /%(5C|2F)/gi;
@@ -39,7 +38,7 @@ function parsePackageName (name) {
       path: packageMatch[2]
     };
 }
-function parsePackagePath (path, jspmPackagesPath) {
+function parsePackagePath (path, jspmPackagesPath, isWindows) {
   if (!path.startsWith(jspmPackagesPath.substr(0, jspmPackagesPath.length - 1)) ||
       path[jspmPackagesPath.length - 1] !== sep && path.length !== jspmPackagesPath.length - 1)
     return;
@@ -53,14 +52,14 @@ function parsePackagePath (path, jspmPackagesPath) {
       path: packageMatch[2]
     };
 }
-function packageToPath (pkg, jspmPackagesPath) {
+function packageToPath (pkg, jspmPackagesPath, isWindows) {
   let registryIndex = pkg.name.indexOf(':');
   return jspmPackagesPath + pkg.name.substr(0, registryIndex) + sep +
       (isWindows ? pkg.name.substr(registryIndex + 1).replace(sepRegEx, sep) : pkg.name.substr(registryIndex + 1)) +
       (isWindows ? pkg.path.replace(sepRegEx, sep) : pkg.path);
 }
 
-async function fileResolve (path) {
+async function fileResolve (path, isWindows, isFile) {
   if (isWindows)
     path = path.replace(sepRegEx, sep);
   if (path[path.length - 1] === sep)
@@ -82,7 +81,7 @@ async function fileResolve (path) {
   throwModuleNotFound(path);
 }
 
-function fileResolveSync (path) {
+function fileResolveSync (path, isWindows, isFileSync) {
   if (isWindows)
     path = path.replace(sepRegEx, sep);
   if (path[path.length - 1] === sep)
@@ -189,9 +188,14 @@ function nodeModuleResolveSync (name, parentPath, env) {
 }
 
 class JspmResolver {
+  constructor () {
+    this.isWindows = process.platform === 'win32';
+  }
+
   async resolve (name, parentPath = process.cwd(), env = defaultEnv) {
     let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
     let isPlain = false;
+    const isWindows = this.isWindows;
 
     // PERF: test replacing string single character checks with charCodeAt numeric checks
     // Absolute path
@@ -241,7 +245,7 @@ class JspmResolver {
           resolvedPath = decodeURIComponent(resolvedPath);
         if (!(config = await this.getJspmConfig(resolvedPath)))
           return await nodeModuleResolve(resolvedPath, parentPath, env);
-        resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath);
+        resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath, isWindows);
       }
       // package request
       else {
@@ -259,12 +263,12 @@ class JspmResolver {
       basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
 
       // parent plain map
-      let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
+      let parentPackage = parsePackagePath(parentPath, jspmPackagesPath, isWindows);
       if (parentPackage) {
         let mapped = await this.packageResolve(name, parentPackage.name, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return await fileResolve(packageToPath(parentPackage, jspmPackagesPath) + mapped.substr(2));
+            return await fileResolve(packageToPath(parentPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFile);
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -277,7 +281,7 @@ class JspmResolver {
         let mapped = await this.packageResolve(name, undefined, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return await fileResolve(basePath + mapped.substr(2));
+            return await fileResolve(basePath + mapped.substr(2), isWindows, this.isFile);
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -295,7 +299,7 @@ class JspmResolver {
 
     if (resolvedPackage) {
       if (resolvedPackage.path.length === 1)
-        return packageToPath(resolvedPackage, jspmPackagesPath);
+        return packageToPath(resolvedPackage, jspmPackagesPath, isWindows);
 
       let mapped = await this.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, config, env);
       if (mapped) {
@@ -303,10 +307,10 @@ class JspmResolver {
           throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
         resolvedPackage.path = '/';
         // (relative map is always relative)
-        return await fileResolve(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
+        return await fileResolve(packageToPath(resolvedPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFile);
       }
       else {
-        resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath);
+        resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath, isWindows);
       }
     }
 
@@ -317,16 +321,17 @@ class JspmResolver {
       if (mapped) {
         if (!mapped.startsWith('./'))
           throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-        return await fileResolve(basePath + mapped.substr(2));
+        return await fileResolve(basePath + mapped.substr(2), isWindows, this.isFile);
       }
     }
 
-    return await fileResolve(resolvedPath);
+    return await fileResolve(resolvedPath, isWindows, this.isFile);
   }
 
   resolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
     let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
     let isPlain = false;
+    const isWindows = this.isWindows;
 
     // PERF: test replacing string single character checks with charCodeAt numeric checks
     // Absolute path
@@ -376,7 +381,7 @@ class JspmResolver {
           resolvedPath = decodeURIComponent(resolvedPath);
         if (!(config = this.getJspmConfigSync(resolvedPath)))
           return nodeModuleResolveSync(resolvedPath, parentPath, env);
-        resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath);
+        resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath, isWindows);
       }
       // package request
       else {
@@ -394,12 +399,12 @@ class JspmResolver {
       basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
 
       // parent plain map
-      let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
+      let parentPackage = parsePackagePath(parentPath, jspmPackagesPath, isWindows);
       if (parentPackage) {
         let mapped = this.packageResolve(name, parentPackage.name, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return fileResolveSync(packageToPath(parentPackage, jspmPackagesPath) + mapped.substr(2));
+            return fileResolveSync(packageToPath(parentPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFileSync);
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -412,7 +417,7 @@ class JspmResolver {
         let mapped = this.packageResolve(name, undefined, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return fileResolveSync(basePath + mapped.substr(2));
+            return fileResolveSync(basePath + mapped.substr(2), isWindows, this.isFileSync);
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -430,7 +435,7 @@ class JspmResolver {
 
     if (resolvedPackage) {
       if (resolvedPackage.path.length === 1)
-        return packageToPath(resolvedPackage, jspmPackagesPath);
+        return packageToPath(resolvedPackage, jspmPackagesPath, isWindows);
 
       let mapped = this.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, config, env);
       if (mapped) {
@@ -438,10 +443,10 @@ class JspmResolver {
           throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
         resolvedPackage.path = '/';
         // (relative map is always relative)
-        return fileResolveSync(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
+        return fileResolveSync(packageToPath(resolvedPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFileSync);
       }
       else {
-        resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath);
+        resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath, isWindows);
       }
     }
 
@@ -452,15 +457,15 @@ class JspmResolver {
       if (mapped) {
         if (!mapped.startsWith('./'))
           throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-        return fileResolveSync(basePath + mapped.substr(2));
+        return fileResolveSync(basePath + mapped.substr(2), isWindows, this.isFileSync);
       }
     }
 
-    return fileResolveSync(resolvedPath);
+    return fileResolveSync(resolvedPath, isWindows, this.isFileSync);
   }
 
   async getJspmConfig (parentPath) {
-    if (isWindows)
+    if (this.isWindows)
       parentPath = parentPath.replace(sepRegEx, sep);
     let separatorIndex = parentPath.lastIndexOf(sep);
     let rootSeparatorIndex = parentPath.indexOf(sep);
@@ -477,7 +482,7 @@ class JspmResolver {
         let jspmPackagesEnd = jspmPackagesIndex + 14;
         if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
           let jspmSubpath = dir.substr(0, jspmPackagesEnd);
-          let parsedPackage = parsePackagePath(dir, jspmSubpath);
+          let parsedPackage = parsePackagePath(dir, jspmSubpath, this.isWindows);
           if (!parsedPackage || parsedPackage.path === '') {
             separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
             continue;
@@ -487,7 +492,7 @@ class JspmResolver {
 
       // attempt to detect a jspm project rooted in this folder
       // will return undefined if nothing found
-      let config = await readJspmConfig(dir);
+      let config = await readJspmConfig(this, dir);
       if (config)
         return config;
 
@@ -497,6 +502,8 @@ class JspmResolver {
   }
 
   getJspmConfigSync (parentPath) {
+    if (this.isWindows)
+      parentPath = parentPath.replace(sepRegEx, sep);
     let separatorIndex = parentPath.lastIndexOf(sep);
     let rootSeparatorIndex = parentPath.indexOf(sep);
     do {
@@ -512,7 +519,7 @@ class JspmResolver {
         let jspmPackagesEnd = jspmPackagesIndex + 14;
         if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
           let jspmSubpath = dir.substr(0, jspmPackagesEnd);
-          let parsedPackage = parsePackagePath(dir, jspmSubpath);
+          let parsedPackage = parsePackagePath(dir, jspmSubpath, this.isWindows);
           if (!parsedPackage || parsedPackage.path === '') {
             separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
             continue;
@@ -522,7 +529,7 @@ class JspmResolver {
 
       // attempt to detect a jspm project rooted in this folder
       // will return undefined if nothing found
-      let config = readJspmConfigSync(dir);
+      let config = readJspmConfigSync(this, dir);
       if (config)
         return config;
 
@@ -533,11 +540,134 @@ class JspmResolver {
 
   packageResolve (name, parentPackageName, config, env) {
     if (!parentPackageName)
-      return applyMap(name, config.map, env);
+      return this.applyMap(name, config.map, env);
     let packageConfig = config.dependencies[parentPackageName];
     if (!packageConfig || !packageConfig.map)
       return;
-    return applyMap(name, packageConfig.map, env);
+    return this.applyMap(name, packageConfig.map, env);
+  }
+
+  applyMap (name, parentMap, env) {
+    let mapped;
+    let separatorIndex = name.length;
+    let match = name.substr(0, separatorIndex);
+    do {
+      let replacement = parentMap[match];
+      if (replacement) {
+        if (typeof replacement !== 'string') {
+          for (let c in replacement) {
+            if ((c in env ? env[c] : defaultEnv[c]) === true) {
+              replacement = replacement[c];
+              break;
+            }
+          }
+        }
+        return replacement + name.substr(match.length);
+      }
+      separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
+      match = name.substr(0, separatorIndex);
+      if (match === '.')
+        break;
+    }
+    while (separatorIndex !== -1)
+  }
+
+  async isFile (path) {
+    return new Promise((resolve, reject) => {
+      fs.stat(path, (err, stats) => {
+        if (err) {
+          if (err.code === 'ENOENT')
+            resolve(false);
+          else
+            reject(err);
+        }
+        else {
+          resolve(stats.isFile());
+        }
+      });
+    });
+  }
+
+  isFileSync (path) {
+    try {
+      var stats = fs.statSync(path);
+    }
+    catch (e) {
+      if (e.code === 'ENOENT')
+        return false;
+      throw e;
+    }
+    return stats.isFile();
+  }
+
+  // returns undefined if not existing
+  // supports following symlinks
+  getMtime (path) {
+    return new Promise((resolve, reject) => {
+      fs.stat(path, (err, stats) => {
+        if (err) {
+          if (err.code === 'ENOENT')
+            resolve();
+          else
+            reject(err);
+        }
+        else {
+          resolve(stats.mtimeMs);
+        }
+      });
+    });
+  }
+
+  getMtimeSync (path) {
+    try {
+      let stats = fs.statSync(path);
+      return stats.mtimeMs;
+    }
+    catch (e) {
+      if (e.code === 'ENOENT')
+        return;
+      throw e;
+    }
+  }
+
+  // returns undefined if not existing or invalid JSON
+  async readJSON (path) {
+    let source = await new Promise((resolve, reject) => {
+      fs.readFile(path, (err, source) => {
+        if (err) {
+          if (err.code === 'ENOENT')
+            resolve();
+          else
+            reject(err);
+        }
+        else {
+          resolve(source.toString());
+        }
+      });
+    });
+    try {
+      return JSON.parse(source);
+    }
+    catch (e) {
+      return;
+    }
+  }
+
+  readJSONSync (path) {
+    try {
+      var source = fs.readFileSync(path);
+    }
+    catch (e) {
+      if (e.code === 'ENOENT')
+        return;
+      throw e;
+    }
+    try {
+      return JSON.parse(source);
+    }
+    catch (e) {
+      return;
+    }
   }
 }
 
@@ -559,7 +689,7 @@ const dirCache = {};
  * So it doesn't matter if it isn't fully fs-optimized
  * Populates dirCache[dir] for what it processes
  */
-async function readJspmConfig (dir, curConfigJspmDir) {
+async function readJspmConfig (instance, dir, curConfigJspmDir) {
   let cached = dirCache[dir];
 
   let pjsonPath = dir + path.sep + 'package.json';
@@ -568,15 +698,15 @@ async function readJspmConfig (dir, curConfigJspmDir) {
   let pjsonMtime, jspmMtime, pjson, jspmJson, config;
 
   if (cached) {
-    [pjsonMtime, jspmMtime] = await Promise.all([getMtime(pjsonPath), getMtime(jspmPath)]);
+    [pjsonMtime, jspmMtime] = await Promise.all([instance.getMtime(pjsonPath), instance.getMtime(jspmPath)]);
 
     if (pjsonMtime === cached.pjsonMtime && jspmMtime === cached.jspmMtime)
       return cached.config;
   }
 
   [pjsonMtime, pjson] = await Promise.all([
-    cached ? pjsonMtime : getMtime(pjsonPath),
-    readJSON(pjsonPath)
+    cached ? pjsonMtime : instance.getMtime(pjsonPath),
+    instance.readJSON(pjsonPath)
   ]);
 
   if (pjsonMtime && !pjson)
@@ -587,8 +717,8 @@ async function readJspmConfig (dir, curConfigJspmDir) {
       jspmPath = path.resolve(dir, pjson.configFiles.jspm);
 
     [jspmMtime, jspmJson] = await Promise.all([
-      cached && cached.jspmPath === jspmPath ? jspmMtime : getMtime(jspmPath),
-      readJSON(jspmPath)
+      cached && cached.jspmPath === jspmPath ? jspmMtime : instance.getMtime(jspmPath),
+      instance.readJSON(jspmPath)
     ]);
 
     if (jspmMtime) {
@@ -620,7 +750,7 @@ async function readJspmConfig (dir, curConfigJspmDir) {
   return config;
 }
 
-function readJspmConfigSync (dir, curConfigJspmDir) {
+function readJspmConfigSync (instance, dir, curConfigJspmDir) {
   let cached = dirCache[dir];
 
   let pjsonPath = dir + path.sep + 'package.json';
@@ -628,16 +758,16 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
 
   let pjsonMtime, jspmMtime, pjson, jspmJson, config;
 
-  pjsonMtime = getMtimeSync(pjsonPath);
+  pjsonMtime = instance.getMtimeSync(pjsonPath);
 
   if (cached) {
-    jspmMtime = getMtimeSync(jspmPath);
+    jspmMtime = instance.getMtimeSync(jspmPath);
     if (pjsonMtime === cached.pjsonMtime && jspmMtime === cached.jspmMtime)
       return cached.config;
   }
 
   if (pjsonMtime) {
-    pjson = readJSONSync(pjsonPath);
+    pjson = instance.readJSONSync(pjsonPath);
     if (!pjson)
       throwInvalidConfig(`Package file ${pjsonPath} is not valid JSON.`);
   }
@@ -647,10 +777,10 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
       jspmPath = path.resolve(dir, pjson.configFiles.jspm);
 
     if (!cached || cached.jspmPath !== jspmPath)
-      jspmMtime = getMtimeSync(jspmPath);
+      jspmMtime = instance.getMtimeSync(jspmPath);
 
     if (jspmMtime) {
-      jspmJson = readJSONSync(jspmPath);
+      jspmJson = instance.readJSONSync(jspmPath);
       if (!jspmJson)
         throwInvalidConfig(`jspm configuration file ${jspmPath} is not valid JSON.`);
 
@@ -677,127 +807,4 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
   dirCache[dir] = { pjsonMtime, jspmPath, jspmMtime, config };
 
   return config;
-}
-
-function applyMap (name, parentMap, env) {
-  let mapped;
-  let separatorIndex = name.length;
-  let match = name.substr(0, separatorIndex);
-  do {
-    let replacement = parentMap[match];
-    if (replacement) {
-      if (typeof replacement !== 'string') {
-        for (let c in replacement) {
-          if ((c in env ? env[c] : defaultEnv[c]) === true) {
-            replacement = replacement[c];
-            break;
-          }
-        }
-      }
-      return replacement + name.substr(match.length);
-    }
-    separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
-    match = name.substr(0, separatorIndex);
-    if (match === '.')
-      break;
-  }
-  while (separatorIndex !== -1)
-}
-
-async function isFile (path) {
-  return new Promise((resolve, reject) => {
-    fs.stat(path, (err, stats) => {
-      if (err) {
-        if (err.code === 'ENOENT')
-          resolve(false);
-        else
-          reject(err);
-      }
-      else {
-        resolve(stats.isFile());
-      }
-    });
-  });
-}
-
-function isFileSync (path) {
-  try {
-    var stats = fs.statSync(path);
-  }
-  catch (e) {
-    if (e.code === 'ENOENT')
-      return false;
-    throw e;
-  }
-  return stats.isFile();
-}
-
-// returns undefined if not existing
-// supports following symlinks
-function getMtime (path) {
-  return new Promise((resolve, reject) => {
-    fs.stat(path, (err, stats) => {
-      if (err) {
-        if (err.code === 'ENOENT')
-          resolve();
-        else
-          reject(err);
-      }
-      else {
-        resolve(stats.mtimeMs);
-      }
-    });
-  });
-}
-
-function getMtimeSync (path) {
-  try {
-    let stats = fs.statSync(path);
-    return stats.mtimeMs;
-  }
-  catch (e) {
-    if (e.code === 'ENOENT')
-      return;
-    throw e;
-  }
-}
-
-// returns undefined if not existing or invalid JSON
-async function readJSON (path) {
-  let source = await new Promise((resolve, reject) => {
-    fs.readFile(path, (err, source) => {
-      if (err) {
-        if (err.code === 'ENOENT')
-          resolve();
-        else
-          reject(err);
-      }
-      else {
-        resolve(source.toString());
-      }
-    });
-  });
-  try {
-    return JSON.parse(source);
-  }
-  catch (e) {
-    return;
-  }
-}
-
-function readJSONSync (path) {
-  try {
-    var source = fs.readFileSync(path);
-  }
-  catch (e) {
-    if (e.code === 'ENOENT')
-      return;
-    throw e;
-  }
-  try {
-    return JSON.parse(source);
-  }
-  catch (e) {
-    return;
-  }
 }
