@@ -1,3 +1,5 @@
+'use strict';
+
 const { URL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -168,278 +170,6 @@ function resolvePath (path) {
   return outSegments.join('');
 }
 
-module.exports = jspmResolve;
-async function jspmResolve (name, parentPath = process.cwd(), env = defaultEnv) {
-  let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
-  let isPlain = false;
-
-  // PERF: test replacing string single character checks with charCodeAt numeric checks
-  // Absolute path
-  if (name[0] === '/') {
-    resolvedPath = name.replace(winSepRegEx, '/');
-    if (resolvedPath[1] === '/') {
-      if (resolvedPath[2] === '/')
-        resolvedPath = resolvePath(resolvedPath.substr(2 + isWindows));
-      else
-        throwInvalidModuleName(name);
-    }
-    else {
-      resolvedPath = resolvePath(resolvedPath.substr(isWindows));
-    }
-  }
-  // Relative path
-  else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
-    resolvedPath = resolvePath((
-      isWindows
-      ? parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
-      : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
-    ) + name.replace(winSepRegEx, '/'));
-  }
-  // Exact package request or URL request
-  else if (name.indexOf(':') !== -1) {
-    resolvedPackage = parsePackageName(name);
-    // URL
-    if (!resolvedPackage) {
-      let url = tryParseUrl(name);
-      if (url.protocol === 'file:')
-        resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
-      else
-        throwInvalidModuleName(name);
-    }
-  }
-  // Plain name
-  else {
-    isPlain = true;
-  }
-
-  if (!isPlain) {
-    // PERF: check if this conditional makes it faster?
-    if (resolvedPath) {
-      if (resolvedPath.match(encodedSepRegEx))
-        throwInvalidModuleName(name);
-      if (resolvedPath.indexOf('%') !== -1)
-        resolvedPath = decodeURIComponent(resolvedPath);
-      if (!(config = await jspmResolve.getJspmConfig(resolvedPath)))
-        return await nodeModuleResolve(resolvedPath, parentPath, env);
-      resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath);
-    }
-    // package request
-    else {
-      if (!(config = await jspmResolve.getJspmConfig(parentPath)))
-        return await nodeModuleResolve(resolvedPath, parentPath, env);
-    }
-
-    jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
-  }
-  else {
-    if (!(config = await jspmResolve.getJspmConfig(parentPath)))
-      return await nodeModuleResolve(name, parentPath, env);
-    jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
-
-    // parent plain map
-    let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
-    if (parentPackage) {
-      let mapped = await config.packageResolve(name, parentPackage.name, env);
-      if (mapped) {
-        if (mapped.startsWith('./'))
-          return await fileResolve(packageToPath(parentPackage, jspmPackagesPath) + mapped.substr(2));
-
-        name = mapped;
-        if (resolvedPackage = parsePackageName(name))
-          isPlain = false;
-      }
-    }
-
-    // global plain map
-    if (isPlain) {
-      let mapped = await config.packageResolve(name, undefined, env);
-      if (mapped) {
-        if (mapped.startsWith('./'))
-          return await fileResolve(basePath + mapped.substr(2));
-
-        name = mapped;
-        if (resolvedPackage = parsePackageName(name))
-          isPlain = false;
-      }
-    }
-
-    // node modules fallback
-    if (isPlain) {
-      if (name === '@empty')
-        return;
-      return await nodeModuleResolve(name, parentPath, env);
-    }
-  }
-
-  if (resolvedPackage) {
-    if (resolvedPackage.path.length === 1)
-      return packageToPath(resolvedPackage, jspmPackagesPath);
-
-    let mapped = await config.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, env);
-    if (mapped) {
-      if (!mapped.startsWith('./'))
-        throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
-      resolvedPackage.path = '/';
-      // (relative map is always relative)
-      return await fileResolve(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
-    }
-    else {
-      resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath);
-    }
-  }
-
-  else if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
-      (resolvedPath[basePath.length - 1] === sep || resolvedPath.length === basePath.length - 1)) {
-    let relPath = '.' + resolvedPath.substr(basePath.length - 1);
-    let mapped = await config.packageResolve(relPath, undefined, env);
-    if (mapped) {
-      if (!mapped.startsWith('./'))
-        throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-      return await fileResolve(basePath + mapped.substr(2));
-    }
-  }
-
-  return await fileResolve(resolvedPath);
-}
-
-jspmResolve.sync = jspmResolveSync;
-function jspmResolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
-  let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
-  let isPlain = false;
-
-  // PERF: test replacing string single character checks with charCodeAt numeric checks
-  // Absolute path
-  if (name[0] === '/') {
-    resolvedPath = name.replace(winSepRegEx, '/');
-    if (resolvedPath[1] === '/') {
-      if (resolvedPath[2] === '/')
-        resolvedPath = resolvePath(resolvedPath.substr(2 + isWindows));
-      else
-        throwInvalidModuleName(name);
-    }
-    else {
-      resolvedPath = resolvePath(resolvedPath.substr(isWindows));
-    }
-  }
-  // Relative path
-  else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
-    resolvedPath = resolvePath((
-      isWindows
-      ? parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
-      : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
-    ) + name.replace(winSepRegEx, '/'));
-  }
-  // Exact package request or URL request
-  else if (name.indexOf(':') !== -1) {
-    resolvedPackage = parsePackageName(name);
-    // URL
-    if (!resolvedPackage) {
-      let url = tryParseUrl(name);
-      if (url.protocol === 'file:')
-        resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
-      else
-        throwInvalidModuleName(name);
-    }
-  }
-  // Plain name
-  else {
-    isPlain = true;
-  }
-
-  if (!isPlain) {
-    // PERF: check if this conditional makes it faster?
-    if (resolvedPath) {
-      if (resolvedPath.match(encodedSepRegEx))
-        throwInvalidModuleName(name);
-      if (resolvedPath.indexOf('%') !== -1)
-        resolvedPath = decodeURIComponent(resolvedPath);
-      if (!(config = jspmResolve.getJspmConfigSync(resolvedPath)))
-        return nodeModuleResolveSync(resolvedPath, parentPath, env);
-      resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath);
-    }
-    // package request
-    else {
-      if (!(config = jspmResolve.getJspmConfigSync(parentPath)))
-        return nodeModuleResolveSync(resolvedPath, parentPath, env);
-    }
-
-    jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
-  }
-  else {
-    if (!(config = jspmResolve.getJspmConfigSync(parentPath)))
-      return nodeModuleResolveSync(name, parentPath, env);
-    jspmPackagesPath = config.jspmPackagesPath;
-    basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
-
-    // parent plain map
-    let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
-    if (parentPackage) {
-      let mapped = config.packageResolve(name, parentPackage.name, env);
-      if (mapped) {
-        if (mapped.startsWith('./'))
-          return fileResolveSync(packageToPath(parentPackage, jspmPackagesPath) + mapped.substr(2));
-
-        name = mapped;
-        if (resolvedPackage = parsePackageName(name))
-          isPlain = false;
-      }
-    }
-
-    // global plain map
-    if (isPlain) {
-      let mapped = config.packageResolve(name, undefined, env);
-      if (mapped) {
-        if (mapped.startsWith('./'))
-          return fileResolveSync(basePath + mapped.substr(2));
-
-        name = mapped;
-        if (resolvedPackage = parsePackageName(name))
-          isPlain = false;
-      }
-    }
-
-    // node modules fallback
-    if (isPlain) {
-      if (name === '@empty')
-        return;
-      return nodeModuleResolveSync(name, parentPath, env);
-    }
-  }
-
-  if (resolvedPackage) {
-    if (resolvedPackage.path.length === 1)
-      return packageToPath(resolvedPackage, jspmPackagesPath);
-
-    let mapped = config.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, env);
-    if (mapped) {
-      if (!mapped.startsWith('./'))
-        throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
-      resolvedPackage.path = '/';
-      // (relative map is always relative)
-      return fileResolveSync(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
-    }
-    else {
-      resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath);
-    }
-  }
-
-  else if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
-      (resolvedPath[basePath.length - 1] === sep || resolvedPath.length === basePath.length - 1)) {
-    let relPath = '.' + resolvedPath.substr(basePath.length - 1);
-    let mapped = config.packageResolve(relPath, undefined, env);
-    if (mapped) {
-      if (!mapped.startsWith('./'))
-        throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-      return fileResolveSync(basePath + mapped.substr(2));
-    }
-  }
-
-  return fileResolveSync(resolvedPath);
-}
-
 function nodeModuleResolve (name, parentPath, env) {
   if (name[name.length - 1] === '/')
     throwModuleNotFound(name);
@@ -458,6 +188,364 @@ function nodeModuleResolveSync (name, parentPath, env) {
   });
 }
 
+class JspmResolver {
+  async resolve (name, parentPath = process.cwd(), env = defaultEnv) {
+    let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
+    let isPlain = false;
+
+    // PERF: test replacing string single character checks with charCodeAt numeric checks
+    // Absolute path
+    if (name[0] === '/') {
+      resolvedPath = name.replace(winSepRegEx, '/');
+      if (resolvedPath[1] === '/') {
+        if (resolvedPath[2] === '/')
+          resolvedPath = resolvePath(resolvedPath.substr(2 + isWindows));
+        else
+          throwInvalidModuleName(name);
+      }
+      else {
+        resolvedPath = resolvePath(resolvedPath.substr(isWindows));
+      }
+    }
+    // Relative path
+    else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
+      resolvedPath = resolvePath((
+        isWindows
+        ? parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
+        : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
+      ) + name.replace(winSepRegEx, '/'));
+    }
+    // Exact package request or URL request
+    else if (name.indexOf(':') !== -1) {
+      resolvedPackage = parsePackageName(name);
+      // URL
+      if (!resolvedPackage) {
+        let url = tryParseUrl(name);
+        if (url.protocol === 'file:')
+          resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
+        else
+          throwInvalidModuleName(name);
+      }
+    }
+    // Plain name
+    else {
+      isPlain = true;
+    }
+
+    if (!isPlain) {
+      // PERF: check if this conditional makes it faster?
+      if (resolvedPath) {
+        if (resolvedPath.match(encodedSepRegEx))
+          throwInvalidModuleName(name);
+        if (resolvedPath.indexOf('%') !== -1)
+          resolvedPath = decodeURIComponent(resolvedPath);
+        if (!(config = await this.getJspmConfig(resolvedPath)))
+          return await nodeModuleResolve(resolvedPath, parentPath, env);
+        resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath);
+      }
+      // package request
+      else {
+        if (!(config = await this.getJspmConfig(parentPath)))
+          return await nodeModuleResolve(resolvedPath, parentPath, env);
+      }
+
+      jspmPackagesPath = config.jspmPackagesPath;
+      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+    }
+    else {
+      if (!(config = await this.getJspmConfig(parentPath)))
+        return await nodeModuleResolve(name, parentPath, env);
+      jspmPackagesPath = config.jspmPackagesPath;
+      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+
+      // parent plain map
+      let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
+      if (parentPackage) {
+        let mapped = await this.packageResolve(name, parentPackage.name, config, env);
+        if (mapped) {
+          if (mapped.startsWith('./'))
+            return await fileResolve(packageToPath(parentPackage, jspmPackagesPath) + mapped.substr(2));
+
+          name = mapped;
+          if (resolvedPackage = parsePackageName(name))
+            isPlain = false;
+        }
+      }
+
+      // global plain map
+      if (isPlain) {
+        let mapped = await this.packageResolve(name, undefined, config, env);
+        if (mapped) {
+          if (mapped.startsWith('./'))
+            return await fileResolve(basePath + mapped.substr(2));
+
+          name = mapped;
+          if (resolvedPackage = parsePackageName(name))
+            isPlain = false;
+        }
+      }
+
+      // node modules fallback
+      if (isPlain) {
+        if (name === '@empty')
+          return;
+        return await nodeModuleResolve(name, parentPath, env);
+      }
+    }
+
+    if (resolvedPackage) {
+      if (resolvedPackage.path.length === 1)
+        return packageToPath(resolvedPackage, jspmPackagesPath);
+
+      let mapped = await this.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, config, env);
+      if (mapped) {
+        if (!mapped.startsWith('./'))
+          throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
+        resolvedPackage.path = '/';
+        // (relative map is always relative)
+        return await fileResolve(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
+      }
+      else {
+        resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath);
+      }
+    }
+
+    else if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
+        (resolvedPath[basePath.length - 1] === sep || resolvedPath.length === basePath.length - 1)) {
+      let relPath = '.' + resolvedPath.substr(basePath.length - 1);
+      let mapped = await this.packageResolve(relPath, undefined, config, env);
+      if (mapped) {
+        if (!mapped.startsWith('./'))
+          throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
+        return await fileResolve(basePath + mapped.substr(2));
+      }
+    }
+
+    return await fileResolve(resolvedPath);
+  }
+
+  resolveSync (name, parentPath = process.cwd(), env = defaultEnv) {
+    let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
+    let isPlain = false;
+
+    // PERF: test replacing string single character checks with charCodeAt numeric checks
+    // Absolute path
+    if (name[0] === '/') {
+      resolvedPath = name.replace(winSepRegEx, '/');
+      if (resolvedPath[1] === '/') {
+        if (resolvedPath[2] === '/')
+          resolvedPath = resolvePath(resolvedPath.substr(2 + isWindows));
+        else
+          throwInvalidModuleName(name);
+      }
+      else {
+        resolvedPath = resolvePath(resolvedPath.substr(isWindows));
+      }
+    }
+    // Relative path
+    else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
+      resolvedPath = resolvePath((
+        isWindows
+        ? parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
+        : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
+      ) + name.replace(winSepRegEx, '/'));
+    }
+    // Exact package request or URL request
+    else if (name.indexOf(':') !== -1) {
+      resolvedPackage = parsePackageName(name);
+      // URL
+      if (!resolvedPackage) {
+        let url = tryParseUrl(name);
+        if (url.protocol === 'file:')
+          resolvedPath = isWindows ? url.pathname.substr(1) : url.pathname;
+        else
+          throwInvalidModuleName(name);
+      }
+    }
+    // Plain name
+    else {
+      isPlain = true;
+    }
+
+    if (!isPlain) {
+      // PERF: check if this conditional makes it faster?
+      if (resolvedPath) {
+        if (resolvedPath.match(encodedSepRegEx))
+          throwInvalidModuleName(name);
+        if (resolvedPath.indexOf('%') !== -1)
+          resolvedPath = decodeURIComponent(resolvedPath);
+        if (!(config = this.getJspmConfigSync(resolvedPath)))
+          return nodeModuleResolveSync(resolvedPath, parentPath, env);
+        resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath);
+      }
+      // package request
+      else {
+        if (!(config = this.getJspmConfigSync(parentPath)))
+          return nodeModuleResolveSync(resolvedPath, parentPath, env);
+      }
+
+      jspmPackagesPath = config.jspmPackagesPath;
+      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+    }
+    else {
+      if (!(config = this.getJspmConfigSync(parentPath)))
+        return nodeModuleResolveSync(name, parentPath, env);
+      jspmPackagesPath = config.jspmPackagesPath;
+      basePath = ('dev' in env ? env.dev : 'production' in env ? !env.production : true) ? config.basePathDev : config.basePathProduction;
+
+      // parent plain map
+      let parentPackage = parsePackagePath(parentPath, jspmPackagesPath);
+      if (parentPackage) {
+        let mapped = this.packageResolve(name, parentPackage.name, config, env);
+        if (mapped) {
+          if (mapped.startsWith('./'))
+            return fileResolveSync(packageToPath(parentPackage, jspmPackagesPath) + mapped.substr(2));
+
+          name = mapped;
+          if (resolvedPackage = parsePackageName(name))
+            isPlain = false;
+        }
+      }
+
+      // global plain map
+      if (isPlain) {
+        let mapped = this.packageResolve(name, undefined, config, env);
+        if (mapped) {
+          if (mapped.startsWith('./'))
+            return fileResolveSync(basePath + mapped.substr(2));
+
+          name = mapped;
+          if (resolvedPackage = parsePackageName(name))
+            isPlain = false;
+        }
+      }
+
+      // node modules fallback
+      if (isPlain) {
+        if (name === '@empty')
+          return;
+        return nodeModuleResolveSync(name, parentPath, env);
+      }
+    }
+
+    if (resolvedPackage) {
+      if (resolvedPackage.path.length === 1)
+        return packageToPath(resolvedPackage, jspmPackagesPath);
+
+      let mapped = this.packageResolve('.' + resolvedPackage.path, resolvedPackage.name, config, env);
+      if (mapped) {
+        if (!mapped.startsWith('./'))
+          throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
+        resolvedPackage.path = '/';
+        // (relative map is always relative)
+        return fileResolveSync(packageToPath(resolvedPackage, jspmPackagesPath) + mapped.substr(2));
+      }
+      else {
+        resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath);
+      }
+    }
+
+    else if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
+        (resolvedPath[basePath.length - 1] === sep || resolvedPath.length === basePath.length - 1)) {
+      let relPath = '.' + resolvedPath.substr(basePath.length - 1);
+      let mapped = this.packageResolve(relPath, undefined, config, env);
+      if (mapped) {
+        if (!mapped.startsWith('./'))
+          throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
+        return fileResolveSync(basePath + mapped.substr(2));
+      }
+    }
+
+    return fileResolveSync(resolvedPath);
+  }
+
+  async getJspmConfig (parentPath) {
+    if (isWindows)
+      parentPath = parentPath.replace(sepRegEx, sep);
+    let separatorIndex = parentPath.lastIndexOf(sep);
+    let rootSeparatorIndex = parentPath.indexOf(sep);
+    do {
+      let dir = parentPath.substr(0, separatorIndex);
+
+      if (dir.endsWith(sep + 'node_modules'))
+        return;
+
+      // dont detect jspm projects within the jspm_packages folder until through the
+      // package boundary
+      let jspmPackagesIndex = dir.indexOf(sep + 'jspm_packages');
+      if (jspmPackagesIndex !== -1) {
+        let jspmPackagesEnd = jspmPackagesIndex + 14;
+        if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
+          let jspmSubpath = dir.substr(0, jspmPackagesEnd);
+          let parsedPackage = parsePackagePath(dir, jspmSubpath);
+          if (!parsedPackage || parsedPackage.path === '') {
+            separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
+            continue;
+          }
+        }
+      }
+
+      // attempt to detect a jspm project rooted in this folder
+      // will return undefined if nothing found
+      let config = await readJspmConfig(dir);
+      if (config)
+        return config;
+
+      separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
+    }
+    while (separatorIndex > rootSeparatorIndex)
+  }
+
+  getJspmConfigSync (parentPath) {
+    let separatorIndex = parentPath.lastIndexOf(sep);
+    let rootSeparatorIndex = parentPath.indexOf(sep);
+    do {
+      let dir = parentPath.substr(0, separatorIndex);
+
+      if (dir.endsWith(sep + 'node_modules'))
+        return;
+
+      // dont detect jspm projects within the jspm_packages folder until through the
+      // package boundary
+      let jspmPackagesIndex = dir.indexOf(sep + 'jspm_packages');
+      if (jspmPackagesIndex !== -1) {
+        let jspmPackagesEnd = jspmPackagesIndex + 14;
+        if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
+          let jspmSubpath = dir.substr(0, jspmPackagesEnd);
+          let parsedPackage = parsePackagePath(dir, jspmSubpath);
+          if (!parsedPackage || parsedPackage.path === '') {
+            separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
+            continue;
+          }
+        }
+      }
+
+      // attempt to detect a jspm project rooted in this folder
+      // will return undefined if nothing found
+      let config = readJspmConfigSync(dir);
+      if (config)
+        return config;
+
+      separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
+    }
+    while (separatorIndex > rootSeparatorIndex)
+  }
+
+  packageResolve (name, parentPackageName, config, env) {
+    if (!parentPackageName)
+      return applyMap(name, config.map, env);
+    let packageConfig = config.dependencies[parentPackageName];
+    if (!packageConfig || !packageConfig.map)
+      return;
+    return applyMap(name, packageConfig.map, env);
+  }
+}
+
+const defaultResolver = new JspmResolver();
+const boundDefaultResolver = defaultResolver.resolve.bind(defaultResolver);
+boundDefaultResolver.sync = defaultResolver.resolveSync.bind(defaultResolver);
+boundDefaultResolver.JspmResolver = JspmResolver;
+module.exports = boundDefaultResolver;
 
 /*
  * Keyed by '/'-separated unencoded directory path without trailing '/'
@@ -465,79 +553,6 @@ function nodeModuleResolveSync (name, parentPath, env) {
  * Used to store and validate both configuration positives and configuration negatives
  */
 const dirCache = {};
-
-jspmResolve.getJspmConfig = getJspmConfig;
-async function getJspmConfig (parentPath) {
-  if (isWindows)
-    parentPath = parentPath.replace(sepRegEx, sep);
-  let separatorIndex = parentPath.lastIndexOf(sep);
-  let rootSeparatorIndex = parentPath.indexOf(sep);
-  do {
-    let dir = parentPath.substr(0, separatorIndex);
-
-    if (dir.endsWith(sep + 'node_modules'))
-      return;
-
-    // dont detect jspm projects within the jspm_packages folder until through the
-    // package boundary
-    let jspmPackagesIndex = dir.indexOf(sep + 'jspm_packages');
-    if (jspmPackagesIndex !== -1) {
-      let jspmPackagesEnd = jspmPackagesIndex + 14;
-      if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
-        let jspmSubpath = dir.substr(0, jspmPackagesEnd);
-        let parsedPackage = parsePackagePath(dir, jspmSubpath);
-        if (!parsedPackage || parsedPackage.path === '') {
-          separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
-          continue;
-        }
-      }
-    }
-
-    // attempt to detect a jspm project rooted in this folder
-    // will return undefined if nothing found
-    let config = await readJspmConfig(dir);
-    if (config)
-      return config;
-
-    separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
-  }
-  while (separatorIndex > rootSeparatorIndex)
-}
-jspmResolve.getJspmConfigSync = getJspmConfigSync;
-function getJspmConfigSync (parentPath) {
-  let separatorIndex = parentPath.lastIndexOf(sep);
-  let rootSeparatorIndex = parentPath.indexOf(sep);
-  do {
-    let dir = parentPath.substr(0, separatorIndex);
-
-    if (dir.endsWith(sep + 'node_modules'))
-      return;
-
-    // dont detect jspm projects within the jspm_packages folder until through the
-    // package boundary
-    let jspmPackagesIndex = dir.indexOf(sep + 'jspm_packages');
-    if (jspmPackagesIndex !== -1) {
-      let jspmPackagesEnd = jspmPackagesIndex + 14;
-      if (dir[jspmPackagesEnd] === undefined || dir[jspmPackagesEnd] === sep) {
-        let jspmSubpath = dir.substr(0, jspmPackagesEnd);
-        let parsedPackage = parsePackagePath(dir, jspmSubpath);
-        if (!parsedPackage || parsedPackage.path === '') {
-          separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
-          continue;
-        }
-      }
-    }
-
-    // attempt to detect a jspm project rooted in this folder
-    // will return undefined if nothing found
-    let config = readJspmConfigSync(dir);
-    if (config)
-      return config;
-
-    separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
-  }
-  while (separatorIndex > rootSeparatorIndex)
-}
 
 /*
  * This function is on the cache miss path
@@ -579,7 +594,24 @@ async function readJspmConfig (dir, curConfigJspmDir) {
     if (jspmMtime) {
       if (!jspmJson)
         throwInvalidConfig(`jspm configuration file ${jspmPath} is not valid JSON.`);
-      config = new JspmConfig(dir, jspmJson, pjson);
+
+      let dirSep = dir + sep;
+      config = {
+        basePathDev: dirSep,
+        basePathProduction: dirSep,
+        jspmPackagesPath: dirSep + 'jspm_packages' + sep,
+        map: jspmJson.map || {},
+        dependencies: jspmJson.dependencies || {}
+      };
+
+      if (pjson && typeof pjson.directories === 'object') {
+        if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..'))
+          config.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + sep;
+        if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..'))
+          config.basePathDev = config.basePathProduction = path.resolve(dir, pjson.directories.lib) + sep;
+        if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..'))
+          config.basePathProduction = path.resolve(dir, pjson.directories.dist) + sep;
+      }
     }
   }
 
@@ -621,41 +653,30 @@ function readJspmConfigSync (dir, curConfigJspmDir) {
       jspmJson = readJSONSync(jspmPath);
       if (!jspmJson)
         throwInvalidConfig(`jspm configuration file ${jspmPath} is not valid JSON.`);
-      config = new JspmConfig(dir, jspmJson, pjson);
+
+      let dirSep = dir + sep;
+      config = {
+        basePathDev: dirSep,
+        basePathProduction: dirSep,
+        jspmPackagesPath: dirSep + 'jspm_packages' + sep,
+        map: jspmJson.map || {},
+        dependencies: jspmJson.dependencies || {}
+      };
+
+      if (pjson && typeof pjson.directories === 'object') {
+        if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..'))
+          config.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + sep;
+        if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..'))
+          config.basePathDev = config.basePathProduction = path.resolve(dir, pjson.directories.lib) + sep;
+        if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..'))
+          config.basePathProduction = path.resolve(dir, pjson.directories.dist) + sep;
+      }
     }
   }
 
   dirCache[dir] = { pjsonMtime, jspmPath, jspmMtime, config };
 
   return config;
-}
-
-class JspmConfig {
-  constructor (dir, jspmJson, pjson) {
-    this.basePathDev = this.basePathProduction = dir + sep;
-    this.jspmPackagesPath = dir + sep + 'jspm_packages' + sep;
-
-    if (pjson && typeof pjson.directories === 'object') {
-      if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..'))
-        this.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + sep;
-      if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..'))
-        this.basePathDev = this.basePathProduction = path.resolve(dir, pjson.directories.lib) + sep;
-      if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..'))
-        this.basePathProduction = path.resolve(dir, pjson.directories.dist) + sep;
-    }
-
-    this.config = jspmJson;
-    this.config.dependencies = this.config.dependencies || {};
-  }
-
-  packageResolve (name, parentPackageName, env) {
-    if (!parentPackageName)
-      return applyMap(name, this.config.map, env);
-    let packageConfig = this.config.dependencies[parentPackageName];
-    if (!packageConfig || !packageConfig.map)
-      return;
-    return applyMap(name, packageConfig.map, env);
-  }
 }
 
 function applyMap (name, parentMap, env) {

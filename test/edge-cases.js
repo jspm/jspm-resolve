@@ -46,6 +46,10 @@ suite('Invalidation', () => {
 });
 
 suite('Mapping edge cases', () => {
+  // do we want to support ".." segments in maps?
+  // Note that NodeJS effectively permits this via require('x/y/../z') === require('x/z')
+  // although not sure how common ecosystem use is... this may well be a deciding factor
+
   //- mapping into an absolute URL
   //- mapping into a backtracking URL
   //- mapping into a /-relative URL
