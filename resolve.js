@@ -59,46 +59,46 @@ function packageToPath (pkg, jspmPackagesPath, isWindows) {
       (isWindows ? pkg.path.replace(sepRegEx, sep) : pkg.path);
 }
 
-async function fileResolve (path, isWindows, isFile) {
-  if (isWindows)
+async function fileResolve (instance, path) {
+  if (instance.isWindows)
     path = path.replace(sepRegEx, sep);
   if (path[path.length - 1] === sep)
     return path;
-  if (await isFile(path))
+  if (await instance.isFile(path))
     return path;
-  if (await isFile(path + '.js'))
+  if (await instance.isFile(path + '.js'))
     return path + '.js';
-  if (await isFile(path + '.json'))
+  if (await instance.isFile(path + '.json'))
     return path + '.json';
-  if (await isFile(path + '.node'))
+  if (await instance.isFile(path + '.node'))
     return path + '.node';
-  if (await isFile(path + sep + 'index.js'))
+  if (await instance.isFile(path + sep + 'index.js'))
     return path + sep + 'index.js';
-  if (await isFile(path + sep + 'index.json'))
+  if (await instance.isFile(path + sep + 'index.json'))
     return path + sep + 'index.json';
-  if (await isFile(path + sep + 'index.node'))
+  if (await instance.isFile(path + sep + 'index.node'))
     return path + sep + 'index.node';
   throwModuleNotFound(path);
 }
 
-function fileResolveSync (path, isWindows, isFileSync) {
-  if (isWindows)
+function fileResolveSync (instance, path) {
+  if (instance.isWindows)
     path = path.replace(sepRegEx, sep);
   if (path[path.length - 1] === sep)
     return path;
-  if (isFileSync(path))
+  if (instance.isFileSync(path))
     return path;
-  if (isFileSync(path + '.js'))
+  if (instance.isFileSync(path + '.js'))
     return path + '.js';
-  if (isFileSync(path + '.json'))
+  if (instance.isFileSync(path + '.json'))
     return path + '.json';
-  if (isFileSync(path + '.node'))
+  if (instance.isFileSync(path + '.node'))
     return path + '.node';
-  if (isFileSync(path + sep + 'index.js'))
+  if (instance.isFileSync(path + sep + 'index.js'))
     return path + sep + 'index.js';
-  if (isFileSync(path + sep + 'index.json'))
+  if (instance.isFileSync(path + sep + 'index.json'))
     return path + sep + 'index.json';
-  if (isFileSync(path + sep + 'index.node'))
+  if (instance.isFileSync(path + sep + 'index.node'))
     return path + sep + 'index.node';
   throwModuleNotFound(path);
 }
@@ -294,7 +294,7 @@ class JspmResolver {
         let mapped = await this.packageResolve(name, parentPackage.name, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return await fileResolve(packageToPath(parentPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFile);
+            return await fileResolve(this, packageToPath(parentPackage, jspmPackagesPath, isWindows) + mapped.substr(2));
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -307,7 +307,7 @@ class JspmResolver {
         let mapped = await this.packageResolve(name, undefined, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return await fileResolve(basePath + mapped.substr(2), isWindows, this.isFile);
+            return await fileResolve(this, basePath + mapped.substr(2));
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -333,7 +333,7 @@ class JspmResolver {
           throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
         resolvedPackage.path = '/';
         // (relative map is always relative)
-        return await fileResolve(packageToPath(resolvedPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFile);
+        return await fileResolve(this, packageToPath(resolvedPackage, jspmPackagesPath, isWindows) + mapped.substr(2));
       }
       else {
         resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath, isWindows);
@@ -347,11 +347,11 @@ class JspmResolver {
       if (mapped) {
         if (!mapped.startsWith('./'))
           throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-        return await fileResolve(basePath + mapped.substr(2), isWindows, this.isFile);
+        return await fileResolve(this, basePath + mapped.substr(2));
       }
     }
 
-    return await fileResolve(resolvedPath, isWindows, this.isFile);
+    return await fileResolve(this, resolvedPath);
   }
 
   resolveSync (name, parentPath = process.cwd(), env) {
@@ -432,7 +432,7 @@ class JspmResolver {
         let mapped = this.packageResolveSync(name, parentPackage.name, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return fileResolveSync(packageToPath(parentPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFileSync);
+            return fileResolveSync(this, packageToPath(parentPackage, jspmPackagesPath, isWindows) + mapped.substr(2));
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -445,7 +445,7 @@ class JspmResolver {
         let mapped = this.packageResolveSync(name, undefined, config, env);
         if (mapped) {
           if (mapped.startsWith('./'))
-            return fileResolveSync(basePath + mapped.substr(2), isWindows, this.isFileSync);
+            return fileResolveSync(this, basePath + mapped.substr(2));
 
           name = mapped;
           if (resolvedPackage = parsePackageName(name))
@@ -471,7 +471,7 @@ class JspmResolver {
           throwInvalidConfig(`Invalid package map for ${resolvedPackage.name}. Relative path ".${resolvedPackage.path}" must map to another relative path, not "${mapped}".`);
         resolvedPackage.path = '/';
         // (relative map is always relative)
-        return fileResolveSync(packageToPath(resolvedPackage, jspmPackagesPath, isWindows) + mapped.substr(2), isWindows, this.isFileSync);
+        return fileResolveSync(this, packageToPath(resolvedPackage, jspmPackagesPath, isWindows) + mapped.substr(2));
       }
       else {
         resolvedPath = packageToPath(resolvedPackage, jspmPackagesPath, isWindows);
@@ -485,11 +485,11 @@ class JspmResolver {
       if (mapped) {
         if (!mapped.startsWith('./'))
           throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-        return fileResolveSync(basePath + mapped.substr(2), isWindows, this.isFileSync);
+        return fileResolveSync(this, basePath + mapped.substr(2));
       }
     }
 
-    return fileResolveSync(resolvedPath, isWindows, this.isFileSync);
+    return fileResolveSync(this, resolvedPath);
   }
 
   async getJspmConfig (parentPath) {
