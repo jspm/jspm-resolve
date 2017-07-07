@@ -187,7 +187,7 @@ function nodeModuleResolveSync (instance, name, parentPath, env) {
   });
 }
 
-function setDefaultEnv (env) {
+function setDefaultEnv (env, defaultEnv) {
   if (typeof env.browser === 'boolean') {
     if (typeof env.node !== 'boolean')
       env.node = !env.browser;
@@ -196,8 +196,8 @@ function setDefaultEnv (env) {
     env.browser = !env.node;
   }
   else {
-    env.browser = false;
-    env.node = true;
+    env.browser = defaultEnv.browser;
+    env.node = defaultEnv.node;
   }
   if (typeof env.production === 'boolean') {
     env.dev = !env.production;
@@ -206,8 +206,8 @@ function setDefaultEnv (env) {
     env.production = !env.dev;
   }
   else {
-    env.dev = true;
-    env.production = false;
+    env.dev = defaultEnv.dev;
+    env.production = defaultEnv.production;
   }
   env.default = true;
   return env;
@@ -216,7 +216,12 @@ function setDefaultEnv (env) {
 
 class JspmResolver {
   constructor (env) {
-    this.env = setDefaultEnv(env || {});
+    this.env = setDefaultEnv(env || {}, {
+      browser: false,
+      node: true,
+      production: false,
+      dev: true
+    });
     this.isWindows = process.platform === 'win32';
 
     this.resolve = this.resolve.bind(this);
@@ -228,7 +233,7 @@ class JspmResolver {
   }
 
   async resolve (name, parentPath = process.cwd(), env) {
-    env = env ? setDefaultEnv(env) : this.env;
+    env = env ? setDefaultEnv(env, this.env) : this.env;
 
     let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
     let isPlain = false;
@@ -366,7 +371,7 @@ class JspmResolver {
   }
 
   resolveSync (name, parentPath = process.cwd(), env) {
-    env = env ? setDefaultEnv(env) : this.env;
+    env = env ? setDefaultEnv(env, this.env) : this.env;
 
     let resolvedPath, resolvedPackage, config, jspmPackagesPath, basePath;
     let isPlain = false;

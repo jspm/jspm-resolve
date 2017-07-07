@@ -313,7 +313,7 @@ Applying the map is then the process of adding back the subpath after the match 
 >       1. Throw an _Invalid Configuration_ error.
 > 1. Otherwise,
 >    1. If _IS_RELATIVE(replacement)_ or _IS_PLAIN(replacement)_ is _true_ or _PARSE_PACKAGE_CANONICAL(replacement)_ is _undefined_ then,
->    1. Throw an _Invalid Configuration_ error.
+>       1. Throw an _Invalid Configuration_ error.
 > 1. Return _replacement_ concatenated with the substring of _name_ from the index at the length of _match_ to the end of the string.
 
 
