@@ -161,21 +161,29 @@ function resolvePath (path) {
   return outSegments.join('');
 }
 
-function nodeModuleResolve (name, parentPath, env) {
+function nodeModuleResolve (instance, name, parentPath, env) {
   if (name[name.length - 1] === '/')
     throwModuleNotFound(name);
   return new Promise((resolve, reject) => {
     (env.browser ? browserResolve : nodeResolve)(name, {
-      basedir: parentPath.substr(0, parentPath.lastIndexOf(sep))
+      basedir: parentPath.substr(0, parentPath.lastIndexOf(sep)),
+      isFile (path, cb) {
+        instance.isFile(path).then(result => cb(null, result), cb);
+      },
+      readFile (path, cb) {
+        instance.readFile(path).then(source => cb(null, source), cb);
+      }
     }, (err, resolved) => err ? reject(err) : resolve(resolved));
   });
 }
 
-function nodeModuleResolveSync (name, parentPath, env) {
+function nodeModuleResolveSync (instance, name, parentPath, env) {
   if (name[name.length - 1] === '/')
     throwModuleNotFound(name);
   return (env.browser ? browserResolve : nodeResolve).sync(name, {
-    basedir: parentPath.substr(0, parentPath.lastIndexOf(sep))
+    basedir: parentPath.substr(0, parentPath.lastIndexOf(sep)),
+    isFile: instance.isFileSync,
+    readFileSync: instance.readFileSync
   });
 }
 
@@ -214,6 +222,9 @@ class JspmResolver {
     this.resolve = this.resolve.bind(this);
     this.resolveSync = this.resolveSync.bind(this);
     this.resolve.sync = this.resolveSync;
+
+    this.isFileSync = this.isFileSync.bind(this);
+    this.readFileSync = this.readFileSync.bind(this);
   }
 
   async resolve (name, parentPath = process.cwd(), env) {
@@ -270,13 +281,13 @@ class JspmResolver {
         if (resolvedPath.indexOf('%') !== -1)
           resolvedPath = decodeURIComponent(resolvedPath);
         if (!(config = await this.getJspmConfig(resolvedPath)))
-          return await nodeModuleResolve(resolvedPath, parentPath, env);
+          return await nodeModuleResolve(this, resolvedPath, parentPath, env);
         resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath, isWindows);
       }
       // package request
       else {
         if (!(config = await this.getJspmConfig(parentPath)))
-          return await nodeModuleResolve(resolvedPath, parentPath, env);
+          return await nodeModuleResolve(this, resolvedPath, parentPath, env);
       }
 
       jspmPackagesPath = config.jspmPackagesPath;
@@ -284,7 +295,7 @@ class JspmResolver {
     }
     else {
       if (!(config = await this.getJspmConfig(parentPath)))
-        return await nodeModuleResolve(name, parentPath, env);
+        return await nodeModuleResolve(this, name, parentPath, env);
       jspmPackagesPath = config.jspmPackagesPath;
       basePath = env.dev ? config.basePathDev : config.basePathProduction;
 
@@ -319,7 +330,7 @@ class JspmResolver {
       if (isPlain) {
         if (name === '@empty')
           return;
-        return await nodeModuleResolve(name, parentPath, env);
+        return await nodeModuleResolve(this, name, parentPath, env);
       }
     }
 
@@ -408,13 +419,13 @@ class JspmResolver {
         if (resolvedPath.indexOf('%') !== -1)
           resolvedPath = decodeURIComponent(resolvedPath);
         if (!(config = this.getJspmConfigSync(resolvedPath)))
-          return nodeModuleResolveSync(resolvedPath, parentPath, env);
+          return nodeModuleResolveSync(this, resolvedPath, parentPath, env);
         resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath, isWindows);
       }
       // package request
       else {
         if (!(config = this.getJspmConfigSync(parentPath)))
-          return nodeModuleResolveSync(resolvedPath, parentPath, env);
+          return nodeModuleResolveSync(this, resolvedPath, parentPath, env);
       }
 
       jspmPackagesPath = config.jspmPackagesPath;
@@ -422,7 +433,7 @@ class JspmResolver {
     }
     else {
       if (!(config = this.getJspmConfigSync(parentPath)))
-        return nodeModuleResolveSync(name, parentPath, env);
+        return nodeModuleResolveSync(this, name, parentPath, env);
       jspmPackagesPath = config.jspmPackagesPath;
       basePath = env.dev ? config.basePathDev : config.basePathProduction;
 
@@ -457,7 +468,7 @@ class JspmResolver {
       if (isPlain) {
         if (name === '@empty')
           return;
-        return nodeModuleResolveSync(name, parentPath, env);
+        return nodeModuleResolveSync(this, name, parentPath, env);
       }
     }
 
@@ -642,44 +653,14 @@ class JspmResolver {
     }
   }
 
-  // returns undefined if not existing or invalid JSON
-  async readJSON (path) {
-    let source = await new Promise((resolve, reject) => {
-      fs.readFile(path, (err, source) => {
-        if (err) {
-          if (err.code === 'ENOENT')
-            resolve();
-          else
-            reject(err);
-        }
-        else {
-          resolve(source.toString());
-        }
-      });
+  readFile (path) {
+    return new Promise((resolve, reject) => {
+      fs.readFile(path, (err, source) => err ? reject(err) : resolve(source.toString()));
     });
-    try {
-      return JSON.parse(source);
-    }
-    catch (e) {
-      return;
-    }
   }
 
-  readJSONSync (path) {
-    try {
-      var source = fs.readFileSync(path);
-    }
-    catch (e) {
-      if (e.code === 'ENOENT')
-        return;
-      throw e;
-    }
-    try {
-      return JSON.parse(source);
-    }
-    catch (e) {
-      return;
-    }
+  readFileSync (path) {
+    return fs.readFileSync(path);
   }
 }
 
@@ -742,7 +723,13 @@ async function readJspmConfig (instance, dir, curConfigJspmDir) {
 
   [pjsonMtime, pjson] = await Promise.all([
     cached ? pjsonMtime : instance.getMtime(pjsonPath),
-    instance.readJSON(pjsonPath)
+    instance.readFile(pjsonPath)
+    .then(source => JSON.parse(source))
+    .catch(e => {
+      if (e && e.code === 'ENOENT' || e instanceof SyntaxError)
+        return;
+      throw e;
+    })
   ]);
 
   if (pjsonMtime && !pjson)
@@ -754,7 +741,13 @@ async function readJspmConfig (instance, dir, curConfigJspmDir) {
 
     [jspmMtime, jspmJson] = await Promise.all([
       cached && cached.jspmPath === jspmPath ? jspmMtime : instance.getMtime(jspmPath),
-      instance.readJSON(jspmPath)
+      instance.readFile(jspmPath)
+      .then(source => JSON.parse(source))
+      .catch(e => {
+        if (e && e.code === 'ENOENT' || e instanceof SyntaxError)
+          return;
+        throw e;
+      })
     ]);
 
     if (jspmMtime) {
@@ -803,7 +796,14 @@ function readJspmConfigSync (instance, dir, curConfigJspmDir) {
   }
 
   if (pjsonMtime) {
-    pjson = instance.readJSONSync(pjsonPath);
+    try {
+      pjson = JSON.parse(instance.readFileSync(pjsonPath));
+    }
+    catch (e) {
+      if (e && e.code === 'ENOENT' || e instanceof SyntaxError)
+        return;
+      throw e;
+    }
     if (!pjson)
       throwInvalidConfig(`Package file ${pjsonPath} is not valid JSON.`);
   }
@@ -816,7 +816,14 @@ function readJspmConfigSync (instance, dir, curConfigJspmDir) {
       jspmMtime = instance.getMtimeSync(jspmPath);
 
     if (jspmMtime) {
-      jspmJson = instance.readJSONSync(jspmPath);
+      try {
+        jspmJson = JSON.parse(instance.readFileSync(jspmPath));
+      }
+      catch (e) {
+        if (e && e.code === 'ENOENT' || e instanceof SyntaxError)
+          return;
+        throw e;
+      }
       if (!jspmJson)
         throwInvalidConfig(`jspm configuration file ${jspmPath} is not valid JSON.`);
 
