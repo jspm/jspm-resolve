@@ -373,7 +373,7 @@ class JspmResolver {
     return await fileResolve(this, resolvedPath);
   }
 
-  resolveSync (name, parentPath = process.cwd(), env) {
+  resolveSync (name, parentPath, env) {
     if (!parentPath)
       parentPath = this.config ? this.config.basePath : process.cwd();
     env = env ? setDefaultEnv(env, this.env) : this.env;
@@ -567,7 +567,7 @@ class JspmResolver {
         if (jspmJson) {
           let dirSep = dir + sep;
           let config = {
-            basePath: dir,
+            basePath: dirSep,
             localPackagePathDev: dirSep,
             localPackagePathProduction: dirSep,
             jspmPackagesPath: dirSep + 'jspm_packages' + sep,
@@ -594,46 +594,82 @@ class JspmResolver {
   }
 
   async isCommonJS (resolvedModulePath) {
-    // fill in...
-    let parentPackagePath = path.dirname(resolvedModulePath);
-    let pcfg = this.pjsonConfigCache[parentPackagePath];
-    if (!pcfg) {
-      try {
-        let pjson = JSON.parse(await this.readFile(parentPackagePath + sep + 'package.json'));
-        pcfg = processPjsonConfig(pjson);
+    let separatorIndex = resolvedModulePath.lastIndexOf(sep);
+    let rootSeparatorIndex = resolvedModulePath.indexOf(sep);
+    let isJspmProject = this.getJspmConfig(resolvedModulePath) !== undefined;
+    while (separatorIndex > rootSeparatorIndex) {
+      let parentPath = resolvedModulePath.substr(0, separatorIndex);
+      let pcfg;
+      if (parentPath in this.pjsonConfigCache) {
+        pcfg = this.pjsonConfigCache[parentPath];
       }
-      catch (e) {
-        if (e && e.code === 'ENOENT')
-          pcfg = {};
-        else
-          throw e;
+      else {
+        try {
+          let pjson = JSON.parse(await this.readFile(parentPath + sep + 'package.json'));
+          pcfg = processPjsonConfig(pjson, isJspmProject);
+        }
+        catch (e) {
+          if (!e || e.code !== 'ENOENT')
+            throw e;
+        }
+        this.pjsonConfigCache[parentPath] = pcfg;
       }
-      this.pjsonConfigCache[parentPackagePath] = pcfg;
+      if (pcfg)
+        return !pcfg.module;
+      separatorIndex = resolvedModulePath.lastIndexOf(sep, separatorIndex - 1);
     }
+    return isJspmProject;
+  }
 
-    return pcfg.module === false;
+  isCommonJSSync (resolvedModulePath) {
+    let separatorIndex = resolvedModulePath.lastIndexOf(sep);
+    let rootSeparatorIndex = resolvedModulePath.indexOf(sep);
+    let isJspmProject = this.getJspmConfig(resolvedModulePath) !== undefined;
+    while (separatorIndex > rootSeparatorIndex) {
+      let parentPath = resolvedModulePath.substr(0, separatorIndex);
+      let pcfg;
+      if (parentPath in this.pjsonConfigCache) {
+        pcfg = this.pjsonConfigCache[parentPath];
+      }
+      else {
+        try {
+          let pjson = JSON.parse(this.readFileSync(parentPath + sep + 'package.json'));
+          pcfg = processPjsonConfig(pjson, isJspmProject);
+        }
+        catch (e) {
+          if (!e || e.code !== 'ENOENT')
+            throw e;
+        }
+        this.pjsonConfigCache[parentPath] = pcfg;
+      }
+      if (pcfg)
+        return !pcfg.module;
+      separatorIndex = resolvedModulePath.lastIndexOf(sep, separatorIndex - 1);
+    }
+    return isJspmProject;
   }
 
   async packageMap (name, parentPackagePath, config, env) {
     if (parentPackagePath === undefined)
       parentPackagePath = config.basePath;
 
-    let pcfg = this.pjsonConfigCache[parentPackagePath];
-    if (!pcfg) {
+    let pcfg;
+    if (parentPackagePath in this.pjsonConfigCache) {
+      pcfg = this.pjsonConfigCache[parentPackagePath];
+    }
+    else {
       try {
         let pjson = JSON.parse(await this.readFile(parentPackagePath + sep + 'package.json'));
-        pcfg = processPjsonConfig(pjson);
+        pcfg = processPjsonConfig(pjson, true);
       }
       catch (e) {
-        if (e && e.code === 'ENOENT')
-          pcfg = {};
-        else
+        if (!e || e.code !== 'ENOENT')
           throw e;
       }
       this.pjsonConfigCache[parentPackagePath] = pcfg;
     }
 
-    if (pcfg.map)
+    if (pcfg && pcfg.map)
       return applyMap(name, pcfg.map, env);
   }
 
@@ -641,21 +677,23 @@ class JspmResolver {
     if (parentPackagePath === undefined)
       parentPackagePath = config.basePath;
 
-    let pcfg = this.pjsonConfigCache[parentPackagePath];
-    if (!pcfg) {
+    let pcfg;
+    if (parentPackagePath in this.pjsonConfigCache) {
+      pcfg = this.pjsonConfigCache[parentPackagePath];
+    }
+    else {
       try {
-        var pjson = JSON.parse(this.readFileSync(parentPackagePath + sep + 'package.json'));
+        let pjson = JSON.parse(this.readFileSync(parentPackagePath + sep + 'package.json'));
+        pcfg = processPjsonConfig(pjson, true);
       }
       catch (e) {
-        if (e && e.code === 'ENOENT')
-          pjson = {};
-        else
+        if (!e || e.code !== 'ENOENT')
           throw e;
       }
-      pcfg = this.pjsonConfigCache[parentPackagePath] = processPjsonConfig(pjson);
+      this.pjsonConfigCache[parentPackagePath] = pcfg;
     }
 
-    if (pcfg.map)
+    if (pcfg && pcfg.map)
       return applyMap(name, pcfg.map, env);
   }
 
@@ -748,9 +786,9 @@ function applyMap (name, parentMap, env) {
   while (separatorIndex !== -1)
 }
 
-function processPjsonConfig (pjson) {
+function processPjsonConfig (pjson, moduleDefault) {
   let pcfg = {
-    module: pjson.module === false ? false : true
+    module: typeof pjson.module === 'boolean' ? pjson.module : moduleDefault
   };
 
   if (pjson.main) {
@@ -798,6 +836,7 @@ function processPjsonConfig (pjson) {
   }
 
   if (typeof pjson.module === 'string') {
+    // pcfg.module = true;
     pcfg.map = pcfg.map || {};
     pcfg.map['.'] = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
   }

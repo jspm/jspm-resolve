@@ -193,6 +193,17 @@ suite('Standard Cases', () => {
     var resolved = await subResolve.resolve('pkg', sfPath);
     assert.equal(resolved, path.join(sfPath, 'jspm_packages', 'ra', 'pkg@version', 'index.js'));
   });
+  
+  test('Module format', async () => {
+    let pkgAModule = jspmResolve.resolveSync('pkg');
+    assert.equal(await jspmResolve.isCommonJS(pkgAModule), true);
+
+    let pkgBModule = jspmResolve.resolveSync('pkg2');
+    assert.equal(await jspmResolve.isCommonJS(pkgBModule), false);
+
+    let outerModule = jspmResolve.resolveSync('../../../resolve.js');
+    assert.equal(await jspmResolve.isCommonJS(outerModule), true);
+  });
 });
 
 suite('Standard Cases Sync', () => {
@@ -378,5 +389,16 @@ suite('Standard Cases Sync', () => {
 
     var resolved = subResolve.resolveSync('pkg', sfPath);
     assert.equal(resolved, path.join(sfPath, 'jspm_packages', 'ra', 'pkg@version', 'index.js'));
+  });
+
+  test('Module format', async () => {
+    let pkgAModule = jspmResolve.resolveSync('pkg');
+    assert.equal(jspmResolve.isCommonJSSync(pkgAModule), true);
+
+    let pkgBModule = jspmResolve.resolveSync('pkg2');
+    assert.equal(jspmResolve.isCommonJSSync(pkgBModule), false);
+
+    let outerModule = jspmResolve.resolveSync('../../../resolve.js');
+    assert.equal(jspmResolve.isCommonJSSync(outerModule), true);
   });
 });
