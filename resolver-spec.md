@@ -286,12 +286,10 @@ To convert a package between these forms, the following methods are defined:
 > 1. Assert _jspmPackagesPath_ is a valid file system path.
 > 1. Assert _jspmPackagesPath_ ends with the path segment _"jspm_packages"_.
 > 1. Assert _name_ satisfies the valid package name regular expression.
-> 1. Assert _path_ is empty or it does not start with _"/"_.
 > 1. Replace in _name_ the first _":"_ character with the file system path separator.
 > 1. If running in Windows then,
 >    1. Replace any instance of _"/"_ in _name_ with _"\\"_.
->    1. Replace any instance of _"/"_ in _path_ with _"\\"_.
-> 1. Return the result of the path resolution of _"${name}${path}"_ within parent _jspmPackagesParent_.
+> 1. Return the result of the path resolution of _"${name}"_ within parent _jspmPackagesParent_.
 
 The parse functions return undefined if not a valid package canonical name form, while the package to URL function must
 always be called against a valid package canonical name form.
@@ -403,12 +401,9 @@ Applying the map is then the process of adding back the subpath after the match 
 >    1. For each property _condition_ of _replacement_,
 >       1. If _condition_ is the name of an environment conditional that is _true_.
 >          1. Set _replacement_ to the value of _replacement[condition]_.
->          1. If _replacement_ is an object then,
->             1. Continue the next loop iteration.
->          1. Break the loop.
->    1. If _replacement_ is not a _string_,
->       1. Return _undefined_.
-> 1. Otherwise, assert _replacement_ is a _string_.
+>          1. Continue the next outer loop iteration.
+>    1. Return _undefined_.
+> 1. Assert _replacement_ is a _string_.
 > 1. If _IS_RELATIVE(match)_ then,
 >    1. If _IS_RELATIVE(replacement)_ is _false_ and _replacement_ is not equal to _"@empty"_, or if _replacement_ contains any _".."_ or _"."_ path segments from after the second character index then,
 >       1. Throw an _Invalid Configuration_ error.
@@ -424,6 +419,8 @@ Like the NodeJS module resolution, jspm 2.0 supports automatic extension and dir
 
 There is one exception added to this which is that if a path ends in a separator character it is allowed not to resolve at all,
 in order to support directory resolution utility functions.
+
+In addition, jspm does not implement the real path lookup for modules loaded. This allows globally and locally linked packages to be scoped to the project they are loaded in, so the entire resolution for the project is managed through a single jspm configuration file despite many packages possibly being linked in.
 
 The full algorithm applied with this directory addition is:
 
@@ -490,25 +487,23 @@ Before resolution can be run, the resolver needs to be initialized against a _pr
 
 > **JSPM_RESOLVE_INIT(projectPath: string)**
 > 1. Let _config_ be the return value of _GET_JSPM_CONFIG(projectPath)_.
-> 1. If _config_ is _undefined_ then,
->    1. Throw a _Jspm Project Not Found_ error.
-> 1. Let _jspmConfig_, _jspmPackagesPath_, _localPackagePath_, _projectBasePath_ be the destructured values of _config_.
-> 1. Set the [[jspmConfig]] internal property to _jspmConfig_.
-> 1. Set the [[jspmPackagesPath]] internal property to _jspmPackagesPath_.
-> 1. Set the [[localPackagePath]] internal property to _localPackagePath_.
-> 1. Set the [[projectBasePath]] internal property to _projectBasePath_.
+> 1. If _config_ is not _undefined_ then,
+>    1. Let _jspmConfig_, _jspmPackagesPath_, _localPackagePath_, _projectBasePath_ be the destructured values of _config_.
+>    1. Set the [[jspmConfig]] internal property to _jspmConfig_.
+>    1. Set the [[jspmPackagesPath]] internal property to _jspmPackagesPath_.
+>    1. Set the [[localPackagePath]] internal property to _localPackagePath_.
+>    1. Set the [[projectBasePath]] internal property to _projectBasePath_.
 
 The resolution algorithm breaks down into the following high-level process to get the fully resolved URL:
 
 > **JSPM_RESOLVE(name: string, parentPath: string)**
 > 1. Assert _parentPath_ is a valid absolute file system path.
 > 1. If _parentPath_ is not contained within _[[projectBasePath]]_ then,
->    1. If _GET_JSPM_CONFIG(parentPath)_ is not _undefined_ then,
->       1. Let _R_ be the resolver initialized to the the project path _parentPath_.
->       1. Return the result of _R.JSPM_RESOLVE(name, parentPath)_.
->    1. Otherwise,
->       1. Return the result of _NODE_RESOLVE(name, parentPath)_.
+>    1. Let _R_ be a new resolver initialized against the parent path _parentPath_.
+>    1. Return the result of _R.JSPM_RESOLVE(name, parentPath)_.
 > 1. If _IS_PLAIN(name)_ then,
+>    1. If _[[jspmConfig]]_ is _undefined_ then,
+>       1. Return the result of _NODE_RESOLVE(name, parentPath)_.
 >    1. Let _parentPackage_ be the result of _PARSE_PACKAGE_PATH(parentPath, [[jspmPackagesPath]])_.
 >    1. If _parentPackage_ is not _undefined_ then,
 >       1. Let _parentPackagePath_ be the value of _PACKAGE_TO_PATH(parentPackage, [[jspmPackagesPath]])_.
@@ -542,6 +537,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Return the result of _NODE_RESOLVE(name, parentPath)_.
 > 1. Let _resolved_ be equal to _undefined_.
 > 1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_CANONICAL(name)_.
+> 1. If _resolvedPackage_ is not _undefined_ and  _[[jspmConfig]]_ is _undefined_ then,
+>    1. Throw an _Invalid Module Name_ error.
 > 1. If _resolvedPackage_ is _undefined_ then,
 >    1. Replace in _name_ all ocurrences of _"\\"_ with _"/"_ (relative paths like _".\\"_ detect as plain names above, thrown as not found before reaching here)
 >    1. If _name_ contains the substring _"%2F"_ or _"%5C"_ then,
@@ -561,13 +558,11 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. If _name_ is not a file URL then,
 >          1. Throw an _Invalid Module Name_ error.
 >       1. Set _resolved_ to the absolute file system path of the file URL _name_.
->    1. If _resolved_ is not contained within the path _[[projectBasePath]]_ then,
->       1. If _GET_JSPM_CONFIG(resolved)_ is not _undefined_ then,
->          1. Let _R_ be the resolver initialized to the the project path _resolved_.
->          1. Return the result of _R.JSPM_RESOLVE(resolved)_.
->       1. Otherwise,
->          1. Return the result of _NODE_RESOLVE(name, parentPath)_.
->    1. Set _resolvedPackage_ to the result of _PARSE_PACKAGE_PATH(resolved, jspmPackagesPath)_.
+>    1. If _resolved_ is not contained within _[[projectBasePath]]_ then,
+>       1. Let _R_ be a new resolver initialized against the parent path _parentPath_.
+>       1. Return the result of _R.JSPM_RESOLVE(resolved, parentPath)_.
+>    1. If _[[jspmConfig]]_ is not _undefined_ then,
+>       1. Set _resolvedPackage_ to the result of _PARSE_PACKAGE_PATH(resolved, [[jspmPackagesPath]])_.
 > 1. If _resolvedPackage_ is not _undefined_ then,
 >    1. If _resolvedPackage.path_ is equal to _"/"_ then,
 >       1. Return _resolved_.

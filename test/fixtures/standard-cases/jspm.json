@@ -1,35 +1,6 @@
 {
-  "map": {
-    "a": "./b",
-    "a/c": "./b",
-    "./rel": "./d",
+  "resolve": {
     "pkg": "ra:pkg@version",
-    "pkg2": "ra:pkg@version2",
-    "p": "pkg",
-    "./fail": "fail",
-    "c": {
-      "browser": "./c-browser",
-      "node": "./c-node"
-    }
-  },
-  "dependencies": {
-    "ra:pkg@version": {
-      "map": {
-        "x": "./y",
-        "./z": "./a",
-        "p": "a",
-        "c": {
-          "browser": "./c-browser",
-          "node": "./c-node"
-        },
-        "./fail": "fail"
-      }
-    },
-    "ra:pkg@version2": {
-      "map": {
-        ".": "./a",
-        "./a": "./b"
-      }
-    }
+    "pkg2": "ra:pkg@version2"
   }
 }

@@ -1,31 +1,34 @@
 const assert = require('assert');
 const path = require('path');
-const jspmResolve = require('../resolve.js');
+const JspmResolver = require('../resolve.js');
 
 const fixturesPath = path.resolve(__dirname, 'fixtures') + path.sep;
 const pbPath = fixturesPath + 'project-boundaries' + path.sep;
+
 suite('jspm project nesting', () => {
+  const jspmResolve = new JspmResolver(pbPath);
+
   test('Custom project folders', async () => {
-    var resolved = await jspmResolve('x', pbPath);
+    var resolved = await jspmResolve.resolve('x', pbPath);
     assert.equal(resolved, path.join(pbPath, 'lib', 'x.js'));
 
-    var resolved = await jspmResolve('x', pbPath, { production: true });
+    var resolved = await jspmResolve.resolve('x', pbPath, { production: true });
     assert.equal(resolved, path.join(pbPath, 'lib', 'x.js'));
 
-    var resolved = await jspmResolve('x', pbPath + 'config' + path.sep);
+    var resolved = await jspmResolve.resolve('x', pbPath + 'config' + path.sep);
     assert.equal(resolved, path.join(pbPath, 'lib', 'x.js'));
 
-    var resolved = await jspmResolve('y', pbPath + 'config' + path.sep);
+    var resolved = await jspmResolve.resolve('y', pbPath + 'config' + path.sep);
     assert.equal(resolved, path.join(pbPath, 'config', 'node_modules', 'y', 'index.js'));
 
-    var resolved = await jspmResolve('y', path.join(pbPath,'config', 'node_modules') + path.sep);
+    var resolved = await jspmResolve.resolve('y', path.join(pbPath,'config', 'node_modules') + path.sep);
     assert.equal(resolved, path.join(pbPath, 'config', 'node_modules', 'y', 'index.js'));
 
-    var resolved = await jspmResolve('y', path.join(pbPath,'config', 'node_modules', 'y') + path.sep);
-    assert.equal(resolved, path.join(pbPath, 'config', 'node_modules', 'y', 'custom.js'));
+    var resolved = await jspmResolve.resolve('y', path.join(pbPath,'config', 'node_modules', 'y') + path.sep);
+    assert.equal(resolved, path.join(pbPath, 'config', 'node_modules', 'y', 'index.js'));
 
     try {
-      var resolved = await jspmResolve('y', path.join(pbPath,'config', 'node_modules', 'z') + path.sep)
+      var resolved = await jspmResolve.resolve('y', path.join(pbPath,'config', 'node_modules', 'z') + path.sep)
       assert(false);
     }
     catch (e) {

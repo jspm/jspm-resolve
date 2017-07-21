@@ -1,9 +1,13 @@
 {
   "directories": {
     "lib": "lib",
-    "dist": "../Blah"
+    "dist": "../Blah",
+    "packages": "x/jspm_packages"
   },
   "configFiles": {
     "jspm": "config/jspm.json"
+  },
+  "map": {
+    "x": "./x.js"
   }
 }

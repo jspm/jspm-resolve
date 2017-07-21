@@ -1,0 +1,12 @@
+{
+  "map": {
+    "x": "./y",
+    "./z": "./a",
+    "p": "pkg2",
+    "c": {
+      "browser": "./c-browser",
+      "node": "./c-node"
+    },
+    "./fail": "fail"
+  }
+}

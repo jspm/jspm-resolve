@@ -1,1 +1,13 @@
-{}
+{
+  "map": {
+    "a": "./b",
+    "a/c": "./b",
+    "./rel": "./d",
+    "p": "pkg",
+    "./fail": "fail",
+    "c": {
+      "browser": "./c-browser",
+      "node": "./c-node"
+    }
+  }
+}
