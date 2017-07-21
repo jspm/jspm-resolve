@@ -520,10 +520,10 @@ class JspmResolver {
   }
 
   getJspmConfig (parentPath) {
-    parentPath = parentPath.substr(0, parentPath.lastIndexOf(sep));
     if (this.config && (parentPath === this.config.basePath || parentPath.startsWith(this.config.basePath) && 
-          parentPath[this.config.basePath.length] === sep))
+          parentPath[this.config.basePath.length - 1] === sep))
       return this.config;
+    parentPath = parentPath.substr(0, parentPath.lastIndexOf(sep));
     if (this.isWindows)
       parentPath = parentPath.replace(sepRegEx, sep);
     let separatorIndex = parentPath.length;
