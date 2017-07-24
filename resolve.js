@@ -231,7 +231,7 @@ class JspmResolver {
     if (!parentPath)
       parentPath = this.config ? this.config.basePath : process.cwd();
     env = env ? setDefaultEnv(env, this.env) : this.env;
-    
+
     let config, resolvedPath, resolvedPackage;
 
     // Absolute path
@@ -332,7 +332,7 @@ class JspmResolver {
 
       if (!config)
         return await fileResolve(this, resolvedPath);
-      
+
       resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath, this.isWindows);
     }
 
@@ -377,7 +377,7 @@ class JspmResolver {
     if (!parentPath)
       parentPath = this.config ? this.config.basePath : process.cwd();
     env = env ? setDefaultEnv(env, this.env) : this.env;
-    
+
     let config, resolvedPath, resolvedPackage;
 
     // Absolute path
@@ -478,7 +478,7 @@ class JspmResolver {
 
       if (!config)
         return fileResolveSync(this, resolvedPath);
-      
+
       resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath, this.isWindows);
     }
 
@@ -520,7 +520,7 @@ class JspmResolver {
   }
 
   getJspmConfig (parentPath) {
-    if (this.config && (parentPath === this.config.basePath || parentPath.startsWith(this.config.basePath) && 
+    if (this.config && (parentPath === this.config.basePath || parentPath.startsWith(this.config.basePath) &&
           parentPath[this.config.basePath.length - 1] === sep))
       return this.config;
     parentPath = parentPath.substr(0, parentPath.lastIndexOf(sep));
@@ -606,7 +606,9 @@ class JspmResolver {
       else {
         try {
           let pjson = JSON.parse(await this.readFile(parentPath + sep + 'package.json'));
-          pcfg = processPjsonConfig(pjson, isJspmProject);
+          pcfg = processPjsonConfig({
+            module: typeof pjson.module === 'boolean' ? pjson.module : isJspmProject
+          }, pjson);
         }
         catch (e) {
           if (!e || e.code !== 'ENOENT')
@@ -634,7 +636,9 @@ class JspmResolver {
       else {
         try {
           let pjson = JSON.parse(this.readFileSync(parentPath + sep + 'package.json'));
-          pcfg = processPjsonConfig(pjson, isJspmProject);
+          pcfg = processPjsonConfig({
+            module: typeof pjson.module === 'boolean' ? pjson.module : isJspmProject
+          }, pjson);
         }
         catch (e) {
           if (!e || e.code !== 'ENOENT')
@@ -660,7 +664,9 @@ class JspmResolver {
     else {
       try {
         let pjson = JSON.parse(await this.readFile(parentPackagePath + sep + 'package.json'));
-        pcfg = processPjsonConfig(pjson, true);
+        pcfg = processPjsonConfig({
+          module: typeof pjson.module === 'boolean' ? pjson.module : true
+        }, pjson);
       }
       catch (e) {
         if (!e || e.code !== 'ENOENT')
@@ -684,7 +690,9 @@ class JspmResolver {
     else {
       try {
         let pjson = JSON.parse(this.readFileSync(parentPackagePath + sep + 'package.json'));
-        pcfg = processPjsonConfig(pjson, true);
+        pcfg = processPjsonConfig({
+          module: typeof pjson.module === 'boolean' ? pjson.module : true
+        }, pjson);
       }
       catch (e) {
         if (!e || e.code !== 'ENOENT')
@@ -786,11 +794,8 @@ function applyMap (name, parentMap, env) {
   while (separatorIndex !== -1)
 }
 
-function processPjsonConfig (pjson, moduleDefault) {
-  let pcfg = {
-    module: typeof pjson.module === 'boolean' ? pjson.module : moduleDefault
-  };
-
+exports.processPjsonConfig = processPjsonConfig;
+function processPjsonConfig (pcfg, pjson) {
   if (pjson.main) {
     pcfg.map = pcfg.map || {};
     if (typeof pjson.main === 'string')
@@ -807,7 +812,7 @@ function processPjsonConfig (pjson, moduleDefault) {
     else
       pcfg.map['.'] = { 'react-native': pjson['react-native'].startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'] };
   }
-  
+
   if (typeof pjson.electron === 'string') {
     if (typeof pcfg.map['.'] === 'object')
       pcfg.map['.'].electron = pjson.electron.startsWith('./') ? pjson.electron : './' + pjson.electron;
