@@ -177,6 +177,7 @@ properties are the only ones which affect the jspm resolution of a module:
   // Installed dependency version ranges
   "dependencies": {
     [exactName: ExactPackageName]: {
+      "source": String,
       "resolve": {
         [name: PlainName]: ExactPackageName
       }
@@ -251,6 +252,17 @@ must rely on custom encoding of these cases by the registry implementation. Each
 
 A package called `registry:package@version` in jspm is stored in `/path/to/jspm_packages/registry/package@version/`.
 
+Packages not found in the local `jspm_packages` folder are loaded from the global package cache by the resolver, where they are keyed by
+package hash.
+
+The hash will match the regular expression:
+
+```js
+/^[a-z0-9]{16,}$/i
+```
+
+The directory in which these global packages are installed is the global cache folder, which is configured by the environment.
+
 To convert a package between these forms, the following methods are defined:
 
 > **PARSE_PACKAGE_CANONICAL(canonical: String): { name: String, path: String }**
@@ -282,14 +294,27 @@ To convert a package between these forms, the following methods are defined:
 >    1. Return _undefined_.
 > 1. Return the object with values _{ name, path }_.
 
-> **PACKAGE_TO_PATH(name: String, jspmPackagesPath: String): String**
+> **PACKAGE_TO_PATH(name: String, jspmPackagesPath: String, jspmConfig: Object): String**
 > 1. Assert _jspmPackagesPath_ is a valid file system path.
 > 1. Assert _jspmPackagesPath_ ends with the path segment _"jspm_packages"_.
 > 1. Assert _name_ satisfies the valid package name regular expression.
 > 1. Replace in _name_ the first _":"_ character with the file system path separator.
 > 1. If running in Windows then,
 >    1. Replace any instance of _"/"_ in _name_ with _"\\"_.
-> 1. Return the result of the path resolution of _"${name}"_ within parent _jspmPackagesParent_.
+> 1. Let _packagePath_ be the path resolution of _"${name}"_ within parent _jspmPackagesPath_.
+> 1. If the directory _packagePath_ exists then,
+>    1. Return _packagePath_.
+>  1. Let _source_ be the value of _jspmConfig.dependencies?[name]?.source_.
+>  1. If _source_ is not _undefined_ then,
+>     1. Assert _source_ is a _string_, throwing an _Invalid Configuration_ error otherwise.
+>     1. Let _globalCachePath_ be the environment global package cache path.
+>     1. Let _hash_ be the substring of _source_ from the last index of _"#"_ to the end of the string.
+>     1. If _hash_ is defined then,
+>        1. Return _${globalCachePath}/${hash}_.
+>     1. Otherwise,
+>        1. Let _hash_ be the first substring of _source_ matching the package hash regex.
+>        1. If _hash_ is not defined then throw an _Invalid Configuration_ error.
+>        1. Return _${globalCachePath}/${hash}_.
 
 The parse functions return undefined if not a valid package canonical name form, while the package to URL function must
 always be called against a valid package canonical name form.
@@ -506,7 +531,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Return the result of _NODE_RESOLVE(name, parentPath)_.
 >    1. Let _parentPackage_ be the result of _PARSE_PACKAGE_PATH(parentPath, [[jspmPackagesPath]])_.
 >    1. If _parentPackage_ is not _undefined_ then,
->       1. Let _parentPackagePath_ be the value of _PACKAGE_TO_PATH(parentPackage, [[jspmPackagesPath]])_.
+>       1. Let _parentPackagePath_ be the value of _PACKAGE_TO_PATH(parentPackage, [[jspmPackagesPath]], [[jspmConfig]])_.
 >       1. Let _parentPackageMap_ be the value of _GET_MAP(parentPackagePath)_.
 >       1. If _parentPackageMap_ is not _undefined_ then,
 >          1. Let _mapped_ be the value of _APPLY_MAP(name, parentPackageMap)_
@@ -566,16 +591,16 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _resolvedPackage_ is not _undefined_ then,
 >    1. If _resolvedPackage.path_ is equal to _"/"_ then,
 >       1. Return _resolved_.
->    1. Let _resolvedPackagePath_ be the value of _PACKAGE_TO_PATH(resolvedPackage, [[jspmPackagesPath]])_.
+>    1. Let _resolvedPackagePath_ be the value of _PACKAGE_TO_PATH(resolvedPackage, [[jspmPackagesPath]], [[jspmConfig]])_.
 >    1. Let _resolvedPackageMap_ be the value of _GET_MAP(resolvedPackagePath)_.
 >    1. If _resolvedPackageMap_ is not _undefined_ then,
 >       1. Let _relPath_ be the string _"."_ concatenated with _resolvedPackage.path_.
 >       1. Let _mapped_ be the value of _APPLY_MAP(relPath, resolvedPackageMap)_.
 >       1. If _mapped_ is not _undefined_ then,
->          1. Let _resolvedPackagePath_ be the result of _PACKAGE_TO_PATH(resolvedPackage.name, resolvedPackage.path, jspmPackagesPath)_.
+>          1. Let _resolvedPackagePath_ be the result of _PACKAGE_TO_PATH(resolvedPackage.name, jspmPackagesPath)_.
 >          1. If _mapped_ is equal to _"@empty"_ then,
 >             1. Return _undefined_.
->          1. Let _resolved_ be the path resolution of _mapped_ to _resolvedPackagePath_.
+>          1. Let _resolved_ be the path resolution of _mapped_ to _${resolvedPackagePath}${resolvedPackage.path}_.
 >          1. Return _FILE_RESOLVE(resolved)_.
 > 1. Otherwise, if _resolved_ is equal to or contained within _[[localPackagePath]]_ then,
 >    1. Let _relPath_ be the string _"."_ concatenated with the substring of _resolved_ from the index of the length of _[[localPackagePath]]_ to the end of the string.
