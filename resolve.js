@@ -7,9 +7,9 @@ const browserResolve = require('browser-resolve');
 const nodeResolve = require('resolve');
 
 const winSepRegEx = /\\/g;
-const winDrivePathRegEx = /^[a-z]:\\/i;
 const sepRegEx = /\//g;
 const encodedSepRegEx = /%(5C|2F)/gi;
+const sep = path.sep;
 
 function throwModuleNotFound (name) {
   let e = new Error(`Module ${name} not found.`);
@@ -17,8 +17,8 @@ function throwModuleNotFound (name) {
   throw e;
 }
 
-function throwInvalidModuleName (msg) {
-  let e = new Error(msg);
+function throwInvalidModuleName (name, msg) {
+  let e = new Error(`${name} is an invalid module name.${msg ? ' ' + msg : ''}`);
   e.code = 'INVALID_MODULE_NAME';
   throw e;
 }
@@ -29,16 +29,23 @@ function throwInvalidConfig (msg) {
   throw e;
 }
 
-function throwNotInstalled (msg) {
-  let e = new Error(msg);
-  e.code = 'NOT_INSTALLED';
-  throw e;
-}
-
-const packageHashRegEx = /^[a-z0-9]{16,}$/i;
 const packageRegEx = /^([a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^\/\\%]+)(\/[\s\S]*|$)/;
 function parsePackageName (name) {
   let packageMatch = name.match(packageRegEx);
+  if (packageMatch)
+    return {
+      name: packageMatch[1],
+      path: packageMatch[2]
+    };
+}
+function parsePackagePath (path, jspmPackagesPath, isWindows) {
+  if (!path.startsWith(jspmPackagesPath.substr(0, jspmPackagesPath.length - 1)) ||
+      path[jspmPackagesPath.length - 1] !== sep && path.length !== jspmPackagesPath.length - 1)
+    return;
+  let relPackagePath = path.substr(jspmPackagesPath.length).replace(sep, ':');
+  if (isWindows)
+    relPackagePath = relPackagePath.replace(winSepRegEx, '/');
+  let packageMatch = relPackagePath.match(packageRegEx);
   if (packageMatch)
     return {
       name: packageMatch[1],
@@ -200,14 +207,6 @@ function setDefaultEnv (env, defaultEnv) {
   return env;
 }
 
-function percentDecode (path) {
-  if (path.match(encodedSepRegEx))
-    throwInvalidModuleName(`${path} cannot be URI decoded as it contains a percent-encoded separator or percent character.`);
-  if (path.indexOf('%') === -1)
-    return path;
-  return decodeURIComponent(path);
-}
-
 const defaultEnv = {
   browser: false,
   node: true,
@@ -217,20 +216,15 @@ const defaultEnv = {
   electron: false
 };
 
-const HOME = process.env.JSPM_GLOBAL_PATH || process.env.LOCALAPPDATA || process.env.HOME || process.env.HOMEPATH;
-
 class JspmResolver {
-  constructor (projectPath = process.cwd(), env = {}, globalPackagesPath = path.resolve(HOME, 'jspm', 'packages')) {
+  constructor (projectPath = process.cwd(), env = {}) {
     this.pjsonConfigCache = {};
     if (projectPath[projectPath.length - 1] !== sep)
       projectPath += sep;
     this.config = this.getJspmConfig(projectPath);
-    this.reverseHashLookup = {};
 
     this.env = setDefaultEnv(env, defaultEnv);
-    this.globalPackagesPath = globalPackagesPath;
     this.isWindows = process.platform === 'win32';
-    this.sep = this.isWindows ? '\\' : '/';
   }
 
   async resolve (name, parentPath, env) {
@@ -238,79 +232,59 @@ class JspmResolver {
       parentPath = this.config ? this.config.basePath : process.cwd();
     env = env ? setDefaultEnv(env, this.env) : this.env;
 
-    let config, pkg, pkgPath, resolvedPath;
+    let config, resolvedPath, resolvedPackage;
 
     // Absolute path
     if (name[0] === '/') {
       resolvedPath = name.replace(winSepRegEx, '/');
       if (resolvedPath[1] === '/') {
         if (resolvedPath[2] === '/')
-          resolvedPath = percentDecode(resolvePath(resolvedPath.substr(2 + this.isWindows)));
+          resolvedPath = resolvePath(resolvedPath.substr(2 + this.isWindows));
         else
-          throwInvalidModuleName(`${name} is not a valid module name.`);
+          throwInvalidModuleName(name);
       }
       else {
-        if (this.isWindows)
-          resolvedPath = resolvePath(percentDecode(resolvedPath.substr(1)));
-        else
-          resolvedPath = resolvePath(resolvedPath);
+        resolvedPath = resolvePath(resolvedPath.substr(this.isWindows));
       }
     }
     // Relative path
     else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
-      { config, pkg, pkgPath } = await this.getJspmContext(parentPath);
-      if (pkg) {
-        let relPath = resolvePath(pkg.path.substr(0, pkg.path.lastIndexOf('/') + 1) + percentDecode(name));
-        if (relPath[0] !== '/')
-          throw InvalidModuleName(`Backtracking below a package boundary is not permitted resolving ${name} to ${parentPath}.`);
-        if (relPath.length === 1)
-          relPath = '';
-        pkg.path = relPath;
-      }
-      else {
-        resolvedPath = resolvePath((
-          this.isWindows
-          ? parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
-          : parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
-        ) + name.replace(winSepRegEx, '/'));
-      }
+      resolvedPath = resolvePath((
+        this.isWindows
+        ? parentPath.substr(0, parentPath.lastIndexOf('/') + 1)
+        : parentPath.replace(winSepRegEx, '/').substr(0, parentPath.lastIndexOf('/') + 1)
+      ) + name.replace(winSepRegEx, '/'));
     }
     // Exact package request or URL request
     else if (name.indexOf(':') !== -1) {
-      pkg = parsePackageName(name);
-      if (pkg) {
-        { config } = await this.getJspmContext(parentPath);
-        pkgPath = packageToPath(pkg.name, config.jspmPackagesPath, this.isWindows);
-        if (!config)
-          throwInvalidModuleName(`Cannot import jspm package ${name} when path ${parentPath} is not a jspm project.`);
-      }
-      // support Windows drive letter absolute paths
-      else if (this.isWindows && name.match(winDrivePathRegEx)) {
-        resolvedPath = resolvePath(name.replace(winSepRegEx, '/'));
-      }
+      resolvedPackage = parsePackageName(name);
       // URL
-      else {
+      if (!resolvedPackage) {
         let url = tryParseUrl(name);
         if (url.protocol === 'file:')
-          resolvedPath = percentDecode(this.isWindows ? url.pathname.substr(1) : url.pathname);
+          resolvedPath = this.isWindows ? url.pathname.substr(1) : url.pathname;
         else
-          throwInvalidModuleName(`${name} is not a valid module name.`);
+          throwInvalidModuleName(name);
       }
     }
     // Plain name resolution
     else {
-      { config, pkgPath } = this.getJspmContext(parentPath);
+      config = this.getJspmConfig(parentPath);
 
       if (!config)
         return await nodeModuleResolve(this, name, parentPath, env);
 
       // package map
+      let parentPackagePath;
       {
-        let mapped = await this.packageMap(name, pkgPath, config, env);
+        let parentPackage = parsePackagePath(parentPath, config.jspmPackagesPath, this.isWindows);
+        if (parentPackage)
+          parentPackagePath = packageToPath(parentPackage.name, config.jspmPackagesPath, this.isWindows);
+        let mapped = await this.packageMap(name, parentPackagePath, config, env);
         if (mapped) {
           if (mapped.startsWith('./')) {
-            if (pkgPath) {
-              return await fileResolve(this, pkgPath + mapped.substr(1));
+            if (parentPackagePath) {
+              return await fileResolve(this, parentPackagePath + mapped.substr(1));
             }
             else {
               let basePath = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
@@ -318,55 +292,74 @@ class JspmResolver {
             }
           }
           name = mapped;
-          pkg = parsePackageName(name);
+          resolvedPackage = parsePackageName(name);
         }
       }
 
       // resolve
-      if (!pkg) {
-        let resolved = await this.packageResolve(name, pkg && pkg.name, config);
+      if (!resolvedPackage) {
+        let parentPackageName;
+        if (parentPackagePath) {
+          let parentPackage = parsePackagePath(parentPackagePath, config.jspmPackagesPath, this.isWindows);
+          if (parentPackage)
+            parentPackageName = parentPackage.name;
+        }
+
+        let resolved = await this.packageResolve(name, parentPackageName, config);
         if (resolved) {
-          pkg = parsePackageName(resolved);
-          if (pkg)
+          resolvedPackage = parsePackageName(resolved);
+          if (resolvedPackage)
             name = resolved;
         }
       }
 
       // node modules fallback
-      if (!pkg) {
+      if (!resolvedPackage) {
         if (name === '@empty')
           return;
         return await nodeModuleResolve(this, name, parentPath, env);
       }
     }
 
-    if (!pkg) {
-      { config, pkg, pkgPath } = this.getJspmContext(resolvedPath);
+    // detect package from resolved path, including detecting in other jspm projects
+    if (!resolvedPackage) {
+      config = this.getJspmConfig(resolvedPath);
+
+      if (resolvedPath.match(encodedSepRegEx))
+        throwInvalidModuleName(name);
+      if (resolvedPath.indexOf('%') !== -1)
+        resolvedPath = decodeURIComponent(resolvedPath);
+
       if (!config)
         return await fileResolve(this, resolvedPath);
+
+      resolvedPackage = parsePackagePath(resolvedPath, config.jspmPackagesPath, this.isWindows);
     }
 
     // internal package resolution maps
-    if (pkg) {
-      if (!pkgPath)
-        pkgPath = packageToPath(pkg.name, config.jspmPackagesPath, this.isWindows);
+    if (resolvedPackage) {
+      if (!config)
+        config = this.getJspmConfig(parentPath);
+      if (!resolvedPath && !config)
+        throwInvalidModuleName(resolvedPackage.name, `Cannot import jspm packages as ${parentPath} is not a jspm project.`);
+      let resolvedPackagePath = packageToPath(resolvedPackage.name, config.jspmPackagesPath, this.isWindows);
       if (!resolvedPath)
-        resolvedPath = pkgPath + pkg.path;
-      if (pkg.path === '/')
+        resolvedPath = resolvedPackagePath + resolvedPackage.path;
+      if (resolvedPackage.path === '/')
         return resolvedPath;
-      let mapped = await this.packageMap('.' + pkg.path, pkgPath, config, env);
+      let mapped = await this.packageMap('.' + resolvedPackage.path, resolvedPackagePath, config, env);
       if (mapped) {
         if (!mapped.startsWith('./'))
-          throwInvalidConfig(`Invalid package map for ${pkgPath}. Relative path ".${resolvedPath.substr(pkgPath.length)}" must map to another relative path, not "${mapped}".`);
+          throwInvalidConfig(`Invalid package map for ${resolvedPackagePath}. Relative path ".${resolvedPath.substr(resolvedPackagePath.length)}" must map to another relative path, not "${mapped}".`);
         // (relative map is always relative)
-        return await fileResolve(this, pkgPath + mapped.substr(1));
+        return await fileResolve(this, resolvedPackagePath + mapped.substr(1));
       }
     }
     // base project package internal resolution map
     else if (config) {
       let basePath = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
       if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
-        (resolvedPath[basePath.length - 1] === this.sep || resolvedPath.length === basePath.length - 1)) {
+        (resolvedPath[basePath.length - 1] === sep || resolvedPath.length === basePath.length - 1)) {
         let relPath = '.' + resolvedPath.substr(basePath.length - 1);
         let mapped = await this.packageMap(relPath, undefined, config, env);
         if (mapped) {
@@ -476,7 +469,7 @@ class JspmResolver {
 
     // detect package from resolved path, including detecting in other jspm projects
     if (!resolvedPackage) {
-      { config, parentHash } = this.getJspmConfig(resolvedPath);
+      config = this.getJspmConfig(resolvedPath);
 
       if (resolvedPath.match(encodedSepRegEx))
         throwInvalidModuleName(name);
@@ -526,76 +519,22 @@ class JspmResolver {
     return fileResolveSync(this, resolvedPath);
   }
 
-  async getJspmContext (parentPath) {
-    if (this.config && (parentPath.startsWith(this.config.basePath) && (
-        parentPath[this.config.basePath.length - 1] === this.sep || parentPath.length === this.config.basePath.length))) {
-      let config = this.config;
-
-      if (!path.startsWith(jspmPackagesPath.substr(0, jspmPackagesPath.length - 1)) ||
-          path[jspmPackagesPath.length - 1] !== this.sep && path.length !== jspmPackagesPath.length - 1)
-        return;
-      let relPackagePath = path.substr(jspmPackagesPath.length).replace(this.sep, ':');
-      if (isWindows)
-        relPackagePath = relPackagePath.replace(winSepRegEx, '/');
-      let packageMatch = relPackagePath.match(packageRegEx);
-      if (packageMatch)
-        return {
-          name: packageMatch[1],
-          path: packageMatch[2]
-        };
-
-      let pkg = parsePackagePath(parentPath, config.jspmPackagesPath, this.isWindows);
-      let pkgPath;
-      if (pkg) {
-        pkgPath = packageToPath(pkg.name, config.jspmPackagesPath, this.isWindows);
-        if (!(await this.isDirectory(pkgPath))) {
-          let packageHash = this.getPackageHash(parentPackage.name);
-          // packageHash -> package + pkgPath
-        }
-      }
-      return { config, pkg, pkgPath };
-    }
-    else if (parentPath.startsWith(this.globalPackagesPath) && parentPath[this.globalPackagesPath.length] === this.sep) {
-      let config = this.config;
-      let pkgHashIndexStart = this.globalPackagesPath.length + 1;
-      let pkgHashIndexEnd = parentPath.indexOf(this.sep, pkgHashIndex);
-      let pkgHash = parentPath.substring(pkgHashIndexStart, pkgHashIndexEnd);
-      let pkgPath = parentPath.substr(0, pkgHashIndexEnd);
-      let path = parentPath.substr(pkgHashIndexEnd);
-
-      let name = this.reverseHashLookup[pkgHash];
-      if (!name) {
-        if (!pkgHash.match(packageHashRegEx))
-          throwInvalidModuleName(`Parent path ${parentPath} is not a valid installed package of this jspm project.`);
-        for (let depName in config.dependencies) {
-          let depHash = getPackageHash(config.dependencies[depName].source);
-          if (depHash === pkgHash) {
-            name = this.reverseHshLookup[pkgHash] = depName;
-            break;
-          }
-        }
-        throwNotInstalled(`Package ${parentPath} is not yet installed.`);
-      }
-
-      return { config, pkg: { name, path }, pkgPath };
-    }
-
-    return this.getJspmConfig(parentPath);
-  }
-
   getJspmConfig (parentPath) {
-    parentPath = parentPath.substr(0, parentPath.lastIndexOf(this.sep));
+    if (this.config && (parentPath === this.config.basePath || parentPath.startsWith(this.config.basePath) &&
+          parentPath[this.config.basePath.length - 1] === sep))
+      return this.config;
+    parentPath = parentPath.substr(0, parentPath.lastIndexOf(sep));
     if (this.isWindows)
-      parentPath = parentPath.replace(sepRegEx, this.sep);
+      parentPath = parentPath.replace(sepRegEx, sep);
     let separatorIndex = parentPath.length;
-    let rootSeparatorIndex = parentPath.indexOf(this.sep);
+    let rootSeparatorIndex = parentPath.indexOf(sep);
     do {
       let dir = parentPath.substr(0, separatorIndex);
-      if (dir.endsWith(this.sep + 'node_modules'))
+      if (dir.endsWith(sep + 'node_modules'))
         return;
 
       try {
-        var pjson = JSON.parse(this.readFileSync(dir + this.sep + 'package.json'));
+        var pjson = JSON.parse(this.readFileSync(dir + sep + 'package.json'));
       }
       catch (e) {
         if (e instanceof SyntaxError) {
@@ -611,7 +550,7 @@ class JspmResolver {
         if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
           jspmPath = path.resolve(dir, pjson.configFiles.jspm);
         else
-          jspmPath = dir + this.sep + 'jspm.json';
+          jspmPath = dir + sep + 'jspm.json';
 
         try {
           var jspmJson = JSON.parse(this.readFileSync(jspmPath));
@@ -626,30 +565,30 @@ class JspmResolver {
         }
 
         if (jspmJson) {
-          let dirSep = dir + this.sep;
+          let dirSep = dir + sep;
           let config = {
             basePath: dirSep,
             localPackagePathDev: dirSep,
             localPackagePathProduction: dirSep,
-            jspmPackagesPath: dirSep + 'jspm_packages' + this.sep,
+            jspmPackagesPath: dirSep + 'jspm_packages' + sep,
             resolve: jspmJson.resolve || {},
             dependencies: jspmJson.dependencies || {}
           };
 
           if (pjson && typeof pjson.directories === 'object') {
             if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..'))
-              config.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + this.sep;
+              config.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + sep;
             if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..'))
-              config.localPackagePathDev = config.localPackagePathProduction = path.resolve(dir, pjson.directories.lib) + this.sep;
+              config.localPackagePathDev = config.localPackagePathProduction = path.resolve(dir, pjson.directories.lib) + sep;
             if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..'))
-              config.localPackagePathProduction = path.resolve(dir, pjson.directories.dist) + this.sep;
+              config.localPackagePathProduction = path.resolve(dir, pjson.directories.dist) + sep;
           }
 
           return config;
         }
       }
 
-      separatorIndex = parentPath.lastIndexOf(this.sep, separatorIndex - 1);
+      separatorIndex = parentPath.lastIndexOf(sep, separatorIndex - 1);
     }
     while (separatorIndex > rootSeparatorIndex)
   }
@@ -784,34 +723,6 @@ class JspmResolver {
     return applyMap(name, config.resolve);
   }
 
-  async isDirectory (path) {
-    return new Promise((resolve, reject) => {
-      fs.stat(path, (err, stats) => {
-        if (err) {
-          if (err.code === 'ENOENT')
-            resolve(false);
-          else
-            reject(err);
-        }
-        else {
-          resolve(stats.isDirectory());
-        }
-      });
-    });
-  }
-
-  isDirectorySync (path) {
-    try {
-      var stats = fs.statSync(path);
-    }
-    catch (e) {
-      if (e.code === 'ENOENT')
-        return false;
-      throw e;
-    }
-    return stats.isDirectory();
-  }
-
   async isFile (path) {
     return new Promise((resolve, reject) => {
       fs.stat(path, (err, stats) => {
@@ -851,14 +762,10 @@ class JspmResolver {
   }
 }
 
+JspmResolver.applyMap = applyMap;
+
 module.exports = JspmResolver;
 
-exports.getPackageHash = getPackageHash;
-function getPackageHash (source) {
-
-}
-
-exports.applyMap = applyMap;
 function applyMap (name, parentMap, env) {
   let mapped;
   let separatorIndex = name.length;
