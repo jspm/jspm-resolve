@@ -523,6 +523,8 @@ Package name requests and plain name requests are both considered unescaped - th
 
 The parent pathname is assumed a valid fully-resolved path in the environment, with the exception that `/` in Windows paths is allowed to be converted into `\\` as is the NodeJS convention for resolve. No absolute paths, URLs, URL-encoding, and relative segments are not supported in the parent path.
 
+In order to make the resolver an idempotent path resolver, the following exceptions apply to absolute paths - if a path begins with a single forward slash in posix or if it begines with a letter colon and backlash in Windows (eg `C:\`) then it is not decoded as URI.
+
 Before resolution can be run, the resolver needs to be initialized against a _projectPath_:
 
 > **JSPM_RESOLVE_INIT(projectPath: string)**
@@ -605,9 +607,12 @@ The resolution algorithm breaks down into the following high-level process to ge
 >         1. Throw a _Not Installed_ error.
 > 1. Otherwise if _resolvedPackage_ is _undefined_ then,
 >    1. Replace in _name_ all ocurrences of _"\\"_ with _"/"_ (relative paths like _".\\"_ detect as plain names above, thrown as not found before reaching here)
->    1. If _name_ contains the substring _"%2F"_ or _"%5C"_ then,
->       1. Throw an _Invalid Module Name_ error.
->    1. Replace in _name_ all percent-encoded values with their URI-decodings.
+>    1. If in a Windows environment and _name_ begins with a letter followed by a colon and backslash then,
+>       1. Set _name_ to _/${name}_.
+>    1. Otherwise if in Windows environment or _name_ does not begin with a single insance of _"/"_ only then,
+>       1. If _name_ contains the substring _"%2F"_ or _"%5C"_ then,
+>          1. Throw an _Invalid Module Name_ error.
+>       1. Replace in _name_ all percent-encoded values with their URI-decodings.
 >    1. If _name_ starts with _"//"_ and _name_ does not start with _"///"_ then,
 >       1. Throw an _Invalid Module Name_ error.
 >    1. Otherwise if _name_ starts with _"/"_ or _name_ starts with _"/"_ then,
