@@ -203,7 +203,7 @@ Any error in any operation, including assertion errors, should be fully propagat
 
 Module specifiers are considered relative URLs, so obey URL encoding and normalization rules.
 
-This specification handles resolution in path space, including handling of `.` and `..` internal segments, converting `\\` into `/` for the resolution process, before outputting a valid pathname for the environment with the correct separator at the end of resolution. Valid absolute paths are well-formed file paths of the target file system with the correct separator being used.
+This specification handles resolution in path space, including handling of `.` and `..` internal segments, converting `\\` into `/` for the resolution process, before outputting a valid pathname for the environment using the _"/"_ separator at the end of resolution.
 
 The reason for this is that resolution in URL space with mappings results in moving between spaces as maps are in path-space, while resolution is in URL space. The first iteration of the resolver was written entirely in URL space, but converted into path space for performance and simplicity.
 
@@ -268,12 +268,10 @@ To convert a package between these forms, the following methods are defined:
 > 1. If _path_ does not start with the string _jspmPackagesPath_ then,
 >    1. Return _undefined_.
 > 1. Let _relPackagePath_ be the substring of _path_ starting at the index of the length of _jspmPackagesPath_.
-> 1. Let _registrySep_ be the index of the first path separator in _relPackagePath_.
+> 1. Let _registrySep_ be the index of _"/"_ in _relPackagePath_.
 > 1. _If _registrySep_ is not defined then,
 >    1. Return _undefined_.
 > 1. Let _canonical_ be the result of replacing the character at _registrySep_ in _relPackagePath_ with _":"_.
-> 1. If running in Windows then,
->    1. Replace in _canonical_ any instance of _"\\"_ with _"/"_.
 > 1. If _canonical_ does not contain a zero-indexed substring matching the package name regular expression then,
 >    1. Return _undefined_.
 > 1. Let _name_ be the unique substring of _canonical_ starting from the first character, matched against the package name regular expression.
@@ -286,13 +284,20 @@ To convert a package between these forms, the following methods are defined:
 > 1. Assert _jspmPackagesPath_ is a valid file system path.
 > 1. Assert _jspmPackagesPath_ ends with the path segment _"jspm_packages"_.
 > 1. Assert _name_ satisfies the valid package name regular expression.
-> 1. Replace in _name_ the first _":"_ character with the file system path separator.
-> 1. If running in Windows then,
->    1. Replace any instance of _"/"_ in _name_ with _"\\"_.
+> 1. Replace in _name_ the first _":"_ character with _"/"_.
 > 1. Return the result of the path resolution of _"${name}"_ within parent _jspmPackagesParent_.
 
 The parse functions return undefined if not a valid package canonical name form, while the package to URL function must
 always be called against a valid package canonical name form.
+
+### Path Resolution
+
+All paths are resolved using the OS-specific resolver handling, using the `/` separator, replacing any instances of the `\\` separator
+on Windows only.
+
+When resolving paths in Windows, we ensure that resolution uses the `/` separator for greater consistency between platforms.
+The reason for this is that `/` is supported fine as a path separator in Windows APIs (eg for `C:/some/path`), which is enough of
+a change to remove a lot of the pain in working with cross-platform path handling.
 
 ### Reading jspm Configuration
 
@@ -426,8 +431,7 @@ The full algorithm applied with this directory addition is:
 
 > **FILE_RESOLVE(path: string)**
 > 1. Assert _path_ is a valid file path.
-> 1. Let _sep_ be the environment path separator.
-> 1. If _path_ ends with the character _sep_ then,
+> 1. If _path_ ends with the character _"/"_ then,
 >    1. Return _path_.
 > 1. If the file at _path_ exists,
 >    1. Return _path_.
@@ -481,7 +485,9 @@ The resolver will either return undefined or a resolved path string, or throw a 
 
 Package name requests and plain name requests are both considered unescaped - that is URL decoding will not be applied. URL decoding is only applied to URL-like requests.
 
-The parent pathname is assumed a valid fully-resolved path in the environment, with the exception that `/` in Windows paths is allowed to be converted into `\\` as is the NodeJS convention for resolve. No absolute paths, URLs, URL-encoding, and relative segments are not supported in the parent path.
+The parent pathname is assumed a valid fully-resolved path in the environment. Any `\\` in Windows paths are converted into `/` for consistency within this resolver. Absolute paths, URLs, URL-encoding, and relative segments are not supported in the parent path.
+
+In order to make the resolver an idempotent path resolver, the following exceptions apply to absolute paths - if a path begins with a single forward slash in posix or if it begines with a letter colon and backlash in Windows (eg `C:\`) then it is not decoded as URI.
 
 Before resolution can be run, the resolver needs to be initialized against a _projectPath_:
 
@@ -540,7 +546,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _resolvedPackage_ is not _undefined_ and  _[[jspmConfig]]_ is _undefined_ then,
 >    1. Throw an _Invalid Module Name_ error.
 > 1. If _resolvedPackage_ is _undefined_ then,
->    1. Replace in _name_ all ocurrences of _"\\"_ with _"/"_ (relative paths like _".\\"_ detect as plain names above, thrown as not found before reaching here)
+>    1. If in a Windows environment and _name_ begins with a letter followed by a colon and backslash then,
+>      1. Set _name_ to _/${name}_.
 >    1. If _name_ contains the substring _"%2F"_ or _"%5C"_ then,
 >       1. Throw an _Invalid Module Name_ error.
 >    1. Replace in _name_ all percent-encoded values with their URI-decodings.
@@ -552,7 +559,16 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Otherwise,
 >          1. Set _resolved_ to the resolved file path of the substring of _name_ from the index of the last leading _"/"_.
 >    1. Otherwise if _name_ starts with _"."_ then,
->       1. Set _resolved_ to the result of the path resolution of _name_ relative to _parentPath_.
+>       1. Let _parentPackage_ be the result of _PARSE_PACKAGE_PATH(parentPath, [[jspmPackagesPath]])_.
+>       1. If _parentPackage_ is _undefined_ then,
+>          1. Set _resolved_ to the result of the path resolution of _name_ relative to _parentPath_.
+>       1. Otherwise,
+>          1. Let _relResolved to the result of the path resolution of _name_ relative to _parentPackage.path_.
+>          1. If _relResolved_ does not begin with _"/"_ then,
+>             1. Throw an _Invalid Module Name_ error, as we cannot backtrack below package boundaries.
+>          1. If _relResolved_ is equal to _"/"_ then,
+>             1. Set _relResolved_ to _""_.
+>          1. Set _resolved_ to the value of _${parentPackagePath}${relResolved}_.
 >    1. Otherwise,
 >       1. Assert _name_ is a valid URL.
 >       1. If _name_ is not a file URL then,
@@ -591,7 +607,7 @@ The implementation of `NODE_RESOLVE` is exactly the NodeJS module resolution alg
 
 * NodeJS core module names should not be resolved, and should throw a _Module Not Found_ error.
 * The browserify "browser" field should be respected when resolving in the browser environment (including a `false` map returning _undefined_).
-* Module names ending in the environment path separator must always throw a not found error.
+* Module names ending in _"/"_ must always throw a not found error.
 
 Full compatility in a module loading pipeline would be formed with a wrapper along the following lines:
 

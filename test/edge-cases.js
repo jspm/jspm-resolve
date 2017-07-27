@@ -44,14 +44,9 @@ suite('jspm project nesting', () => {
   });
 });
 
-suite('Invalidation', () => {
-  //- invalidation mid-resolve
-});
-
 suite('Mapping edge cases', () => {
-  // do we want to support ".." segments in maps?
-  // Note that NodeJS effectively permits this via require('x/y/../z') === require('x/z')
-  // although not sure how common ecosystem use is... this may well be a deciding factor
+  // ".." and "." segments in package names must not be supported as would enable package boundary backtracking
+  // can be detected with a simple validation - first checking \\ and throwing for that, then checking /\/..?(\/|$)/
 
   //- mapping into an absolute URL
   //- mapping into a backtracking URL
