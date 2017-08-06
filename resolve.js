@@ -28,13 +28,13 @@ function throwInvalidConfig (msg) {
   throw e;
 }
 
-const packageRegEx = /^([a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^\/\\%]+)(\/[\s\S]*|$)/;
+const packageRegEx = /^([a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^@<>:"/\|?*^\u0000-\u001F]+)(\/[\s\S]*|$)/;
 function parsePackageName (name) {
   let packageMatch = name.match(packageRegEx);
   if (packageMatch)
     return { name: packageMatch[1], path: packageMatch[2] };
 }
-const packagePathRegEx = /^([a-z]+\/[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^\/\\%]+)(\/[\s\S]*|$)/;
+const packagePathRegEx = /^([a-z]+\/[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^@<>:"/\|?*^\u0000-\u001F]+)(\/[\s\S]*|$)/;
 function parsePackagePath (path, jspmPackagesPath) {
   if (!path.startsWith(jspmPackagesPath.substr(0, jspmPackagesPath.length - 1)) ||
       path[jspmPackagesPath.length - 1] !=='/' && path.length !== jspmPackagesPath.length - 1)

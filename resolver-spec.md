@@ -243,15 +243,15 @@ Package names in canonical form are names of the form `registry:package@version`
 Valid package names satisfy the JS regular expression:
 
 ```js
-/^[a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(\/[-_\.a-zA-Z\d]+)*@[^\/\\]+$/
+/^[a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(\/[-_\.a-zA-Z\d]+)*@[^@<>:"/\|?*^\u0000-\u001F]+$/
 ```
 
-For compatibility with cross-platform file paths, the following character classes in versions are not permitted: `[<>:"/\|?*^\u0001-\u0031]`.
+For compatibility with cross-platform file paths, the following character classes are not permitted in versions: `[@<>:"/\|?*^\u0000-\u001F]`.
 
-The convention used for versions that contain these characters is to encode these characters when used in unambiguous inputs, such that
+The convention encouraged for versions that contain these characters is to encode these characters when used in unambiguous inputs, such that
 they are replaced by their URI percent encoding.
 
-So `jspm install x@a/b` is sanitized as an input into the canonical form `x@a%2F`, which is the form used in the jspm lock file and file paths thereafter.
+So that for example, `jspm install x@a/b` is sanitized as an input into the canonical name `x@a%2F`, which is the form used in the jspm configuration files and file paths thereafter.
 
 A package called `registry:package@version` in jspm is stored in `/path/to/jspm_packages/registry/package@version/`.
 
