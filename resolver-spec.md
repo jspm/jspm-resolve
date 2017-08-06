@@ -246,8 +246,12 @@ Valid package names satisfy the JS regular expression:
 /^[a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(\/[-_\.a-zA-Z\d]+)*@[^\/\\]+$/
 ```
 
-Any characters are supported in versions except for `\`, `/`. Version tags that do contain these characters
-must rely on custom encoding of these cases by the registry implementation. Each registry can have its own more restrictive requirements for sanitization of package names and versions as well.
+For compatibility with cross-platform file paths, the following character classes in versions are not permitted: `[<>:"/\|?*^\u0001-\u0031]`.
+
+The convention used for versions that contain these characters is to encode these characters when used in unambiguous inputs, such that
+they are replaced by their URI percent encoding.
+
+So `jspm install x@a/b` is sanitized as an input into the canonical form `x@a%2F`, which is the form used in the jspm lock file and file paths thereafter.
 
 A package called `registry:package@version` in jspm is stored in `/path/to/jspm_packages/registry/package@version/`.
 
