@@ -865,9 +865,12 @@ function processPjsonConfig (pcfg, pjson) {
   }
 
   if (typeof pjson.module === 'string') {
-    // pcfg.module = true;
+    pcfg.module = true;
     pcfg.map = pcfg.map || {};
     pcfg.map['.'] = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
+  }
+  else if (typeof pjson.module === 'boolean') {
+    pcfg.module = pjson.module;
   }
 
   if (pjson.map && typeof pjson.map === 'object') {
