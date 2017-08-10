@@ -827,7 +827,10 @@ function processPjsonConfig (pcfg, pjson) {
     const mainMap = pcfg.map['.'];
     const mapping = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
     if (typeof mainMap === 'object')
-      pcfg.map['.'] = Object.assign({ module: mapping }, mainMap);
+      if (mainMap.module)
+        mainMap.module = mapping;
+      else
+        pcfg.map['.'] = Object.assign({ module: mapping }, mainMap);
     else if (typeof mainMap === 'string')
       pcfg.map['.'] = { module: mapping, default: mainMap };
     else
@@ -852,7 +855,10 @@ function processPjsonConfig (pcfg, pjson) {
     const mainMap = pcfg.map['.'];
     const mapping = pjson.module.startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'];
     if (typeof mainMap === 'object')
-      pcfg.map['.'] = Object.assign({ 'react-native': mapping }, mainMap);
+      if (mainMap['react-native'])
+        mainMap['react-native'] = mapping;
+      else
+        pcfg.map['.'] = Object.assign({ 'react-native': mapping }, mainMap);
     else if (typeof mainMap === 'string')
       pcfg.map['.'] = { 'react-native': mapping, default: mainMap };
     else
@@ -864,7 +870,10 @@ function processPjsonConfig (pcfg, pjson) {
     const mainMap = pcfg.map['.'];
     const mapping = pjson.electron.startsWith('./') ? pjson.electron : './' + pjson.electron;
     if (typeof mainMap === 'object')
-      pcfg.map['.'] = Object.assign({ electron: mapping }, mainMap);
+      if (mainMap.electron)
+        mainMap.electron = mapping;
+      else
+        pcfg.map['.'] = Object.assign({ electron: mapping }, mainMap);
     else if (typeof mainMap === 'string')
       pcfg.map['.'] = { electron: mapping, default: mainMap };
     else
@@ -877,7 +886,10 @@ function processPjsonConfig (pcfg, pjson) {
       const mainMap = pcfg.map['.'];
       const mapping = pjson.module.startsWith('./') ? pjson.browser : './' + pjson.browser;
       if (typeof mainMap === 'object')
-        pcfg.map['.'] = Object.assign({ browser: mapping }, mainMap);
+        if (mainMap.browser)
+          mainMap.browser = mapping;
+        else
+          pcfg.map['.'] = Object.assign({ browser: mapping }, mainMap);
       else if (typeof mainMap === 'string')
         pcfg.map['.'] = { browser: mapping, default: mainMap };
       else
@@ -895,7 +907,10 @@ function processPjsonConfig (pcfg, pjson) {
         const browserMap = { browser: mapping };
         const map = pcfg.map[p];
         if (typeof map === 'object')
-          pcfg.map[p] = Object.assign({ browser: mapping }, map);
+          if (map.browser)
+            map.browser = mapping;
+          else
+            pcfg.map[p] = Object.assign({ browser: mapping }, map);
         else if (typeof map === 'string')
           pcfg.map[p] = { browser: mapping, default: map };
         else
