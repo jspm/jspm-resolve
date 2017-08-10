@@ -216,7 +216,8 @@ const defaultEnv = {
   production: false,
   dev: true,
   'react-native': false,
-  electron: false
+  electron: false,
+  module: true
 };
 
 class JspmResolver {
@@ -823,52 +824,82 @@ function processPjsonConfig (pcfg, pjson) {
   if (typeof pjson.module === 'string') {
     pcfg.module = true;
     pcfg.map = pcfg.map || {};
-    pcfg.map['.'] = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
+    const mainMap = pcfg.map['.'];
+    const mapping = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
+    if (typeof mainMap === 'object')
+      pcfg.map['.'] = Object.assign({ module: mapping }, mainMap);
+    else if (typeof mainMap === 'string')
+      pcfg.map['.'] = { module: mapping, default: mainMap };
+    else
+      pcfg.map['.'] = { module: mapping };
   }
-  else if (pjson.module === true) {
-    pcfg.module = true;
+  else {
+    pcfg.module = pjson.module === true;
   }
 
   if (pjson.main) {
     pcfg.map = pcfg.map || {};
-    if (typeof pjson.main === 'string')
-      pcfg.map['.'] = pjson.main.startsWith('./') ? pjson.main : './' + pjson.main;
-    else if (typeof pjson.main === 'object')
-      pcfg.map['.'] = pjson.main;
+    const mainMap = pcfg.map['.'];
+    const mapping = pjson.main.startsWith('./') ? pjson.main : './' + pjson.main;
+    if (typeof mainMap === 'object')
+      mainMap.default = mapping;
+    else
+      pcfg.map['.'] = mapping;
   }
 
   if (typeof pjson['react-native'] === 'string') {
-    if (typeof pcfg.map['.'] === 'object')
-      pcfg.map['.']['react-native'] = pjson['react-native'].startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'];
-    else if (typeof pcfg.map['.'] == 'string')
-      pcfg.map['.'] = { 'react-native': pjson['react-native'].startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'], default: pcfg.map['.'] };
+    pcfg.map = pcfg.map || {};
+    const mainMap = pcfg.map['.'];
+    const mapping = pjson.module.startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'];
+    if (typeof mainMap === 'object')
+      pcfg.map['.'] = Object.assign({ 'react-native': mapping }, mainMap);
+    else if (typeof mainMap === 'string')
+      pcfg.map['.'] = { 'react-native': mapping, default: mainMap };
     else
-      pcfg.map['.'] = { 'react-native': pjson['react-native'].startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'] };
+      pcfg.map['.'] = { 'react-native': mapping };
   }
 
   if (typeof pjson.electron === 'string') {
-    if (typeof pcfg.map['.'] === 'object')
-      pcfg.map['.'].electron = pjson.electron.startsWith('./') ? pjson.electron : './' + pjson.electron;
-    else if (typeof pcfg.map['.'] == 'string')
-      pcfg.map['.'] = { electron: pjson.electron.startsWith('./') ? pjson.electron : './' + pjson.electron, default: pcfg.map['.'] };
+    pcfg.map = pcfg.map || {};
+    const mainMap = pcfg.map['.'];
+    const mapping = pjson.electron.startsWith('./') ? pjson.electron : './' + pjson.electron;
+    if (typeof mainMap === 'object')
+      pcfg.map['.'] = Object.assign({ electron: mapping }, mainMap);
+    else if (typeof mainMap === 'string')
+      pcfg.map['.'] = { electron: mapping, default: mainMap };
     else
-      pcfg.map['.'] = { 'react-native': pjson.electron.startsWith('./') ? pjson.electron : './' + pjson.electron };
+      pcfg.map['.'] = { electron: mapping };
   }
 
   if (pjson.browser) {
     pcfg.map = pcfg.map || {};
     if (typeof pjson.browser === 'string') {
-      if (typeof pcfg.map['.'] === 'object')
-        pcfg.map['.'].browser = pjson.browser.startsWith('./') ? pjson.browser : './' + pjson.browser;
-      else if (typeof pcfg.map['.'] == 'string')
-        pcfg.map['.'] = { browser: pjson.browser.startsWith('./') ? pjson.browser : './' + pjson.browser, default: pcfg.map['.'] };
+      const mainMap = pcfg.map['.'];
+      const mapping = pjson.module.startsWith('./') ? pjson.browser : './' + pjson.browser;
+      if (typeof mainMap === 'object')
+        pcfg.map['.'] = Object.assign({ browser: mapping }, mainMap);
+      else if (typeof mainMap === 'string')
+        pcfg.map['.'] = { browser: mapping, default: mainMap };
       else
-        pcfg.map['.'] = { browser: pjson.browser.startsWith('./') ? pjson.browser : './' + pjson.browser };
+        pcfg.map['.'] = { browser: mapping };
     }
     else if (typeof pjson.browser === 'object') {
       for (let p in pjson.browser) {
-        let m = pcfg.map[p] = pcfg.map[p] || {};
-        m.browser = pjson.browser[p];
+        let mapping = pjson.browser[p];
+        if (typeof mapping === false) {
+          mapping = '@empty';
+        }
+        else if (typeof mapping !== 'string') {
+          continue;
+        }
+        const browserMap = { browser: mapping };
+        const map = pcfg.map[p];
+        if (typeof map === 'object')
+          pcfg.map[p] = Object.assign({ browser: mapping }, map);
+        else if (typeof map === 'string')
+          pcfg.map[p] = { browser: mapping, default: map };
+        else
+          pcfg.map[p] = { browser: mapping };
       }
     }
   }
