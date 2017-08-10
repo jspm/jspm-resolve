@@ -820,6 +820,15 @@ function applyMap (name, parentMap, env) {
 
 exports.processPjsonConfig = processPjsonConfig;
 function processPjsonConfig (pcfg, pjson) {
+  if (typeof pjson.module === 'string') {
+    pcfg.module = true;
+    pcfg.map = pcfg.map || {};
+    pcfg.map['.'] = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
+  }
+  else if (pjson.module === true) {
+    pcfg.module = true;
+  }
+
   if (pjson.main) {
     pcfg.map = pcfg.map || {};
     if (typeof pjson.main === 'string')
@@ -862,15 +871,6 @@ function processPjsonConfig (pcfg, pjson) {
         m.browser = pjson.browser[p];
       }
     }
-  }
-
-  if (typeof pjson.module === 'string') {
-    pcfg.module = true;
-    pcfg.map = pcfg.map || {};
-    pcfg.map['.'] = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
-  }
-  else if (typeof pjson.module === 'boolean') {
-    pcfg.module = pjson.module;
   }
 
   if (pjson.map && typeof pjson.map === 'object') {
