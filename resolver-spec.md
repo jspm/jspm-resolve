@@ -617,4 +617,5 @@ Full compatility in a module loading pipeline would be formed with a wrapper alo
 
 > 1. If _name_ is a core module then return _name_.
 > 1. If _name_ ends with a _"/"_ character then set _name_ to the substring of _name_ up to the second last character.
-> 1. Return the result of _JSPM_RESOLVE(name, parentUrl)_, propagating any error on abrupt completion.
+> 1. Initialize a jspm resolver with a conditional environment containing with the _"module"_ conditional set to false.
+> 1. Return the result of _JSPM_RESOLVE(name, parentUrl)_ on the resolver instance, propagating any error on abrupt completion.
