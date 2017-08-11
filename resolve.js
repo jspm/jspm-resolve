@@ -821,6 +821,16 @@ function applyMap (name, parentMap, env) {
 
 exports.processPjsonConfig = processPjsonConfig;
 function processPjsonConfig (pcfg, pjson) {
+  if (pjson.main) {
+    pcfg.map = pcfg.map || {};
+    const mainMap = pcfg.map['.'];
+    const mapping = pjson.main.startsWith('./') ? pjson.main : './' + pjson.main;
+    if (typeof mainMap === 'object')
+      mainMap.default = mapping;
+    else
+      pcfg.map['.'] = mapping;
+  }
+
   if (typeof pjson.module === 'string') {
     pcfg.module = true;
     pcfg.map = pcfg.map || {};
@@ -838,16 +848,6 @@ function processPjsonConfig (pcfg, pjson) {
   }
   else {
     pcfg.module = pjson.module === true;
-  }
-
-  if (pjson.main) {
-    pcfg.map = pcfg.map || {};
-    const mainMap = pcfg.map['.'];
-    const mapping = pjson.main.startsWith('./') ? pjson.main : './' + pjson.main;
-    if (typeof mainMap === 'object')
-      mainMap.default = mapping;
-    else
-      pcfg.map['.'] = mapping;
   }
 
   if (typeof pjson['react-native'] === 'string') {
@@ -922,16 +922,34 @@ function processPjsonConfig (pcfg, pjson) {
     pcfg.map = pcfg.map || {};
     for (let p in pjson.map) {
       const mapping = pjson.map[p];
-      const existingMap = cfg.map[name];
-      if (typeof existingMap === 'object')
-        if (existingMap[condition])
-          existingMap[condition] = mapping;
+      if (typeof mapping === 'string') {
+        const existingMap = pcfg.map[p];
+        if (typeof existingMap === 'object')
+          existingMap.default = mapping;
         else
-          cfg.map['.'] = Object.assign({ [condition]: mapping }, existingMap);
-      else if (typeof existingMap === 'string')
-        config.map['.'] = { [condition]: mapping, default: existingMap };
-      else
-        config.map['.'] = { [condition]: mapping };
+          pcfg.map[p] = mapping;
+      }
+      else if (typeof mapping === 'object') {
+        const existingMap = pcfg.map[p];
+        if (typeof existingMap === 'object') {
+          const newMap = {};
+          // new conditions go to the top
+          for (let p in mapping)
+            if (!(p in existingMap))
+              newMap[p] = mapping[p];
+          // then existing conditions in same order
+          // replaced by the new conditions
+          for (let p in existingMap)
+            newMap[p] = mapping[p] || existingMap[p];
+          pcfg.map[p] = newMap;
+        }
+        else if (typeof existingMap === 'string') {
+          pcfg.map[p] = Object.assign({ default: existingMap }, mapping);
+        }
+        else {
+          pcfg.map[p] = Object.assign({}, mapping);
+        }
+      }
     }
   }
 
