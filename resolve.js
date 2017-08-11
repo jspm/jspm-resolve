@@ -944,7 +944,10 @@ function processPjsonConfig (pcfg, pjson) {
           pcfg.map[p] = newMap;
         }
         else if (typeof existingMap === 'string') {
-          pcfg.map[p] = Object.assign({ default: existingMap }, mapping);
+          const newMap = Object.assign({}, mapping);
+          if (!newMap.default)
+            newMap.default = existingMap;
+          config.map[p] = newMap;
         }
         else {
           pcfg.map[p] = Object.assign({}, mapping);
