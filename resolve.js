@@ -853,7 +853,7 @@ function processPjsonConfig (pcfg, pjson) {
   if (typeof pjson['react-native'] === 'string') {
     pcfg.map = pcfg.map || {};
     const mainMap = pcfg.map['.'];
-    const mapping = pjson.module.startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'];
+    const mapping = pjson['react-native'].startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'];
     if (typeof mainMap === 'object')
       if (mainMap['react-native'])
         mainMap['react-native'] = mapping;
@@ -884,7 +884,7 @@ function processPjsonConfig (pcfg, pjson) {
     pcfg.map = pcfg.map || {};
     if (typeof pjson.browser === 'string') {
       const mainMap = pcfg.map['.'];
-      const mapping = pjson.module.startsWith('./') ? pjson.browser : './' + pjson.browser;
+      const mapping = pjson.browser.startsWith('./') ? pjson.browser : './' + pjson.browser;
       if (typeof mainMap === 'object')
         if (mainMap.browser)
           mainMap.browser = mapping;
@@ -898,13 +898,12 @@ function processPjsonConfig (pcfg, pjson) {
     else if (typeof pjson.browser === 'object') {
       for (let p in pjson.browser) {
         let mapping = pjson.browser[p];
-        if (typeof mapping === false) {
+        if (mapping === false) {
           mapping = '@empty';
         }
         else if (typeof mapping !== 'string') {
           continue;
         }
-        const browserMap = { browser: mapping };
         const map = pcfg.map[p];
         if (typeof map === 'object')
           if (map.browser)
