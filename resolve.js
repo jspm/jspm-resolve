@@ -920,7 +920,19 @@ function processPjsonConfig (pcfg, pjson) {
 
   if (pjson.map && typeof pjson.map === 'object') {
     pcfg.map = pcfg.map || {};
-    Object.assign(pcfg.map, pjson.map);
+    for (let p in pjson.map) {
+      const mapping = pjson.map[p];
+      const existingMap = cfg.map[name];
+      if (typeof existingMap === 'object')
+        if (existingMap[condition])
+          existingMap[condition] = mapping;
+        else
+          cfg.map['.'] = Object.assign({ [condition]: mapping }, existingMap);
+      else if (typeof existingMap === 'string')
+        config.map['.'] = { [condition]: mapping, default: existingMap };
+      else
+        config.map['.'] = { [condition]: mapping };
+    }
   }
 
   return pcfg;
