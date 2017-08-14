@@ -789,7 +789,7 @@ class JspmResolver {
 
 JspmResolver.applyMap = applyMap;
 
-module.exports = JspmResolver;
+module.exports = exports = JspmResolver;
 
 function applyMap (name, parentMap, env) {
   let mapped;
