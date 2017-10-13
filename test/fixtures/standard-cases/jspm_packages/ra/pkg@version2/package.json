@@ -1,6 +1,11 @@
 {
-  "module": "./a",
+  "mains": {
+    "module": "./a"
+  },
   "map": {
-    "./a": "./b"
-  }
+    "./a": {
+      "default": "./b"
+    }
+  },
+  "esm": true
 }

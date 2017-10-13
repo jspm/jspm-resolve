@@ -3,15 +3,13 @@
 const { URL } = require('url');
 const path = require('path');
 const fs = require('fs');
-const browserResolve = require('browser-resolve');
-const nodeResolve = require('resolve');
 
 const winSepRegEx = /\\/g;
 const winDrivePathRegEx = /^[a-z]:\\/i;
 const encodedSepRegEx = /%(5C|2F)/gi;
 
-function throwModuleNotFound (name) {
-  let e = new Error(`Module ${name} not found.`);
+function throwModuleNotFound (name, parent) {
+  let e = new Error(`Cannot find module ${name}${parent ? ` from ${parent}` : ''}.`);
   e.code = 'MODULE_NOT_FOUND';
   throw e;
 }
@@ -43,9 +41,9 @@ function parsePackagePath (path, jspmPackagesPath) {
   if (packageMatch)
     return { name: packageMatch[1].replace('/', ':'), path: packageMatch[2] };
 }
-function packageToPath (pkgName, jspmPackagesPath) {
-  let registryIndex = pkgName.indexOf(':');
-  return jspmPackagesPath + pkgName.substr(0, registryIndex) + '/' + pkgName.substr(registryIndex + 1);
+function packageToPath (pkg, jspmPackagesPath) {
+  let registryIndex = pkg.name.indexOf(':');
+  return jspmPackagesPath + pkg.name.substr(0, registryIndex) + '/' + pkg.name.substr(registryIndex + 1) + pkg.path;
 }
 
 function percentDecode (path) {
@@ -56,36 +54,86 @@ function percentDecode (path) {
   return decodeURIComponent(path);
 }
 
-async function fileResolve (instance, path) {
-  if (path[path.length - 1] === '/')
-    return path;
-  if (await instance.isFile(path))
-    return path;
-  let curPath;
-  if (await instance.isFile((curPath = path + '.js')) ||
-      await instance.isFile((curPath = path + '.json')) ||
-      await instance.isFile((curPath = path + '.node')) ||
-      await instance.isFile((curPath = path + '/index.js')) ||
-      await instance.isFile((curPath = path + '/index.json')) ||
-      await instance.isFile((curPath = path + '/index.node')))
-    return curPath;
-  throwModuleNotFound(path);
+async function fileResolve (path, cjsResolve, realpath) {
+  if (path[path.length - 1] === '/') {
+    if (!await this.isDir(path))
+      throwModuleNotFound(path);
+    return { resolved: path, format: undefined };
+  }
+  let resolved;
+  if (await this.isFile(path))
+    resolved = path;
+  else if (cjsResolve === false && await this.isFile(resolved = path + '.mjs'));
+  else if (await this.isFile(resolved = path + '.js'));
+  else if (await this.isFile(resolved = path + '.json'));
+  else if (await this.isFile(resolved = path + '.node'));
+  else if (cjsResolve === false && await this.isFile(resolved = path + '/index.mjs'));
+  else if (await this.isFile(resolved = path + '/index.js'));
+  else if (await this.isFile(resolved = path + '/index.json'));
+  else if (await this.isFile(resolved = path + '/index.node'));
+  else
+    throwModuleNotFound(path);
+  if (realpath)
+    resolved = await this.realpath(resolved);
+  if (resolved.endsWith('.mjs')) {
+    if (cjsResolve === true)
+      throwInvalidModuleName(`Cannot load ES module ${resolved} from CommonJS parent.`);
+    return { resolved, format: 'esm' };
+  }
+  if (resolved.endsWith('.json'))
+    return { resolved, format: 'json' };
+  if (resolved.endsWith('.node'))
+    return { resolved, format: 'addon' };
+  if (resolved.endsWith('.js')) {
+    if (cjsResolve === false) {
+      const pcfg = await getPackageConfig.call(this, resolved);
+      if (pcfg !== undefined)
+        return { resolved, format: pcfg.config.esm === true ? 'esm' : 'cjs' };
+    }
+    return { resolved, format: cjsResolve === true ?  'cjs' : 'esm' };
+  }
+  throwInvalidModuleName(`Cannot load unknown file type ${resolved}`);
 }
 
-function fileResolveSync (instance, path) {
-  if (path[path.length - 1] === '/')
-    return path;
-  if (instance.isFileSync(path))
-    return path;
-  let curPath;
-  if (instance.isFileSync((curPath = path + '.js')) ||
-      instance.isFileSync((curPath = path + '.json')) ||
-      instance.isFileSync((curPath = path + '.node')) ||
-      instance.isFileSync((curPath = path + '/index.js')) ||
-      instance.isFileSync((curPath = path + '/index.json')) ||
-      instance.isFileSync((curPath = path + '/index.node')))
-    return curPath;
-  throwModuleNotFound(path);
+function fileResolveSync (path, cjsResolve, realpath) {
+  if (path[path.length - 1] === '/') {
+    if (!this.isDirSync(path))
+      throwModuleNotFound(path);
+    return { resolved: path, format: undefined };
+  }
+  let resolved;
+  if (this.isFileSync(path))
+    resolved = path;
+  else if (cjsResolve === false && this.isFileSync(resolved = path + '.mjs'));
+  else if (this.isFileSync(resolved = path + '.js'));
+  else if (this.isFileSync(resolved = path + '.json'));
+  else if (this.isFileSync(resolved = path + '.node'));
+  else if (cjsResolve === false && this.isFileSync(resolved = path + '/index.mjs'));
+  else if (this.isFileSync(resolved = path + '/index.js'));
+  else if (this.isFileSync(resolved = path + '/index.json'));
+  else if (this.isFileSync(resolved = path + '/index.node'));
+  else
+    throwModuleNotFound(path);
+  if (realpath)
+    resolved = this.realpathSync(resolved);
+  if (resolved.endsWith('.mjs')) {
+    if (cjsResolve === true)
+      throwInvalidModuleName(`Cannot load ES module ${resolved} from CommonJS parent.`);
+    return { resolved, format: 'esm' };
+  }
+  if (resolved.endsWith('.json'))
+    return { resolved, format: 'json' };
+  if (resolved.endsWith('.node'))
+    return { resolved, format: 'addon' };
+  if (resolved.endsWith('.js')) {
+    if (cjsResolve === false) {
+      const pcfg = getPackageConfigSync.call(this, resolved);
+      if (pcfg !== undefined)
+        return { resolved, format: pcfg.config.esm === true ? 'esm' : 'cjs' };
+    }
+    return { resolved, format: cjsResolve === true ?  'cjs' : 'esm' };
+  }
+  throwInvalidModuleName(`Cannot load unknown file type ${resolved}`);
 }
 
 function tryParseUrl (url) {
@@ -163,30 +211,86 @@ function resolvePath (path) {
   return outStr;
 }
 
-function nodeModuleResolve (instance, name, parentPath, env) {
-  if (name[name.length - 1] === '/')
-    throwModuleNotFound(name);
-  return new Promise((resolve, reject) => {
-    (env.browser ? browserResolve : nodeResolve)(name, {
-      basedir: parentPath.substr(0, parentPath.lastIndexOf('/')),
-      isFile (path, cb) {
-        instance.isFile(path).then(result => cb(null, result), cb);
-      },
-      readFile (path, cb) {
-        instance.readFile(path).then(source => cb(null, source), cb);
+async function nodeModuleResolve (name, parentPath, env, cjsResolve) {
+  if (this.nodeCoreModules[name])
+    return { resolved: name, format: 'builtin' };
+  let separatorIndex = parentPath.lastIndexOf('/');
+  let rootSeparatorIndex = parentPath.indexOf('/');
+  while (separatorIndex > rootSeparatorIndex) {
+    let resolved = parentPath.substr(0, separatorIndex) + '/node_modules/' + name;
+    let pkgConfig = await getPackageConfig.call(this, resolved);
+    if (pkgConfig !== undefined) {
+      if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
+          resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+        const mapped = applyMain(pkgConfig.config.mains, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolved = pkgConfig.path + mapped;
+        }
       }
-    }, (err, resolved) => err ? reject(err) : resolve(resolved));
-  });
+      else if (pkgConfig.config.map !== undefined &&
+          resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+        const relPath = '.' + resolved.substr(pkgConfig.path.length);
+        const mapped = applyMap(relPath, pkgConfig.config.map, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolved = pkgConfig.path + mapped;
+        }
+      }
+    }
+    try {
+      return await fileResolve.call(this, resolved, cjsResolve, true);
+    }
+    catch (e) {
+      if (e.code !== 'MODULE_NOT_FOUND')
+        throw e;
+    }  
+    separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
+  }
+  throwModuleNotFound(name, parentPath);
 }
 
-function nodeModuleResolveSync (instance, name, parentPath, env) {
-  if (name[name.length - 1] === '/')
-    throwModuleNotFound(name);
-  return (env.browser ? browserResolve : nodeResolve).sync(name, {
-    basedir: parentPath.substr(0, parentPath.lastIndexOf('/')),
-    isFile: instance.isFileSync,
-    readFileSync: instance.readFileSync
-  });
+function nodeModuleResolveSync (name, parentPath, env, cjsResolve) {
+  if (this.nodeCoreModules[name])
+    return { resolved: name, format: 'builtin' };
+  let separatorIndex = parentPath.lastIndexOf('/');
+  let rootSeparatorIndex = parentPath.indexOf('/');
+  while (separatorIndex > rootSeparatorIndex) {
+    let resolved = parentPath.substr(0, separatorIndex) + '/node_modules/' + name;
+    let pkgConfig = getPackageConfigSync.call(this, resolved);
+    if (pkgConfig !== undefined) {
+      if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
+          resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+        const mapped = applyMain(pkgConfig.config.mains);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolved = pkgConfig.path + mapped;
+        }
+      }
+      else if (pkgConfig.config.map !== undefined &&
+          resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+        const relPath = '.' + resolved.substr(pkgConfig.path.length);
+        const mapped = applyMap(relPath, pkgConfig.config.map, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolved = pkgConfig.path + mapped;
+        }
+      }
+    }
+    try {
+      return fileResolveSync.call(this, resolved, cjsResolve, true);
+    }
+    catch (e) {
+      if (e.code !== 'MODULE_NOT_FOUND')
+        throw e;
+    }  
+    separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
+  }
+  throwModuleNotFound(name, parentPath);
 }
 
 function setDefaultEnv (env, defaultEnv) {
@@ -207,6 +311,7 @@ function setDefaultEnv (env, defaultEnv) {
   else if (typeof env.dev === 'boolean') {
     env.production = !env.dev;
   }
+  env.default = true;
   return env;
 }
 
@@ -220,9 +325,21 @@ const defaultEnv = {
   module: true
 };
 
+// resolve returns { path,  format }
+// CJS modules always resolve to CJS (thus skipping "module" condition!)
+// where "module" condition is used,  format is "module"
 class JspmResolver {
   constructor (projectPath = process.cwd(), env = {}) {
     this.pjsonConfigCache = {};
+    this.isFileCache = {};
+    this.isDirCache = {};
+    this.nodeCoreModules = {
+      assert: true, buffer: true, child_process: true, cluster: true, console: true, constants: true, crypto: true,
+      dgram: true, dns: true, domain: true, events: true, fs: true, http: true, https: true, module: true, net: true,
+      os: true, path: true, process: true, punycode: true, querystring: true, readline: true, repl: true, stream: true,
+      string_decoder: true, sys: true, timers: true, tls: true, tty: true, url: true, util: true, vm: true, zlib: true
+    };
+ 
     this.isWindows = process.platform === 'win32';
     if (this.isWindows)
       projectPath = projectPath.replace(winSepRegEx, '/');
@@ -233,306 +350,268 @@ class JspmResolver {
     this.env = setDefaultEnv(env, defaultEnv);
   }
 
-  async resolve (name, parentPath, env) {
+  async resolve (name, parentPath, env, cjsResolve = false) {
+    const config = this.config;
     if (!parentPath)
-      parentPath = this.config ? this.config.basePath : process.cwd();
+      parentPath = config ? config.basePath : process.cwd();
+    if (parentPath.indexOf('\\') !== -1)
+      parentPath = parentPath.replace(winSepRegEx, '/');
     env = env ? setDefaultEnv(env, this.env) : this.env;
 
-    // / is supported in windows, so we treat this as the canonical form for this resolver
-    if (this.isWindows && parentPath.indexOf('\\') !== -1)
-      parentPath = parentPath.replace(winSepRegEx, '/');
-
-    let config, resolvedPath, resolvedPkg;
+    let resolvedPath, resolvedPkg;
 
     // Absolute path
     if (name[0] === '/') {
-      resolvedPath = name.replace(winSepRegEx, '/');
-      if (resolvedPath[1] === '/') {
-        if (resolvedPath[2] === '/')
-          resolvedPath = percentDecode(resolvePath(resolvedPath.substr(2 + this.isWindows)));
+      name = name.replace(winSepRegEx, '/');
+      if (name[1] === '/') {
+        if (name[2] === '/')
+          resolvedPath = resolvePath(percentDecode(name.substr(2 + this.isWindows)));
         else
           throwInvalidModuleName(`${name} is not a valid module name.`);
       }
       else {
-        resolvedPath = resolvePath(this.isWindows ? resolvedPath.substr(1) : resolvedPath);
+        resolvedPath = resolvePath(percentDecode(this.isWindows ? name.substr(1) : name));
       }
     }
     // Relative path
-    else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
-      config = this.getJspmConfig(parentPath);
-      if (config && (resolvedPkg = parsePackagePath(parentPath, config.jspmPackagesPath))) {
-        let relPath = resolvePath(resolvedPkg.path.substr(0, resolvedPkg.path.lastIndexOf('/') + 1) + percentDecode(name));
-        if (relPath[0] !== '/')
-          throwInvalidModuleName(`Backtracking below a package boundary is not permitted resolving ${name} to ${parentPath}.`);
-        if (relPath.length === 1)
-          relPath = '';
-        resolvedPkg.path = relPath;
-      }
-      else {
-        resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + name.replace(winSepRegEx, '/'));
-      }
+    else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && name[2] === '/')) {
+      name = name.replace(winSepRegEx, '/');
+      resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + percentDecode(name));
     }
     // Exact package request or URL request
     else if (name.indexOf(':') !== -1) {
       resolvedPkg = parsePackageName(name);
+      if (resolvedPkg) {
+        if (name.indexOf('\\') !== -1)
+          throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
+      }
       // URL
-      if (!resolvedPkg) {
-        if (this.isWindows && name.match(winDrivePathRegEx)) {
-          resolvedPath = percentDecode(resolvePath(name.replace(winSepRegEx, '/')));
-        }
-        else {
-          let url = tryParseUrl(name);
-          if (url.protocol === 'file:')
-            resolvedPath = this.isWindows ? url.pathname.substr(1) : url.pathname;
-          else
-            throwInvalidModuleName(`${name} is not a valid module name.`);
-        }
+      else {
+        const url = tryParseUrl(name);
+        if (url.protocol === 'file:')
+          resolvedPath = percentDecode(this.isWindows ? url.pathname.substr(1) : url.pathname);
+        else
+          throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
       }
     }
     // Plain name resolution
     else {
-      config = this.getJspmConfig(parentPath);
-
-      if (!config)
-        return await nodeModuleResolve(this, name, parentPath, env);
-
-      let parentPkgPath;
-      let parentPkg = parsePackagePath(parentPath, config.jspmPackagesPath);
-      if (parentPkg)
-        parentPkgPath = parentPath.substr(0, config.jspmPackagesPath.length + parentPkg.name.length);
-
-      // package map
-      {
-        let mapped = await this.packageMap(name, parentPkgPath, config, env);
-        if (mapped) {
-          if (mapped.startsWith('./')) {
-            if (parentPkgPath) {
-              return await fileResolve(this, parentPkgPath + mapped.substr(1));
+      if (name.indexOf('\\') !== -1)
+        throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
+      const parentPkgConfig = await getPackageConfig.call(this, parentPath);
+      if (parentPkgConfig.config.map) {
+        const mapped = applyMap(name, parentPkgConfig.config.map, env);
+        if (mapped !== undefined) {
+          if (mapped[0] === '.'  && mapped[1] === '/') {
+            if (config !== undefined && parentPkgConfig.path === config.basePath) {
+              resolvedPath = (env.dev ? config.localPackagePathDev : config.localPackagePathProduction) + mapped.substr(2);
             }
             else {
-              let basePath = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
-              return await fileResolve(this, basePath + mapped.substr(2));
+              resolvedPath = parentPkgConfig.path + mapped.substr(2);
             }
+            return await fileResolve.call(this, resolvedPath, cjsResolve, false);
           }
-          name = mapped;
-          resolvedPkg = parsePackageName(name);
+          else {
+            name = mapped;
+          }
         }
       }
-
-      // resolve
-      if (!resolvedPkg) {
-        let resolved = await this.packageResolve(name, parentPkg && parentPkg.name, config);
-        if (resolved) {
-          resolvedPkg = parsePackageName(resolved);
-          if (resolvedPkg)
-            name = resolved;
-        }
+      let parentPkgName = undefined;
+      if (config !== undefined && (
+          parentPath.length === config.basePath.length - 1 && parentPath === config.basePath.substr(0, config.basePath.length - 1) ||
+          parentPath.length >= config.basePath.length && parentPath.substr(0, config.basePath.length) === config.basePath)) {
+        const parentPkg = parsePackagePath(parentPath, config.jspmPackagesPath);
+        if (parentPkg !== undefined)
+          parentPkgName = parentPkg.name;
       }
 
-      // node modules fallback
-      if (!resolvedPkg) {
+      const resolvedPkgName = await this.packageResolve(name, parentPkgName, config);
+      if (resolvedPkgName) {
+        resolvedPkg = parsePackageName(resolvedPkgName);
+      }
+      else {
         if (name === '@empty')
-          return;
-        return await nodeModuleResolve(this, name, parentPath, env);
+          return { resolved: undefined, format: undefined };
+        return await nodeModuleResolve.call(this, name, parentPath, env);
       }
     }
 
-    // detect package from resolved path, including detecting in other jspm projects
-    if (!resolvedPkg) {
-      config = this.getJspmConfig(resolvedPath);
-
-      if (!config)
-        return await fileResolve(this, resolvedPath);
-
-      resolvedPkg = parsePackagePath(resolvedPath, config.jspmPackagesPath);
-    }
-
-    // internal package resolution maps
+    // convert canonical package names into a resolved path
     if (resolvedPkg) {
       if (!config)
-        config = this.getJspmConfig(parentPath);
-      if (!resolvedPath && !config)
-        throwInvalidModuleName(`Cannot import jspm package ${name} when path ${parentPath} is not a jspm project.`);
-      let resolvedPkgPath = packageToPath(resolvedPkg.name, config.jspmPackagesPath);
-      if (!resolvedPath)
-        resolvedPath = resolvedPkgPath + resolvedPkg.path;
-      if (resolvedPkg.path === '/')
-        return resolvedPath;
-      let mapped = await this.packageMap('.' + resolvedPkg.path, resolvedPkgPath, config, env);
-      if (mapped) {
-        if (!mapped.startsWith('./'))
-          throwInvalidConfig(`Invalid package map for ${resolvedPkgPath}. Relative path ".${resolvedPath.substr(resolvedPkgPath.length)}" must map to another relative path, not "${mapped}".`);
-        // (relative map is always relative)
-        return await fileResolve(this, resolvedPkgPath + mapped.substr(1));
-      }
+        throwInvalidModuleName(`Cannot import jspm package ${name} when resolver is not initialized to a jspm project.`);
+      resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
     }
-    // base project package internal resolution map
-    else if (config) {
-      let basePath = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
-      if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
-        (resolvedPath[basePath.length - 1] === '/' || resolvedPath.length === basePath.length - 1)) {
-        let relPath = '.' + resolvedPath.substr(basePath.length - 1);
-        let mapped = await this.packageMap(relPath, undefined, config, env);
-        if (mapped) {
-          if (!mapped.startsWith('./'))
-            throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-          return await fileResolve(this, basePath + mapped.substr(2));
+
+    const realpath = config === undefined && resolvedPath.indexOf('/node_modules/') !== -1 ||
+        resolvedPath.startsWith(config.basePath) && resolvedPath.lastIndexOf('/node_modules/') > config.basePath.length;
+
+    if (resolvedPath[resolvedPath.length - 1] === '/')
+      return await fileResolve.call(this, resolvedPath, cjsResolve, realpath);
+    
+    const pkgConfig = await getPackageConfig.call(this, resolvedPath);
+    if (pkgConfig.path !== undefined) {
+      if (config !== undefined && pkgConfig.path === config.basePath) {
+        if (resolvedPath.length === config.jspmPackagesPath.length - 1 && resolvedPath === config.jspmPackagesPath.substr(0, config.jspmPackagesPath.length - 1) ||
+            resolvedPath.length >= config.jspmPackagesPath.length && resolvedPath.substr(0, config.jspmPackagesPath.length) === config.jspmPackagesPath)
+          return await fileResolve.call(this, resolvedPath, cjsResolve, realpath);
+        pkgConfig.path = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
+      }
+      
+      if (pkgConfig.config.mains !== undefined && resolvedPath.length === pkgConfig.path.length - 1 &&
+          resolvedPath === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+        const mapped = applyMain(pkgConfig.config.mains, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolvedPath = pkgConfig.path + mapped;
+        }
+      }
+      else if (pkgConfig.config.map !== undefined &&
+          resolvedPath.length >= pkgConfig.path.length && resolvedPath.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+        const relPath = '.' + resolvedPath.substr(pkgConfig.path.length - 1);
+        const mapped = applyMap(relPath, pkgConfig.config.map, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolvedPath = pkgConfig.path + mapped;
         }
       }
     }
 
-    return await fileResolve(this, resolvedPath);
+    return await fileResolve.call(this, resolvedPath, cjsResolve, realpath);
   }
 
-  resolveSync (name, parentPath, env) {
+  resolveSync (name, parentPath, env, cjsResolve = false) {
+    const config = this.config;
     if (!parentPath)
-      parentPath = this.config ? this.config.basePath : process.cwd();
+      parentPath = config ? config.basePath : process.cwd();
+    if (parentPath.indexOf('\\') !== -1)
+      parentPath = parentPath.replace(winSepRegEx, '/');
     env = env ? setDefaultEnv(env, this.env) : this.env;
 
-    // / is supported in windows, so we treat this as the canonical form for this resolver
-    if (this.isWindows && parentPath.indexOf('\\') !== -1)
-      parentPath = parentPath.replace(winSepRegEx, '/');
-
-    let config, resolvedPath, resolvedPkg;
+    let resolvedPath, resolvedPkg;
 
     // Absolute path
     if (name[0] === '/') {
-      resolvedPath = name.replace(winSepRegEx, '/');
-      if (resolvedPath[1] === '/') {
-        if (resolvedPath[2] === '/')
-          resolvedPath = percentDecode(resolvePath(resolvedPath.substr(2 + this.isWindows)));
+      name = name.replace(winSepRegEx, '/');
+      if (name[1] === '/') {
+        if (name[2] === '/')
+          resolvedPath = resolvePath(percentDecode(name.substr(2 + this.isWindows)));
         else
           throwInvalidModuleName(`${name} is not a valid module name.`);
       }
       else {
-        resolvedPath = resolvePath(this.isWindows ? resolvedPath.substr(1) : resolvedPath);
+        resolvedPath = resolvePath(percentDecode(this.isWindows ? name.substr(1) : name));
       }
     }
     // Relative path
-    else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2)) || name[1] === '.' && name[2] === '/')) {
-      config = this.getJspmConfig(parentPath);
-      if (config && (resolvedPkg = parsePackagePath(parentPath, config.jspmPackagesPath))) {
-        let relPath = resolvePath(resolvedPkg.path.substr(0, resolvedPkg.path.lastIndexOf('/') + 1) + percentDecode(name));
-        if (relPath[0] !== '/')
-          throwInvalidModuleName(`Backtracking below a package boundary is not permitted resolving ${name} to ${parentPath}.`);
-        if (relPath.length === 1)
-          relPath = '';
-        resolvedPkg.path = relPath;
-      }
-      else {
-        resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + name.replace(winSepRegEx, '/'));
-      }
+    else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && name[2] === '/')) {
+      name = name.replace(winSepRegEx, '/');
+      resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + percentDecode(name));
     }
     // Exact package request or URL request
     else if (name.indexOf(':') !== -1) {
       resolvedPkg = parsePackageName(name);
+      if (resolvedPkg) {
+        if (name.indexOf('\\') !== -1)
+          throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
+      }
       // URL
-      if (!resolvedPkg) {
-        if (this.isWindows && name.match(winDrivePathRegEx)) {
-          resolvedPath = percentDecode(resolvePath(name.replace(winSepRegEx, '/')));
-        }
-        else {
-          let url = tryParseUrl(name);
-          if (url.protocol === 'file:')
-            resolvedPath = this.isWindows ? url.pathname.substr(1) : url.pathname;
-          else
-            throwInvalidModuleName(`${name} is not a valid module name.`);
-        }
+      else {
+        const url = tryParseUrl(name);
+        if (url.protocol === 'file:')
+          resolvedPath = percentDecode(this.isWindows ? url.pathname.substr(1) : url.pathname);
+        else
+          throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
       }
     }
     // Plain name resolution
     else {
-      config = this.getJspmConfig(parentPath);
-
-      if (!config)
-        return nodeModuleResolve(this, name, parentPath, env);
-
-      let parentPkgPath;
-      let parentPkg = parsePackagePath(parentPath, config.jspmPackagesPath);
-      if (parentPkg)
-        parentPkgPath = parentPath.substr(0, config.jspmPackagesPath.length + parentPkg.name.length);
-
-      // package map
-      {
-        let mapped = this.packageMapSync(name, parentPkgPath, config, env);
-        if (mapped) {
-          if (mapped.startsWith('./')) {
-            if (parentPkgPath) {
-              return fileResolveSync(this, parentPkgPath + mapped.substr(1));
+      if (name.indexOf('\\') !== -1)
+        throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
+      const parentPkgConfig = getPackageConfigSync.call(this, parentPath);
+      if (parentPkgConfig.config.map) {
+        const mapped = applyMap(name, parentPkgConfig.config.map, env);
+        if (mapped !== undefined) {
+          if (mapped[0] === '.'  && mapped[1] === '/') {
+            if (config !== undefined && parentPkgConfig.path === config.basePath) {
+              resolvedPath = (env.dev ? config.localPackagePathDev : config.localPackagePathProduction) + mapped.substr(2);
             }
             else {
-              let basePath = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
-              return fileResolveSync(this, basePath + mapped.substr(2));
+              resolvedPath = parentPkgConfig.path + mapped.substr(2);
             }
+            return fileResolveSync.call(this, resolvedPath, cjsResolve, false);
           }
-          name = mapped;
-          resolvedPkg = parsePackageName(name);
+          else {
+            name = mapped;
+          }
         }
       }
-
-      // resolve
-      if (!resolvedPkg) {
-        let resolved = this.packageResolveSync(name, parentPkg && parentPkg.name, config);
-        if (resolved) {
-          resolvedPkg = parsePackageName(resolved);
-          if (resolvedPkg)
-            name = resolved;
-        }
+      let parentPkgName = undefined;
+      if (config !== undefined && (
+          parentPath.length === config.basePath.length - 1 && parentPath === config.basePath.substr(0, config.basePath.length - 1) ||
+          parentPath.length >= config.basePath.length && parentPath.substr(0, config.basePath.length) === config.basePath)) {
+        const parentPkg = parsePackagePath(parentPath, config.jspmPackagesPath);
+        if (parentPkg !== undefined)
+          parentPkgName = parentPkg.name;
       }
 
-      // node modules fallback
-      if (!resolvedPkg) {
+      const resolvedPkgName = this.packageResolveSync(name, parentPkgName, config);
+      if (resolvedPkgName) {
+        resolvedPkg = parsePackageName(resolvedPkgName);
+      }
+      else {
         if (name === '@empty')
-          return;
-        return nodeModuleResolveSync(this, name, parentPath, env);
+          return { resolved: undefined, format: undefined };
+        return nodeModuleResolveSync.call(this, name, parentPath, env);
       }
     }
 
-    // detect package from resolved path, including detecting in other jspm projects
-    if (!resolvedPkg) {
-      config = this.getJspmConfig(resolvedPath);
-
-      if (!config)
-        return fileResolveSync(this, resolvedPath);
-
-      resolvedPkg = parsePackagePath(resolvedPath, config.jspmPackagesPath);
-    }
-
-    // internal package resolution maps
+    // convert canonical package names into a resolved path
     if (resolvedPkg) {
       if (!config)
-        config = this.getJspmConfig(parentPath);
-      if (!resolvedPath && !config)
-        throwInvalidModuleName(`Cannot import jspm package ${name} when path ${parentPath} is not a jspm project.`);
-      let resolvedPkgPath = packageToPath(resolvedPkg.name, config.jspmPackagesPath);
-      if (!resolvedPath)
-        resolvedPath = resolvedPkgPath + resolvedPkg.path;
-      if (resolvedPkg.path === '/')
-        return resolvedPath;
-      let mapped = this.packageMapSync('.' + resolvedPkg.path, resolvedPkgPath, config, env);
-      if (mapped) {
-        if (!mapped.startsWith('./'))
-          throwInvalidConfig(`Invalid package map for ${resolvedPkgPath}. Relative path ".${resolvedPath.substr(resolvedPkgPath.length)}" must map to another relative path, not "${mapped}".`);
-        // (relative map is always relative)
-        return fileResolveSync(this, resolvedPkgPath + mapped.substr(1));
-      }
+        throwInvalidModuleName(`Cannot import jspm package ${name} when resolver is not initialized to a jspm project.`);
+      resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
     }
-    // base project package internal resolution map
-    else if (config) {
-      let basePath = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
-      if (resolvedPath.startsWith(basePath.substr(0, basePath.length - 1)) &&
-        (resolvedPath[basePath.length - 1] === '/' || resolvedPath.length === basePath.length - 1)) {
-        let relPath = '.' + resolvedPath.substr(basePath.length - 1);
-        let mapped = this.packageMapSync(relPath, undefined, config, env);
-        if (mapped) {
-          if (!mapped.startsWith('./'))
-            throwInvalidConfig(`Invalid base map for relative path "${relPath}". Relative map must map to another relative path, not "${mapped}".`);
-          return fileResolveSync(this, basePath + mapped.substr(2));
+
+    const realpath = config === undefined && resolvedPath.indexOf('/node_modules/') !== -1 ||
+        resolvedPath.startsWith(config.basePath) && resolvedPath.lastIndexOf('/node_modules/') > config.basePath.length;
+
+    if (resolvedPath[resolvedPath.length - 1] === '/')
+      return fileResolveSync.call(this, resolvedPath, cjsResolve, realpath);
+    
+    const pkgConfig = getPackageConfigSync.call(this, resolvedPath);
+    if (pkgConfig.path !== undefined) {
+      if (config !== undefined && pkgConfig.path === config.basePath) {
+        if (resolvedPath.length === config.jspmPackagesPath.length - 1 && resolvedPath === config.jspmPackagesPath.substr(0, config.jspmPackagesPath.length - 1) ||
+            resolvedPath.length >= config.jspmPackagesPath.length && resolvedPath.substr(0, config.jspmPackagesPath.length) === config.jspmPackagesPath)
+          return fileResolveSync.call(this, resolvedPath, cjsResolve, realpath);
+        pkgConfig.path = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
+      }
+      
+      if (pkgConfig.config.mains !== undefined && resolvedPath.length === pkgConfig.path.length - 1 &&
+          resolvedPath === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+        const mapped = applyMain(pkgConfig.config.mains, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolvedPath = pkgConfig.path + mapped;
+        }
+      }
+      else if (pkgConfig.config.map !== undefined &&
+          resolvedPath.length >= pkgConfig.path.length && resolvedPath.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+        const relPath = '.' + resolvedPath.substr(pkgConfig.path.length - 1);
+        const mapped = applyMap(relPath, pkgConfig.config.map, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolvedPath = pkgConfig.path + mapped;
         }
       }
     }
 
-    return fileResolveSync(this, resolvedPath);
+    return fileResolveSync.call(this, resolvedPath, cjsResolve, realpath);
   }
 
   getJspmConfig (parentPath) {
@@ -618,123 +697,11 @@ class JspmResolver {
     while (separatorIndex > rootSeparatorIndex)
   }
 
-  async isCommonJS (resolvedModulePath) {
-    let separatorIndex = resolvedModulePath.lastIndexOf('/');
-    let rootSeparatorIndex = resolvedModulePath.indexOf('/');
-    let isJspmProject = this.getJspmConfig(resolvedModulePath) !== undefined;
-    while (separatorIndex > rootSeparatorIndex) {
-      let parentPath = resolvedModulePath.substr(0, separatorIndex);
-      let pcfg;
-      if (parentPath in this.pjsonConfigCache) {
-        pcfg = this.pjsonConfigCache[parentPath];
-      }
-      else {
-        try {
-          let pjson = JSON.parse(await this.readFile(path.join(parentPath, 'package.json')));
-          pcfg = processPjsonConfig({
-            module: typeof pjson.module === 'boolean' ? pjson.module : isJspmProject
-          }, pjson);
-        }
-        catch (e) {
-          if (!e || e.code !== 'ENOENT')
-            throw e;
-        }
-        this.pjsonConfigCache[parentPath] = pcfg;
-      }
-      if (pcfg)
-        return !pcfg.module;
-      separatorIndex = resolvedModulePath.lastIndexOf('/', separatorIndex - 1);
-    }
-    return isJspmProject;
-  }
-
-  isCommonJSSync (resolvedModulePath) {
-    let separatorIndex = resolvedModulePath.lastIndexOf('/');
-    let rootSeparatorIndex = resolvedModulePath.indexOf('/');
-    let isJspmProject = this.getJspmConfig(resolvedModulePath) !== undefined;
-    while (separatorIndex > rootSeparatorIndex) {
-      let parentPath = resolvedModulePath.substr(0, separatorIndex);
-      let pcfg;
-      if (parentPath in this.pjsonConfigCache) {
-        pcfg = this.pjsonConfigCache[parentPath];
-      }
-      else {
-        try {
-          let pjson = JSON.parse(this.readFileSync(path.join(parentPath, 'package.json')));
-          pcfg = processPjsonConfig({
-            module: typeof pjson.module === 'boolean' ? pjson.module : isJspmProject
-          }, pjson);
-        }
-        catch (e) {
-          if (!e || e.code !== 'ENOENT')
-            throw e;
-        }
-        this.pjsonConfigCache[parentPath] = pcfg;
-      }
-      if (pcfg)
-        return !pcfg.module;
-      separatorIndex = resolvedModulePath.lastIndexOf('/', separatorIndex - 1);
-    }
-    return isJspmProject;
-  }
-
-  async packageMap (name, parentPackagePath, config, env) {
-    if (parentPackagePath === undefined)
-      parentPackagePath = config.basePath;
-
-    let pcfg;
-    if (parentPackagePath in this.pjsonConfigCache) {
-      pcfg = this.pjsonConfigCache[parentPackagePath];
-    }
-    else {
-      try {
-        let pjson = JSON.parse(await this.readFile(path.join(parentPackagePath, 'package.json')));
-        pcfg = processPjsonConfig({
-          module: typeof pjson.module === 'boolean' ? pjson.module : true
-        }, pjson);
-      }
-      catch (e) {
-        if (!e || e.code !== 'ENOENT')
-          throw e;
-      }
-      this.pjsonConfigCache[parentPackagePath] = pcfg;
-    }
-
-    if (pcfg && pcfg.map)
-      return applyMap(name, pcfg.map, env);
-  }
-
-  packageMapSync (name, parentPackagePath, config, env) {
-    if (parentPackagePath === undefined)
-      parentPackagePath = config.basePath;
-
-    let pcfg;
-    if (parentPackagePath in this.pjsonConfigCache) {
-      pcfg = this.pjsonConfigCache[parentPackagePath];
-    }
-    else {
-      try {
-        let pjson = JSON.parse(this.readFileSync(path.join(parentPackagePath, 'package.json')));
-        pcfg = processPjsonConfig({
-          module: typeof pjson.module === 'boolean' ? pjson.module : true
-        }, pjson);
-      }
-      catch (e) {
-        if (!e || e.code !== 'ENOENT')
-          throw e;
-      }
-      this.pjsonConfigCache[parentPackagePath] = pcfg;
-    }
-
-    if (pcfg && pcfg.map)
-      return applyMap(name, pcfg.map, env);
-  }
-
   packageResolve (name, parentPackageName, config) {
     if (parentPackageName) {
       let packageConfig = config.dependencies[parentPackageName];
       if (packageConfig && packageConfig.resolve)
-        mapped = applyMap(name, packageConfig.resolve) || applyMap(name, config.resolve);
+        return applyMap(name, packageConfig.resolve) || applyMap(name, config.resolve);
     }
     return applyMap(name, config.resolve);
   }
@@ -748,7 +715,11 @@ class JspmResolver {
     return applyMap(name, config.resolve);
   }
 
-  async isFile (path) {
+  // possible optimization approach for node_modules lookup
+  async isDir (path) {
+    const cached = this.isDirCache[path];
+    if (cached !== undefined)
+      return this.isDirCache[path];
     return new Promise((resolve, reject) => {
       fs.stat(path, (err, stats) => {
         if (err) {
@@ -758,13 +729,16 @@ class JspmResolver {
             reject(err);
         }
         else {
-          resolve(stats.isFile());
+          resolve(this.isDirCache[path] = stats.isDirectory());
         }
       });
     });
   }
 
-  isFileSync (path) {
+  isDirSync (path) {
+    const cached = this.isDirCache[path];
+    if (cached !== undefined)
+      return this.isDirCache[path];
     try {
       var stats = fs.statSync(path);
     }
@@ -773,7 +747,61 @@ class JspmResolver {
         return false;
       throw e;
     }
-    return stats.isFile();
+    return this.isDirCache[path] = stats.isDirectory();
+  }
+
+  async isFile (path) {
+    const cached = this.isFileCache[path];
+    if (cached !== undefined)
+      return this.isFileCache[path];
+    return new Promise((resolve, reject) => {
+      fs.stat(path, (err, stats) => {
+        if (err) {
+          if (err.code === 'ENOENT')
+            resolve(false);
+          else
+            reject(err);
+        }
+        else {
+          resolve(this.isFileCache[path] = stats.isFile());
+        }
+      });
+    });
+  }
+
+  isFileSync (path) {
+    const cached = this.isFileCache[path];
+    if (cached !== undefined)
+      return this.isFileCache[path];
+    try {
+      var stats = fs.statSync(path);
+    }
+    catch (e) {
+      if (e.code === 'ENOENT')
+        return false;
+      throw e;
+    }
+    return this.isFileCache[path] = stats.isFile();
+  }
+
+  async realpath (path) {
+    return new Promise((resolve, reject) => {
+      fs.realpath(path, (err, realpath) => {
+        if (err)
+          reject(err);
+        else if (realpath.indexOf('\\') !== -1)
+          resolve(realpath.replace(winSepRegEx, '/'));
+        else
+          resolve(realpath);
+      });
+    });
+  }
+
+  realpathSync (path) {
+    const realpath = fs.realpathSync(path);
+    if (realpath.indexOf('\\') !== -1)
+      return realpath.replace(winSepRegEx, '/');
+    return realpath;
   }
 
   readFile (path) {
@@ -791,169 +819,177 @@ JspmResolver.applyMap = applyMap;
 
 module.exports = exports = JspmResolver;
 
+async function getPackageConfig (resolved) {
+  let separatorIndex = resolved.length - 1;
+  if (resolved[separatorIndex] !== '/')
+    separatorIndex++;
+  let rootSeparatorIndex = resolved.indexOf('/');
+  while (separatorIndex > rootSeparatorIndex) {
+    let parentPath = resolved.substr(0, separatorIndex);
+    if (parentPath.endsWith('/node_modules/'))
+      break;
+    let pcfg;
+    if (parentPath in this.pjsonConfigCache) {
+      pcfg = this.pjsonConfigCache[parentPath];
+    }
+    else {
+      try {
+        let pjson = JSON.parse(await this.readFile(parentPath + '/package.json'));
+        pcfg = processPjsonConfig(pjson);
+      }
+      catch (e) {
+        if (!e || e.code !== 'ENOENT')
+          throw e;
+      }
+      this.pjsonConfigCache[parentPath] = pcfg;
+    }
+    if (pcfg !== undefined)
+      return { path: parentPath + '/', config: pcfg };
+    separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
+  }
+}
+
+function getPackageConfigSync (resolved) {
+  let separatorIndex = resolved.lastIndexOf('/');
+  let rootSeparatorIndex = resolved.indexOf('/');
+  while (separatorIndex > rootSeparatorIndex) {
+    let parentPath = resolved.substr(0, separatorIndex + 1);
+    if (parentPath.endsWith('/node_modules/'))
+      break;
+    let pcfg;
+    if (parentPath in this.pjsonConfigCache) {
+      pcfg = this.pjsonConfigCache[parentPath];
+    }
+    else {
+      try {
+        let pjson = JSON.parse(this.readFileSync(parentPath +'package.json'));
+        pcfg = processPjsonConfig(pjson);
+      }
+      catch (e) {
+        if (!e || e.code !== 'ENOENT')
+          throw e;
+      }
+      this.pjsonConfigCache[parentPath] = pcfg;
+    }
+    if (pcfg !== undefined)
+      return { path: parentPath, config: pcfg };
+    separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
+  }
+}
+
+function conditionMap (mapped, env) {
+  main: while (typeof mapped !== 'string') {
+    for (let c in mapped) {
+      if (env[c] === true) {
+        mapped = mapped[c];
+        continue main;
+      }
+    }
+    return undefined;
+  }
+  return mapped;
+}
+
 function applyMap (name, parentMap, env) {
   let mapped;
-  let separatorIndex = name.length;
-  let match = name.substr(0, separatorIndex);
+  let separatorIndex = name.length - 1;
+  let exactSeparator = name[separatorIndex] === '/';
+  let match = name.substr(0, separatorIndex + 1);
   do {
-    let replacement = parentMap[match];
-    if (replacement) {
-      main: while (typeof replacement !== 'string') {
-        if (!env)
-          throwInvalidConfig(`Conditional maps not supported for package resolve.`);
-        for (let c in replacement) {
-          if (env[c] === true) {
-            replacement = replacement[c];
-            continue main;
-          }
-        }
-        return undefined;
-      }
-      return replacement + name.substr(match.length);
-    }
-    separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
-    match = name.substr(0, separatorIndex);
     if (match === '.')
       break;
+    let mapped = parentMap[match];
+    if (mapped !== undefined) {
+      mapped = conditionMap(mapped, env);
+      if (mapped !== undefined) {
+        if (mapped === '@empty')
+          return mapped;
+        if (match[0] === '.' && mapped[0] === '.' && match[1] === '/' && mapped[1] === '/')
+          mapped = mapped.substr(2);
+        if (mapped[mapped.length - 1] === '/') {
+          if (match[match.length - 1] !== '/')
+            throwInvalidConfig(`Invalid map config "${match}" -> "${mapped}" - target cannot have a trailing separator.`);
+        }
+        else {
+          if (match[match.length - 1] === '/')
+            mapped += '/';
+        }
+        return mapped + name.substr(match.length);
+      }
+    }
+    if (exactSeparator) {
+      match = name.substr(0, separatorIndex);
+    }
+    else {
+      separatorIndex = name.lastIndexOf('/', separatorIndex - 1);
+      match = name.substr(0, separatorIndex + 1);
+    }
+    exactSeparator = !exactSeparator;
   }
   while (separatorIndex !== -1)
 }
 
-exports.processPjsonConfig = processPjsonConfig;
-function processPjsonConfig (pcfg, pjson) {
-  if (pjson.main) {
-    pcfg.map = pcfg.map || {};
-    const mainMap = pcfg.map['.'];
-    const mapping = pjson.main.startsWith('./') ? pjson.main : './' + pjson.main;
-    if (typeof mainMap === 'object')
-      mainMap.default = mapping;
-    else
-      pcfg.map['.'] = mapping;
-  }
+function applyMain (mainMap, env) {
+  let mapped = conditionMap(mainMap, env);
+  if (mapped === '@empty')
+    return mapped;
+  if (mapped[0] === '.' && mapped[1] === '/')
+    return mapped.substr(2);
+  return mapped;
+}
 
-  if (typeof pjson.module === 'string') {
-    pcfg.module = true;
-    pcfg.map = pcfg.map || {};
-    const mainMap = pcfg.map['.'];
-    const mapping = pjson.module.startsWith('./') ? pjson.module : './' + pjson.module;
-    if (typeof mainMap === 'object')
-      if (mainMap.module)
-        mainMap.module = mapping;
-      else
-        pcfg.map['.'] = Object.assign({ module: mapping }, mainMap);
-    else if (typeof mainMap === 'string')
-      pcfg.map['.'] = { module: mapping, default: mainMap };
-    else
-      pcfg.map['.'] = { module: mapping };
-  }
-  else {
-    pcfg.module = pjson.module === true;
-  }
+exports.processPjsonConfig = processPjsonConfig;
+
+function processPjsonConfig (pjson) {
+  const pcfg = {
+    mains: typeof pjson.mains === 'object' ? pjson.mains : undefined,
+    map: typeof pjson.map === 'object' ? pjson.map : undefined,
+    esm: pjson.esm === true ? true : false
+  };
 
   if (typeof pjson['react-native'] === 'string') {
-    pcfg.map = pcfg.map || {};
-    const mainMap = pcfg.map['.'];
-    const mapping = pjson['react-native'].startsWith('./') ? pjson['react-native'] : './' + pjson['react-native'];
-    if (typeof mainMap === 'object')
-      if (mainMap['react-native'])
-        mainMap['react-native'] = mapping;
-      else
-        pcfg.map['.'] = Object.assign({ 'react-native': mapping }, mainMap);
-    else if (typeof mainMap === 'string')
-      pcfg.map['.'] = { 'react-native': mapping, default: mainMap };
-    else
-      pcfg.map['.'] = { 'react-native': mapping };
+    const mapped = pjson['react-native'].startsWith('./') ? pjson['react-native'].substr(2) : pjson['react-native'];
+    pcfg.mains = { 'react-native': mapped };
   }
 
   if (typeof pjson.electron === 'string') {
-    pcfg.map = pcfg.map || {};
-    const mainMap = pcfg.map['.'];
-    const mapping = pjson.electron.startsWith('./') ? pjson.electron : './' + pjson.electron;
-    if (typeof mainMap === 'object')
-      if (mainMap.electron)
-        mainMap.electron = mapping;
-      else
-        pcfg.map['.'] = Object.assign({ electron: mapping }, mainMap);
-    else if (typeof mainMap === 'string')
-      pcfg.map['.'] = { electron: mapping, default: mainMap };
+    const mapped = pjson.electron.startsWith('./') ? pjson.electron.substr(2) : pjson.electron;
+    if (!pcfg.mains)
+      pcfg.mains = { electron: mapped };
     else
-      pcfg.map['.'] = { electron: mapping };
+      pcfg.mains.electron = mapped;
   }
 
   if (pjson.browser) {
-    pcfg.map = pcfg.map || {};
     if (typeof pjson.browser === 'string') {
-      const mainMap = pcfg.map['.'];
-      const mapping = pjson.browser.startsWith('./') ? pjson.browser : './' + pjson.browser;
-      if (typeof mainMap === 'object')
-        if (mainMap.browser)
-          mainMap.browser = mapping;
-        else
-          pcfg.map['.'] = Object.assign({ browser: mapping }, mainMap);
-      else if (typeof mainMap === 'string')
-        pcfg.map['.'] = { browser: mapping, default: mainMap };
+      const mapped = pjson.browser.startsWith('./') ? pjson.browser.substr(2) : pjson.browser;
+      if (!pcfg.mains)
+        pcfg.mains = { browser: mapped };
       else
-        pcfg.map['.'] = { browser: mapping };
+        pcfg.mains.browser = mapped;
     }
     else if (typeof pjson.browser === 'object') {
+      if (!pcfg.map)
+        pcfg.map = {};
       for (let p in pjson.browser) {
-        let mapping = pjson.browser[p];
-        if (mapping === false) {
-          mapping = '@empty';
-        }
-        else if (typeof mapping !== 'string') {
+        if (pcfg.map[p] !== undefined)
           continue;
-        }
-        const map = pcfg.map[p];
-        if (typeof map === 'object')
-          if (map.browser)
-            map.browser = mapping;
-          else
-            pcfg.map[p] = Object.assign({ browser: mapping }, map);
-        else if (typeof map === 'string')
-          pcfg.map[p] = { browser: mapping, default: map };
-        else
-          pcfg.map[p] = { browser: mapping };
+        let mapping = pjson.browser[p];
+        if (mapping === false)
+          mapping = '@empty';
+        pcfg.map[p] = {
+          browser: mapping
+        };
       }
     }
   }
 
-  if (pjson.map && typeof pjson.map === 'object') {
-    pcfg.map = pcfg.map || {};
-    for (let p in pjson.map) {
-      const mapping = pjson.map[p];
-      if (typeof mapping === 'string') {
-        const existingMap = pcfg.map[p];
-        if (typeof existingMap === 'object')
-          existingMap.default = mapping;
-        else
-          pcfg.map[p] = mapping;
-      }
-      else if (typeof mapping === 'object') {
-        const existingMap = pcfg.map[p];
-        if (typeof existingMap === 'object') {
-          const newMap = {};
-          // new conditions go to the top
-          for (let p in mapping)
-            if (!(p in existingMap))
-              newMap[p] = mapping[p];
-          // then existing conditions in same order
-          // replaced by the new conditions
-          for (let p in existingMap)
-            newMap[p] = mapping[p] || existingMap[p];
-          pcfg.map[p] = newMap;
-        }
-        else if (typeof existingMap === 'string') {
-          const newMap = Object.assign({}, mapping);
-          if (!newMap.default)
-            newMap.default = existingMap;
-          config.map[p] = newMap;
-        }
-        else {
-          pcfg.map[p] = Object.assign({}, mapping);
-        }
-      }
-    }
+  if (pjson.main) {
+    const mapped = pjson.main.startsWith('./') ? pjson.main.substr(2) : pjson.main;
+    if (!pcfg.mains)
+      pcfg.mains = { default: mapped };
+    else
+      pcfg.mains.default = mapped;
   }
 
   return pcfg;

@@ -1,5 +1,4 @@
 {
-  "module": false,
   "map": {
     "x": "./y",
     "./z": "./a",
