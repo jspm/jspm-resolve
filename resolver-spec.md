@@ -283,9 +283,12 @@ a change to remove a lot of the pain in working with cross-platform path handlin
 
 ### Reading jspm Configuration
 
+A jspm project boundary is detected by the package.json configuration and jspm.json configuration match. The boundary detection also takes into account nested projects where the inner project is an exact package name of the outer project. This is in order to support the inner package being linked as a package of the outer one.
+
 Given a file path, we can determine the base project folder, jspm packages path and jspm configuration with the following algorithm:
 
 > **GET_JSPM_CONFIG(modulePath: String)**
+> 1. Let _innerConfig_ be _undefined_.
 > 1. Let _parentPaths_ be the array of parent paths of _modulePath_ ordered by length decreasing, excluding a trailing separator.
 > 1. For each _path_ of _parentPaths_,
 >    1. If the last path segment of _path_ is equal to _"node_modules"_ then,
@@ -315,8 +318,12 @@ Given a file path, we can determine the base project folder, jspm packages path 
 >          1. Set _localPackagePath_ to _path_.
 >       1. Set _localPackagePath_ to its realpath.
 >       1. Let _projectBasePath_ be set to the realpath of _path_.
->       1. Return the object with values _{ projectBasePath, jspmConfig, jspmPackagesPath, localPackagePath }_.
-> 1. Return _undefined_.
+>       1. If _innerConfig_ is not _undefined_ then,
+>          1. If _innerConfig.projectBasePath_ is not exact package name path conatined in _jspmPackagesPath_ then,
+>             1. Return the value of _innerConfig_.
+>          1. Return the object with values _{ projectBasePath, jspmConfig, jspmPackagesPath, localPackagePath }_.
+>       1. Set _innerConfig_ to the object with values _{ projectBasePath, jspmConfig, jspmPackagesPath, localPackagePath }_.
+> 1. Return the value of _innerConfig_.
 
 The return value of the above method is either `undefined` or an object of the form `{ jspmConfig, jspmPackagesPath, localPackagePath }`.
 
@@ -526,6 +533,8 @@ The parent pathname is assumed a valid fully-resolved path in the environment. A
 
 The resolver has two modes - ES module resolution for loading ES modules, top-level modules and dynamic `import` resolution,
 and legacy CommonJS resolution for running a CommonJS `require` resolution. This mode is tracked by a `cjsResolve` argument.
+
+If two jspm projects are nested, the inner one will be used for resolution, unless the `basePath` of the inner one is exactly a valid package name of the outer project, in which case the outer project is used for resolution. This is to ensure that linking use cases work out correctly.
 
 The resolution algorithm breaks down into the following high-level process to get the fully resolved path:
 

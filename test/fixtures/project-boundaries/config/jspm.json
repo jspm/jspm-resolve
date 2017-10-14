@@ -1,1 +1,12 @@
-{}
+{
+  "resolve": {
+    "pkg": "link:standard-cases@master"
+  },
+  "dependencies": {
+    "link:standard-cases@master": {
+      "resolve": {
+        "pkg": "r:a/c@v"
+      }
+    }
+  }
+}
