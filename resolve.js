@@ -360,9 +360,9 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     name = name.replace(winSepRegEx, '/');
     if (name[1] === '/') {
       if (name[2] === '/')
-        resolvedPath = resolvePath(percentDecode(name.substr(2 + isWindows)));
-      else
         throwInvalidModuleName(`${name} is not a valid module name.`);
+      else
+        resolvedPath = resolvePath(percentDecode(name.substr(1 + isWindows)));
     }
     else {
       resolvedPath = resolvePath(percentDecode(isWindows ? name.substr(1) : name));
@@ -445,7 +445,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     return await fileResolve.call(utils, resolvedPath, cjsResolve, realpath, cache);
   
   const pkgConfig = await utils.getPackageConfig(resolvedPath, cache);
-  if (pkgConfig.path !== undefined) {
+  if (pkgConfig !== undefined) {
     if (config !== undefined && pkgConfig.path === config.basePath) {
       if (resolvedPath.length === config.jspmPackagesPath.length - 1 && resolvedPath === config.jspmPackagesPath.substr(0, config.jspmPackagesPath.length - 1) ||
           resolvedPath.length >= config.jspmPackagesPath.length && resolvedPath.substr(0, config.jspmPackagesPath.length) === config.jspmPackagesPath)
@@ -503,9 +503,9 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     name = name.replace(winSepRegEx, '/');
     if (name[1] === '/') {
       if (name[2] === '/')
-        resolvedPath = resolvePath(percentDecode(name.substr(2 + isWindows)));
-      else
         throwInvalidModuleName(`${name} is not a valid module name.`);
+      else
+        resolvedPath = resolvePath(percentDecode(name.substr(1 + isWindows)));
     }
     else {
       resolvedPath = resolvePath(percentDecode(isWindows ? name.substr(1) : name));
@@ -588,7 +588,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, cache);
 
   const pkgConfig = utils.getPackageConfigSync(resolvedPath, cache);
-  if (pkgConfig.path !== undefined) {
+  if (pkgConfig !== undefined) {
     if (config !== undefined && pkgConfig.path === config.basePath) {
       if (resolvedPath.length === config.jspmPackagesPath.length - 1 && resolvedPath === config.jspmPackagesPath.substr(0, config.jspmPackagesPath.length - 1) ||
           resolvedPath.length >= config.jspmPackagesPath.length && resolvedPath.substr(0, config.jspmPackagesPath.length) === config.jspmPackagesPath)
@@ -640,7 +640,7 @@ const resolveUtils = {
           e.code = 'INVALID_CONFIG';
           throw e;
         }
-        if (!e || e.code !== 'ENOENT')
+        if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
           throw e;
       }
 
@@ -660,7 +660,7 @@ const resolveUtils = {
             e.code = 'INVALID_CONFIG';
             throw e;
           }
-          if (!e || e.code !== 'ENOENT')
+          if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
             throw e;
         }
 
@@ -747,7 +747,7 @@ const resolveUtils = {
           pcfg = processPjsonConfig(pjson);
         }
         catch (e) {
-          if (!e || e.code !== 'ENOENT')
+          if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
             throw e;
         }
         if (cache)
@@ -778,7 +778,7 @@ const resolveUtils = {
           pcfg = processPjsonConfig(pjson);
         }
         catch (e) {
-          if (!e || e.code !== 'ENOENT')
+          if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
             throw e;
         }
         if (cache)
@@ -798,7 +798,7 @@ const resolveUtils = {
     return new Promise((resolve, reject) => {
       fs.stat(path, (err, stats) => {
         if (err) {
-          if (err.code === 'ENOENT')
+          if (err.code === 'ENOENT' || err.code ===  'ENOTDIR')
             resolve(false);
           else
             reject(err);
@@ -820,7 +820,7 @@ const resolveUtils = {
       var stats = fs.statSync(path);
     }
     catch (e) {
-      if (e.code === 'ENOENT')
+      if (e.code === 'ENOENT' || e.code === 'ENOTDIR')
         return false;
       throw e;
     }
@@ -836,7 +836,7 @@ const resolveUtils = {
     return new Promise((resolve, reject) => {
       fs.stat(path, (err, stats) => {
         if (err) {
-          if (err.code === 'ENOENT')
+          if (err.code === 'ENOENT' || err.code === 'ENOTDIR')
             resolve(false);
           else
             reject(err);
@@ -858,7 +858,7 @@ const resolveUtils = {
       var stats = fs.statSync(path);
     }
     catch (e) {
-      if (e.code === 'ENOENT')
+      if (e.code === 'ENOENT' || e.code === 'ENOTDIR')
         return false;
       throw e;
     }

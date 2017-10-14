@@ -27,13 +27,17 @@ suite('jspm project nesting', () => {
     var { resolved } = await jspmResolve('y', `${pbPath}config/node_modules/y/path.sep`);
     assert.equal(resolved, `${pbPath}config/node_modules/y/index.js`);
 
+    var { resolved } = await jspmResolve('y/', `${pbPath}config/node_modules/z/`);
+    assert.equal(resolved, `${pbPath}config/node_modules/y/`);
+
     try {
-      var { resolved } = await jspmResolve('y', `${pbPath}config/node_modules/z/`);
-      assert(false);
+      var { resolved } = await jspmResolve(`${pbPath}config/node_modules/z/`);
     }
     catch (e) {
       assert(e);
+      return;
     }
+    assert(false, 'Should error');
   });
 
   test('Linked project', async () => {
