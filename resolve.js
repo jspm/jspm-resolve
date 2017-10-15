@@ -219,35 +219,38 @@ async function nodeModuleResolve (name, parentPath, env, cjsResolve, cache) {
   let rootSeparatorIndex = parentPath.indexOf('/');
   while (separatorIndex > rootSeparatorIndex) {
     let resolved = parentPath.substr(0, separatorIndex) + '/node_modules/' + name;
-    let pkgConfig = await this.getPackageConfig(resolved, cache);
-    if (pkgConfig !== undefined) {
-      if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
-          resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
-        const mapped = applyMain(pkgConfig.config.mains, env);
-        if (mapped !== undefined) {
-          if (mapped === '@empty')
-            return { resolved: undefined, format: undefined };
-          resolved = pkgConfig.path + mapped;
+    let pkgNameLength = name[0] !== '@' ? name.indexOf('/') : name.indexOf('/', name.indexOf('/') + 1);
+    if (await this.isDir(resolved.substr(0, resolved.length - name.length + pkgNameLength), cache)) {
+      let pkgConfig = await this.getPackageConfig(resolved, cache);
+      if (pkgConfig !== undefined) {
+        if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
+            resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+          const mapped = applyMain(pkgConfig.config.mains, env);
+          if (mapped !== undefined) {
+            if (mapped === '@empty')
+              return { resolved: undefined, format: undefined };
+            resolved = pkgConfig.path + mapped;
+          }
+        }
+        else if (pkgConfig.config.map !== undefined &&
+            resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+          const relPath = '.' + resolved.substr(pkgConfig.path.length);
+          const mapped = applyMap(relPath, pkgConfig.config.map, env);
+          if (mapped !== undefined) {
+            if (mapped === '@empty')
+              return { resolved: undefined, format: undefined };
+            resolved = pkgConfig.path + mapped;
+          }
         }
       }
-      else if (pkgConfig.config.map !== undefined &&
-          resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
-        const relPath = '.' + resolved.substr(pkgConfig.path.length);
-        const mapped = applyMap(relPath, pkgConfig.config.map, env);
-        if (mapped !== undefined) {
-          if (mapped === '@empty')
-            return { resolved: undefined, format: undefined };
-          resolved = pkgConfig.path + mapped;
-        }
+      try {
+        return await fileResolve.call(this, resolved, cjsResolve, true, cache);
+      }
+      catch (e) {
+        if (e.code !== 'MODULE_NOT_FOUND')
+          throw e;
       }
     }
-    try {
-      return await fileResolve.call(this, resolved, cjsResolve, true, cache);
-    }
-    catch (e) {
-      if (e.code !== 'MODULE_NOT_FOUND')
-        throw e;
-    }  
     separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
   }
   throwModuleNotFound(name, parentPath);
@@ -260,35 +263,38 @@ function nodeModuleResolveSync (name, parentPath, env, cjsResolve, cache) {
   let rootSeparatorIndex = parentPath.indexOf('/');
   while (separatorIndex > rootSeparatorIndex) {
     let resolved = parentPath.substr(0, separatorIndex) + '/node_modules/' + name;
-    let pkgConfig = this.getPackageConfigSync(resolved, cache);
-    if (pkgConfig !== undefined) {
-      if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
-          resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
-        const mapped = applyMain(pkgConfig.config.mains, env);
-        if (mapped !== undefined) {
-          if (mapped === '@empty')
-            return { resolved: undefined, format: undefined };
-          resolved = pkgConfig.path + mapped;
+    let pkgNameLength = name[0] !== '@' ? name.indexOf('/') : name.indexOf('/', name.indexOf('/') + 1);
+    if (this.isDirSync(resolved.substr(0, resolved.length - name.length + pkgNameLength), cache)) {
+      let pkgConfig = this.getPackageConfigSync(resolved, cache);
+      if (pkgConfig !== undefined) {
+        if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
+            resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+          const mapped = applyMain(pkgConfig.config.mains, env);
+          if (mapped !== undefined) {
+            if (mapped === '@empty')
+              return { resolved: undefined, format: undefined };
+            resolved = pkgConfig.path + mapped;
+          }
+        }
+        else if (pkgConfig.config.map !== undefined &&
+            resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+          const relPath = '.' + resolved.substr(pkgConfig.path.length);
+          const mapped = applyMap(relPath, pkgConfig.config.map, env);
+          if (mapped !== undefined) {
+            if (mapped === '@empty')
+              return { resolved: undefined, format: undefined };
+            resolved = pkgConfig.path + mapped;
+          }
         }
       }
-      else if (pkgConfig.config.map !== undefined &&
-          resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
-        const relPath = '.' + resolved.substr(pkgConfig.path.length);
-        const mapped = applyMap(relPath, pkgConfig.config.map, env);
-        if (mapped !== undefined) {
-          if (mapped === '@empty')
-            return { resolved: undefined, format: undefined };
-          resolved = pkgConfig.path + mapped;
-        }
+      try {
+        return fileResolveSync.call(this, resolved, cjsResolve, true, cache);
+      }
+      catch (e) {
+        if (e.code !== 'MODULE_NOT_FOUND')
+          throw e;
       }
     }
-    try {
-      return fileResolveSync.call(this, resolved, cjsResolve, true, cache);
-    }
-    catch (e) {
-      if (e.code !== 'MODULE_NOT_FOUND')
-        throw e;
-    }  
     separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
   }
   throwModuleNotFound(name, parentPath);
@@ -343,6 +349,8 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache) {
+    if (!cache.jspmConfigCache)
+      cache.jspmConfigCache = {};
     if (!cache.pjsonConfigCache)
       cache.pjsonConfigCache = {};
     if (!cache.isFileCache)
@@ -486,6 +494,8 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache) {
+    if (!cache.jspmConfigCache)
+      cache.jspmConfigCache = {};
     if (!cache.pjsonConfigCache)
       cache.pjsonConfigCache = {};
     if (!cache.isFileCache)
@@ -630,30 +640,23 @@ const resolveUtils = {
       let dir = parentPath.substr(0, separatorIndex);
       if (dir.endsWith('/' + 'node_modules'))
         return;
-
-      let pjson;
-      try {
-        pjson = JSON.parse(this.readFileSync(path.join(dir, 'package.json')));
-      }
-      catch (e) {
-        if (e instanceof SyntaxError) {
-          e.code = 'INVALID_CONFIG';
-          throw e;
+      
+      if (cache && dir in cache.jspmConfigCache) {
+        let config = cache.jspmConfigCache[dir];
+        if (config !== undefined) {
+          if (innerConfig !== undefined) {
+            const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
+            if (!nestedPkg || nestedPkg.path.length > 1)
+              return innerConfig;
+            return config;
+          }
+          innerConfig = config;
         }
-        if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
-          throw e;
       }
-
-      if (pjson) {
-        let jspmPath;
-        if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
-          jspmPath = path.resolve(dir, pjson.configFiles.jspm);
-        else
-          jspmPath = path.join(dir, 'jspm.json');
-
-        let jspmJson;
+      else {
+        let pjson;
         try {
-          jspmJson = JSON.parse(this.readFileSync(jspmPath));
+          pjson = JSON.parse(this.readFileSync(path.join(dir, 'package.json')));
         }
         catch (e) {
           if (e instanceof SyntaxError) {
@@ -662,44 +665,75 @@ const resolveUtils = {
           }
           if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
             throw e;
+          
+          if (cache)
+            cache.jspmConfigCache[dir] = cache.pjsonConfigCache[dir] = undefined;
         }
 
-        if (jspmJson !== undefined) {
-          let dirSep = (isWindows ? dir.replace(winSepRegEx, '/') : dir) + '/';
-          let config = {
-            basePath: dirSep,
-            localPackagePathDev: dirSep,
-            localPackagePathProduction: dirSep,
-            jspmPackagesPath: dirSep + 'jspm_packages/',
-            resolve: jspmJson.resolve || {},
-            dependencies: jspmJson.dependencies || {}
-          };
+        if (pjson) {
+          let jspmPath;
+          if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
+            jspmPath = path.resolve(dir, pjson.configFiles.jspm);
+          else
+            jspmPath = path.join(dir, 'jspm.json');
 
-          if (pjson && typeof pjson.directories === 'object') {
-            if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..')) {
-              config.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + '/';
-              if (isWindows)
-                config.jspmPackagesPath = config.jspmPackagesPath.replace(winSepRegEx, '/');
-            }
-            if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..')) {
-              config.localPackagePathDev = path.resolve(dir, pjson.directories.lib) + '/';
-              if (isWindows)
-                config.localPackagePathDev = config.localPackagePathDev.replace(winSepRegEx, '/');
-              config.localPackagePathProduction = config.localPackagePathDev;
-            }
-            if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..')) {
-              config.localPackagePathProduction = path.resolve(dir, pjson.directories.dist) + '/';
-              if (isWindows)
-                config.localPackagePathProduction = config.localPackagePathProduction.replace(winSepRegEx, '/');
-            }
+          let jspmJson;
+          try {
+            jspmJson = JSON.parse(this.readFileSync(jspmPath));
           }
-          if (innerConfig !== undefined) {
-            const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
-            if (!nestedPkg || nestedPkg.path.length > 1)
-              return innerConfig;
-            return config;
+          catch (e) {
+            if (e instanceof SyntaxError) {
+              e.code = 'INVALID_CONFIG';
+              throw e;
+            }
+            if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
+              throw e;
+            
+            if (cache)
+              cache.jspmConfigCache[dir] = undefined;
           }
-          innerConfig = config;
+
+          if (jspmJson !== undefined) {
+            let dirSep = (isWindows ? dir.replace(winSepRegEx, '/') : dir) + '/';
+            let config = {
+              basePath: dirSep,
+              localPackagePathDev: dirSep,
+              localPackagePathProduction: dirSep,
+              jspmPackagesPath: dirSep + 'jspm_packages/',
+              resolve: jspmJson.resolve || {},
+              dependencies: jspmJson.dependencies || {}
+            };
+
+            if (pjson && typeof pjson.directories === 'object') {
+              if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..')) {
+                config.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + '/';
+                if (isWindows)
+                  config.jspmPackagesPath = config.jspmPackagesPath.replace(winSepRegEx, '/');
+              }
+              if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..')) {
+                config.localPackagePathDev = path.resolve(dir, pjson.directories.lib) + '/';
+                if (isWindows)
+                  config.localPackagePathDev = config.localPackagePathDev.replace(winSepRegEx, '/');
+                config.localPackagePathProduction = config.localPackagePathDev;
+              }
+              if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..')) {
+                config.localPackagePathProduction = path.resolve(dir, pjson.directories.dist) + '/';
+                if (isWindows)
+                  config.localPackagePathProduction = config.localPackagePathProduction.replace(winSepRegEx, '/');
+              }
+            }
+
+            if (cache)
+              cache.jspmConfigCache[dir] = config;
+
+            if (innerConfig !== undefined) {
+              const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
+              if (!nestedPkg || nestedPkg.path.length > 1)
+                return innerConfig;
+              return config;
+            }
+            innerConfig = config;
+          }
         }
       }
 

@@ -11,44 +11,46 @@ const pkgPath = `${sfPath}jspm_packages/ra/pkg@version/`;
 const pkg2Path = `${sfPath}jspm_packages/ra/pkg@version2/`;
 
 suite('Standard Cases', () => {
+  const cache = {};
+
   test('Extension cases', async () => {
-    var { resolved } = await jspmResolve('./b', sfPath);
+    var { resolved } = await jspmResolve('./b', sfPath, { cache });
     assert.equal(resolved, `${sfPath}b.js`);
 
-    var { resolved } = await jspmResolve('./b', sfPath + 'sub/');
+    var { resolved } = await jspmResolve('./b', sfPath + 'sub/', { cache });
     assert.equal(resolved, `${sfPath}sub/b.js`);
 
-    var { resolved } = await jspmResolve('./c', sfPath);
+    var { resolved } = await jspmResolve('./c', sfPath, { cache });
     assert.equal(resolved, `${sfPath}c.json`);
 
-    var { resolved } = await jspmResolve('./d', sfPath);
+    var { resolved } = await jspmResolve('./d', sfPath, { cache });
     assert.equal(resolved, `${sfPath}d/index.js`);
 
-    var { resolved } = await jspmResolve('./e', sfPath);
+    var { resolved } = await jspmResolve('./e', sfPath, { cache });
     assert.equal(resolved, `${sfPath}e/index.json`);
   });
 
   test('Global map config', async () => {
-    var { resolved } = await jspmResolve('a', sfPath);
+    var { resolved } = await jspmResolve('a', sfPath, { cache });
     assert.equal(resolved, `${sfPath}b.js`);
 
-    var { resolved } = await jspmResolve('a/', sfPath);
+    var { resolved } = await jspmResolve('a/', sfPath, { cache });
     assert.equal(resolved, `${sfPath}b/`);
 
-    var { resolved } = await jspmResolve('a/b', sfPath);
+    var { resolved } = await jspmResolve('a/b', sfPath, { cache });
     assert.equal(resolved, `${sfPath}b/b.js`);
 
-    var { resolved } = await jspmResolve('a/c/b', sfPath);
+    var { resolved } = await jspmResolve('a/c/b', sfPath, { cache });
     assert.equal(resolved, `${sfPath}b/b.js`);
 
-    var { resolved } = await jspmResolve('./rel', sfPath);
+    var { resolved } = await jspmResolve('./rel', sfPath, { cache });
     assert.equal(resolved, `${sfPath}d/index.js`);
 
-    var { resolved } = await jspmResolve(`/${sfPath}rel`, 'file:///');
+    var { resolved } = await jspmResolve(`/${sfPath}rel`, 'file:///', { cache });
     assert.equal(resolved, `${sfPath}d/index.js`);
 
     try {
-      var { resolved } = await jspmResolve('./fail', sfPath);
+      var { resolved } = await jspmResolve('./fail', sfPath, { cache });
       assert(false);
     }
     catch (e) {
@@ -58,26 +60,26 @@ suite('Standard Cases', () => {
 
   
   test('Package loading', async () => {
-    var { resolved } = await jspmResolve('ra:pkg@version', sfPath);
+    var { resolved } = await jspmResolve('ra:pkg@version', sfPath, { cache });
     assert.equal(resolved, `${pPath}ra/pkg@version/index.js`);
 
-    var { resolved } = await jspmResolve('ra:pkg@version/', sfPath);
+    var { resolved } = await jspmResolve('ra:pkg@version/', sfPath, { cache });
     assert.equal(resolved, `${pPath}ra/pkg@version/`);
 
-    var { resolved } = await jspmResolve('ra:pkg@version/a', sfPath);
+    var { resolved } = await jspmResolve('ra:pkg@version/a', sfPath, { cache });
     assert.equal(resolved, `${pPath}ra/pkg@version/a.json`);
 
-    var { resolved } = await jspmResolve('pkg', sfPath);
+    var { resolved } = await jspmResolve('pkg', sfPath, { cache });
     assert.equal(resolved, `${pPath}ra/pkg@version/index.js`);
 
-    var { resolved } = await jspmResolve('pkg/', sfPath);
+    var { resolved } = await jspmResolve('pkg/', sfPath, { cache });
     assert.equal(resolved, `${pPath}ra/pkg@version/`);
 
-    var { resolved } = await jspmResolve('pkg/a', sfPath);
+    var { resolved } = await jspmResolve('pkg/a', sfPath, { cache });
     assert.equal(resolved, `${pPath}ra/pkg@version/a.json`);
 
     try {
-      var { resolved } = await jspmResolve('p/b', sfPath);
+      var { resolved } = await jspmResolve('p/b', sfPath, { cache });
       assert(false);
     }
     catch (e) {
@@ -86,38 +88,38 @@ suite('Standard Cases', () => {
   });
 
   test('Package-relative loading', async () => {
-    var { resolved } = await jspmResolve('./a', pkgPath);
+    var { resolved } = await jspmResolve('./a', pkgPath, { cache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = await jspmResolve('x', pkgPath);
+    var { resolved } = await jspmResolve('x', pkgPath, { cache });
     assert.equal(resolved, `${pkgPath}y.js`);
 
-    var { resolved } = await jspmResolve('./z', pkgPath);
+    var { resolved } = await jspmResolve('./z', pkgPath, { cache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = await jspmResolve('./z/a', pkgPath);
+    var { resolved } = await jspmResolve('./z/a', pkgPath, { cache });
     assert.equal(resolved, `${pkgPath}a/a.js`);
 
-    var { resolved } = await jspmResolve('../z', pkgPath + 'x/y');
+    var { resolved } = await jspmResolve('../z', pkgPath + 'x/y', { cache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = await jspmResolve('../../z', pkgPath + 'x/y/z');
+    var { resolved } = await jspmResolve('../../z', pkgPath + 'x/y/z', { cache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = await jspmResolve('/' + pkgPath + 'z');
+    var { resolved } = await jspmResolve('/' + pkgPath + 'z', undefined, { cache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = await jspmResolve('/' + pkgPath + 'z/a');
+    var { resolved } = await jspmResolve('/' + pkgPath + 'z/a', undefined, { cache });
     assert.equal(resolved, `${pkgPath}a/a.js`);
 
-    var { resolved } = await jspmResolve('p', pkgPath);
+    var { resolved } = await jspmResolve('p', pkgPath, { cache });
     assert.equal(resolved, `${pkg2Path}a.js`);
 
-    var { resolved } = await jspmResolve('p/b', pkgPath);
+    var { resolved } = await jspmResolve('p/b', pkgPath, { cache });
     assert.equal(resolved, `${pkg2Path}b.js`);
 
     try {
-      var { resolved } = await jspmResolve('./fail/x', pkgPath);
+      var { resolved } = await jspmResolve('./fail/x', pkgPath, { cache });
       assert(false);
     }
     catch (e) {
@@ -126,50 +128,50 @@ suite('Standard Cases', () => {
   });
   
   test('Cross-package resolves', async () => {
-    var { resolved } = await jspmResolve('ra:pkg@version2', sfPath);
+    var { resolved } = await jspmResolve('ra:pkg@version2', sfPath, { cache });
     assert.equal(resolved, pkg2Path + 'a.js');
 
-    var { resolved } = await jspmResolve('pkg2/a', sfPath);
+    var { resolved } = await jspmResolve('pkg2/a', sfPath, { cache });
     assert.equal(resolved, pkg2Path + 'b.js');
   });
 
   test('Conditional maps', async () => {
-    var { resolved } = await jspmResolve('c', sfPath);
+    var { resolved } = await jspmResolve('c', sfPath, { cache });
     assert.equal(resolved, sfPath + 'c-node.js');
 
-    var { resolved } = await jspmResolve('c', sfPath, { env: { browser: true } });
+    var { resolved } = await jspmResolve('c', sfPath, { cache, env: { browser: true } });
     assert.equal(resolved, sfPath + 'c-browser.js');
 
     try {
-      var { resolved } = await jspmResolve('c', sfPath, { env: { browser: false, node: false } });
+      var { resolved } = await jspmResolve('c', sfPath, { cache, env: { browser: false, node: false } });
     }
     catch (e) {
       assert(e.message.indexOf('Cannot find module c') !== -1);
     }
 
-    var { resolved } = await jspmResolve('c/a', sfPath);
+    var { resolved } = await jspmResolve('c/a', sfPath, { cache });
     assert.equal(resolved, `${sfPath}c-node/a.js`);
 
-    var { resolved } = await jspmResolve('c', pkgPath);
+    var { resolved } = await jspmResolve('c', pkgPath, { cache });
     assert.equal(resolved, pkgPath + 'c-node.js');
   });
 
   test('Node Resolution fallback', async () => {
-    var { resolved } = await jspmResolve('mocha', sfPath);
+    var { resolved } = await jspmResolve('mocha', sfPath, { cache });
     assert.equal(resolved, `${nodePath}mocha/index.js`);
 
-    var { resolved } = await jspmResolve('mocha/index', sfPath);
+    var { resolved } = await jspmResolve('mocha/index', sfPath, { cache });
     assert.equal(resolved, `${nodePath}mocha/index.js`);
 
-    var { resolved } = await jspmResolve('mocha/', sfPath);
+    var { resolved } = await jspmResolve('mocha/', sfPath, { cache });
     assert.equal(resolved,  `${nodePath}mocha/`);
 
-    var { resolved, format } = await jspmResolve('fs', sfPath);
+    var { resolved, format } = await jspmResolve('fs', sfPath, { cache });
     assert.equal(resolved, 'fs');
     assert.equal(format, 'builtin');
 
     try {
-      var { resolved } = await jspmResolve('thing', sfPath);
+      var { resolved } = await jspmResolve('thing', sfPath, { cache });
     }
     catch (e) {
       assert.equal(e.code, 'MODULE_NOT_FOUND');
@@ -179,72 +181,74 @@ suite('Standard Cases', () => {
   });
 
   test('Empty module', async () => {
-    var { resolved } = await jspmResolve('@empty', sfPath);
+    var { resolved } = await jspmResolve('@empty', sfPath, { cache });
     assert.equal(resolved, undefined);
   });
 
   test('Cross-project resolution', async () => {
-    var { resolved } = await jspmResolve(`/${sfPath}sub/c`, sfPath);
+    var { resolved } = await jspmResolve(`/${sfPath}sub/c`, sfPath, { cache });
     assert.equal(resolved, `${sfPath}sub/b.js`);
 
-    var { resolved } = await jspmResolve('sr:p@1/main', sfPath + 'sub/');
+    var { resolved } = await jspmResolve('sr:p@1/main', sfPath + 'sub/', { cache });
     assert.equal(resolved, `${sfPath}sub/jspm_packages/sr/p@1/main.js`);
 
-    var { resolved } = await jspmResolve('pkg', sfPath);
+    var { resolved } = await jspmResolve('pkg', sfPath, { cache });
     assert.equal(resolved, `${sfPath}jspm_packages/ra/pkg@version/index.js`);
   });
   
   test('Module format', async () => {
-    var { resolved, format } = await jspmResolve('pkg', sfPath);
+    var { resolved, format } = await jspmResolve('pkg', sfPath, { cache });
     assert.equal(format, 'cjs');
 
-    var { resolved, format } = await jspmResolve('pkg2', sfPath);
+    var { resolved, format } = await jspmResolve('pkg2', sfPath, { cache });
     assert.equal(format, 'esm');
 
-    var { resolved, format } = await jspmResolve('../../../resolve.js', sfPath);
+    var { resolved, format } = await jspmResolve('../../../resolve.js', sfPath, { cache });
     assert.equal(format, 'cjs');
   });
 });
 
 suite('Standard Cases Sync', () => {
+  const syncCache = {};
+
   test('Extension cases', () => {
-    var { resolved } = jspmResolve.sync('./b', sfPath);
+    var { resolved } = jspmResolve.sync('./b', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}b.js`);
 
-    var { resolved } = jspmResolve.sync('./b', sfPath + 'sub/');
+    var { resolved } = jspmResolve.sync('./b', sfPath + 'sub/', { cache: syncCache });
     assert.equal(resolved, `${sfPath}sub/b.js`);
 
-    var { resolved } = jspmResolve.sync('./c', sfPath);
+    var { resolved } = jspmResolve.sync('./c', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}c.json`);
 
-    var { resolved } = jspmResolve.sync('./d', sfPath);
+    var { resolved } = jspmResolve.sync('./d', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}d/index.js`);
 
-    var { resolved } = jspmResolve.sync('./e', sfPath);
+    var { resolved } = jspmResolve.sync('./e', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}e/index.json`);
   });
 
   test('Global map config', () => {
-    var { resolved } = jspmResolve.sync('a', sfPath);
+    var { resolved } = jspmResolve.sync('a', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}b.js`);
 
-    var { resolved } = jspmResolve.sync('a/', sfPath);
+    var { resolved } = jspmResolve.sync('a/', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}b/`);
 
-    var { resolved } = jspmResolve.sync('a/b', sfPath);
+    var { resolved } = jspmResolve.sync('a/b', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}b/b.js`);
 
-    var { resolved } = jspmResolve.sync('a/c/b', sfPath);
+    var { resolved } = jspmResolve.sync('a/c/b', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}b/b.js`);
 
-    var { resolved } = jspmResolve.sync('./rel', sfPath);
+    var { resolved } = jspmResolve.sync('./rel', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}d/index.js`);
 
-    var { resolved } = jspmResolve.sync(`/${sfPath}rel`, 'file:///');
+    var { resolved } = jspmResolve.sync(`/${sfPath}rel`, 'file:///', { cache: syncCache });
     assert.equal(resolved, `${sfPath}d/index.js`);
 
     try {
-      var { resolved } = jspmResolve.sync('./fail', sfPath);
+      var { resolved } = jspmResolve.sync('./fail', sfPath, { cache: syncCache });
       assert(false);
     }
     catch (e) {
@@ -254,26 +258,26 @@ suite('Standard Cases Sync', () => {
 
   
   test('Package loading', () => {
-    var { resolved } = jspmResolve.sync('ra:pkg@version', sfPath);
+    var { resolved } = jspmResolve.sync('ra:pkg@version', sfPath, { cache: syncCache });
     assert.equal(resolved, `${pPath}ra/pkg@version/index.js`);
 
-    var { resolved } = jspmResolve.sync('ra:pkg@version/', sfPath);
+    var { resolved } = jspmResolve.sync('ra:pkg@version/', sfPath, { cache: syncCache });
     assert.equal(resolved, `${pPath}ra/pkg@version/`);
 
-    var { resolved } = jspmResolve.sync('ra:pkg@version/a', sfPath);
+    var { resolved } = jspmResolve.sync('ra:pkg@version/a', sfPath, { cache: syncCache });
     assert.equal(resolved, `${pPath}ra/pkg@version/a.json`);
 
-    var { resolved } = jspmResolve.sync('pkg', sfPath);
+    var { resolved } = jspmResolve.sync('pkg', sfPath, { cache: syncCache });
     assert.equal(resolved, `${pPath}ra/pkg@version/index.js`);
 
-    var { resolved } = jspmResolve.sync('pkg/', sfPath);
+    var { resolved } = jspmResolve.sync('pkg/', sfPath, { cache: syncCache });
     assert.equal(resolved, `${pPath}ra/pkg@version/`);
 
-    var { resolved } = jspmResolve.sync('pkg/a', sfPath);
+    var { resolved } = jspmResolve.sync('pkg/a', sfPath, { cache: syncCache });
     assert.equal(resolved, `${pPath}ra/pkg@version/a.json`);
 
     try {
-      var { resolved } = jspmResolve.sync('p/b', sfPath);
+      var { resolved } = jspmResolve.sync('p/b', sfPath, { cache: syncCache });
       assert(false);
     }
     catch (e) {
@@ -282,38 +286,38 @@ suite('Standard Cases Sync', () => {
   });
 
   test('Package-relative loading', () => {
-    var { resolved } = jspmResolve.sync('./a', pkgPath);
+    var { resolved } = jspmResolve.sync('./a', pkgPath, { cache: syncCache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = jspmResolve.sync('x', pkgPath);
+    var { resolved } = jspmResolve.sync('x', pkgPath, { cache: syncCache });
     assert.equal(resolved, `${pkgPath}y.js`);
 
-    var { resolved } = jspmResolve.sync('./z', pkgPath);
+    var { resolved } = jspmResolve.sync('./z', pkgPath, { cache: syncCache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = jspmResolve.sync('./z/a', pkgPath);
+    var { resolved } = jspmResolve.sync('./z/a', pkgPath, { cache: syncCache });
     assert.equal(resolved, `${pkgPath}a/a.js`);
 
-    var { resolved } = jspmResolve.sync('../z', pkgPath + 'x/y');
+    var { resolved } = jspmResolve.sync('../z', pkgPath + 'x/y', { cache: syncCache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = jspmResolve.sync('../../z', pkgPath + 'x/y/z');
+    var { resolved } = jspmResolve.sync('../../z', pkgPath + 'x/y/z', { cache: syncCache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = jspmResolve.sync('/' + pkgPath + 'z');
+    var { resolved } = jspmResolve.sync('/' + pkgPath + 'z', undefined, { cache: syncCache });
     assert.equal(resolved, `${pkgPath}a.json`);
 
-    var { resolved } = jspmResolve.sync('/' + pkgPath + 'z/a');
+    var { resolved } = jspmResolve.sync('/' + pkgPath + 'z/a', undefined, { cache: syncCache });
     assert.equal(resolved, `${pkgPath}a/a.js`);
 
-    var { resolved } = jspmResolve.sync('p', pkgPath);
+    var { resolved } = jspmResolve.sync('p', pkgPath, { cache: syncCache });
     assert.equal(resolved, `${pkg2Path}a.js`);
 
-    var { resolved } = jspmResolve.sync('p/b', pkgPath);
+    var { resolved } = jspmResolve.sync('p/b', pkgPath, { cache: syncCache });
     assert.equal(resolved, `${pkg2Path}b.js`);
 
     try {
-      var { resolved } = jspmResolve.sync('./fail/x', pkgPath);
+      var { resolved } = jspmResolve.sync('./fail/x', pkgPath, { cache: syncCache });
       assert(false);
     }
     catch (e) {
@@ -322,50 +326,50 @@ suite('Standard Cases Sync', () => {
   });
   
   test('Cross-package resolves', () => {
-    var { resolved } = jspmResolve.sync('ra:pkg@version2', sfPath);
+    var { resolved } = jspmResolve.sync('ra:pkg@version2', sfPath, { cache: syncCache });
     assert.equal(resolved, pkg2Path + 'a.js');
 
-    var { resolved } = jspmResolve.sync('pkg2/a', sfPath);
+    var { resolved } = jspmResolve.sync('pkg2/a', sfPath, { cache: syncCache });
     assert.equal(resolved, pkg2Path + 'b.js');
   });
 
   test('Conditional maps', () => {
-    var { resolved } = jspmResolve.sync('c', sfPath);
+    var { resolved } = jspmResolve.sync('c', sfPath, { cache: syncCache });
     assert.equal(resolved, sfPath + 'c-node.js');
 
-    var { resolved } = jspmResolve.sync('c', sfPath, { env: { browser: true } });
+    var { resolved } = jspmResolve.sync('c', sfPath, { env: { browser: true }, cache: syncCache });
     assert.equal(resolved, sfPath + 'c-browser.js');
 
     try {
-      var { resolved } = jspmResolve.sync('c', sfPath, { env: { browser: false, node: false } });
+      var { resolved } = jspmResolve.sync('c', sfPath, { env: { browser: false, node: false }, cache: syncCache });
     }
     catch (e) {
       assert(e.message.indexOf('Cannot find module c') !== -1);
     }
 
-    var { resolved } = jspmResolve.sync('c/a', sfPath);
+    var { resolved } = jspmResolve.sync('c/a', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}c-node/a.js`);
 
-    var { resolved } = jspmResolve.sync('c', pkgPath);
+    var { resolved } = jspmResolve.sync('c', pkgPath, { cache: syncCache });
     assert.equal(resolved, pkgPath + 'c-node.js');
   });
 
   test('Node Resolution fallback', () => {
-    var { resolved } = jspmResolve.sync('mocha', sfPath);
+    var { resolved } = jspmResolve.sync('mocha', sfPath, { cache: syncCache });
     assert.equal(resolved, `${nodePath}mocha/index.js`);
 
-    var { resolved } = jspmResolve.sync('mocha/index', sfPath);
+    var { resolved } = jspmResolve.sync('mocha/index', sfPath, { cache: syncCache });
     assert.equal(resolved, `${nodePath}mocha/index.js`);
 
-    var { resolved } = jspmResolve.sync('mocha/', sfPath);
+    var { resolved } = jspmResolve.sync('mocha/', sfPath, { cache: syncCache });
     assert.equal(resolved,  `${nodePath}mocha/`);
 
-    var { resolved, format } = jspmResolve.sync('fs', sfPath);
+    var { resolved, format } = jspmResolve.sync('fs', sfPath, { cache: syncCache });
     assert.equal(resolved, 'fs');
     assert.equal(format, 'builtin');
 
     try {
-      var { resolved } = jspmResolve.sync('thing', sfPath);
+      var { resolved } = jspmResolve.sync('thing', sfPath, { cache: syncCache });
     }
     catch (e) {
       assert.equal(e.code, 'MODULE_NOT_FOUND');
@@ -375,29 +379,29 @@ suite('Standard Cases Sync', () => {
   });
 
   test('Empty module', () => {
-    var { resolved } = jspmResolve.sync('@empty', sfPath);
+    var { resolved } = jspmResolve.sync('@empty', sfPath, { cache: syncCache });
     assert.equal(resolved, undefined);
   });
 
   test('Cross-project resolution', () => {
-    var { resolved } = jspmResolve.sync(`/${sfPath}sub/c`, sfPath);
+    var { resolved } = jspmResolve.sync(`/${sfPath}sub/c`, sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}sub/b.js`);
 
-    var { resolved } = jspmResolve.sync('sr:p@1/main', sfPath + 'sub/');
+    var { resolved } = jspmResolve.sync('sr:p@1/main', sfPath + 'sub/', { cache: syncCache });
     assert.equal(resolved, `${sfPath}sub/jspm_packages/sr/p@1/main.js`);
 
-    var { resolved } = jspmResolve.sync('pkg', sfPath);
+    var { resolved } = jspmResolve.sync('pkg', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}jspm_packages/ra/pkg@version/index.js`);
   });
   
   test('Module format', () => {
-    var { resolved, format } = jspmResolve.sync('pkg', sfPath);
+    var { resolved, format } = jspmResolve.sync('pkg', sfPath, { cache: syncCache });
     assert.equal(format, 'cjs');
 
-    var { resolved, format } = jspmResolve.sync('pkg2', sfPath);
+    var { resolved, format } = jspmResolve.sync('pkg2', sfPath, { cache: syncCache });
     assert.equal(format, 'esm');
 
-    var { resolved, format } = jspmResolve.sync('../../../resolve.js', sfPath);
+    var { resolved, format } = jspmResolve.sync('../../../resolve.js', sfPath, { cache: syncCache });
     assert.equal(format, 'cjs');
   });
 });
