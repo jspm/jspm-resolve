@@ -67,7 +67,7 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
   if (!path.endsWith('.mjs') && !path.endsWith('.js')) {
     let results = await Promise.all([
       this.isFile(path, cache),
-      this.isFile(path + '.mjs', cache),
+      cjsResolve === false ? this.isFile(path + '.mjs', cache) : Promise.resolve(false),
       this.isFile(path + '.js', cache)
     ]);
     if (results[0] === true)
@@ -78,12 +78,20 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
       resolved = path + '.js';
     else if (await this.isFile(resolved = path + '.json', cache));
     else if (await this.isFile(resolved = path + '.node', cache));
-    else if (cjsResolve === false && await this.isFile(resolved = path + '/index.mjs', cache));
-    else if (await this.isFile(resolved = path + '/index.js', cache));
-    else if (await this.isFile(resolved = path + '/index.json', cache));
-    else if (await this.isFile(resolved = path + '/index.node', cache));
-    else
-      throwModuleNotFound(path);
+    else {
+      let results = await Promise.all([
+        cjsResolve === false ? this.isFile(path + '/index.mjs') : Promise.resolve(false),
+        this.isFile(path + '/index.js')
+      ]);
+      if (results[0] === true)
+        resolved = path + '/index.mjs';
+      else if (results[1] === true)
+        resolved = path + '/index.js';
+      else if (await this.isFile(resolved = path + '/index.json', cache));
+      else if (await this.isFile(resolved = path + '/index.node', cache));
+      else
+        throwModuleNotFound(path);
+    }
   }
   else {
     if (await this.isFile(path, cache))
@@ -246,25 +254,27 @@ async function nodeModuleResolve (name, parentPath, env, cjsResolve, cache) {
     let resolved = parentPath.substr(0, separatorIndex) + '/node_modules/' + name;
     let pkgNameLength = name[0] !== '@' ? name.indexOf('/') : name.indexOf('/', name.indexOf('/') + 1);
     if (await this.isDir(resolved.substr(0, resolved.length - name.length + pkgNameLength), cache)) {
-      let pkgConfig = await this.getPackageConfig(resolved, cache);
-      if (pkgConfig !== undefined) {
-        if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
-            resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
-          const mapped = applyMain(pkgConfig.config.mains, env);
-          if (mapped !== undefined) {
-            if (mapped === '@empty')
-              return { resolved: undefined, format: undefined };
-            resolved = pkgConfig.path + mapped;
+      if (name[name.length - 1] !== '/') {
+        let pkgConfig = await this.getPackageConfig(resolved, cache);
+        if (pkgConfig !== undefined) {
+          if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
+              resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+            const mapped = applyMain(pkgConfig.config.mains, env);
+            if (mapped !== undefined) {
+              if (mapped === '@empty')
+                return { resolved: undefined, format: undefined };
+              resolved = pkgConfig.path + mapped;
+            }
           }
-        }
-        else if (pkgConfig.config.map !== undefined &&
-            resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
-          const relPath = '.' + resolved.substr(pkgConfig.path.length);
-          const mapped = applyMap(relPath, pkgConfig.config.map, env);
-          if (mapped !== undefined) {
-            if (mapped === '@empty')
-              return { resolved: undefined, format: undefined };
-            resolved = pkgConfig.path + mapped;
+          else if (pkgConfig.config.map !== undefined &&
+              resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+            const relPath = '.' + resolved.substr(pkgConfig.path.length);
+            const mapped = applyMap(relPath, pkgConfig.config.map, env);
+            if (mapped !== undefined) {
+              if (mapped === '@empty')
+                return { resolved: undefined, format: undefined };
+              resolved = pkgConfig.path + mapped;
+            }
           }
         }
       }
@@ -290,25 +300,27 @@ function nodeModuleResolveSync (name, parentPath, env, cjsResolve, cache) {
     let resolved = parentPath.substr(0, separatorIndex) + '/node_modules/' + name;
     let pkgNameLength = name[0] !== '@' ? name.indexOf('/') : name.indexOf('/', name.indexOf('/') + 1);
     if (this.isDirSync(resolved.substr(0, resolved.length - name.length + pkgNameLength), cache)) {
-      let pkgConfig = this.getPackageConfigSync(resolved, cache);
-      if (pkgConfig !== undefined) {
-        if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
-            resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
-          const mapped = applyMain(pkgConfig.config.mains, env);
-          if (mapped !== undefined) {
-            if (mapped === '@empty')
-              return { resolved: undefined, format: undefined };
-            resolved = pkgConfig.path + mapped;
+      if (name[name.length - 1] !== '/') {
+        let pkgConfig = this.getPackageConfigSync(resolved, cache);
+        if (pkgConfig !== undefined) {
+          if (pkgConfig.config.mains !== undefined && resolved.length === pkgConfig.path.length - 1 &&
+              resolved === pkgConfig.path.substr(0, pkgConfig.path.length - 1)) {
+            const mapped = applyMain(pkgConfig.config.mains, env);
+            if (mapped !== undefined) {
+              if (mapped === '@empty')
+                return { resolved: undefined, format: undefined };
+              resolved = pkgConfig.path + mapped;
+            }
           }
-        }
-        else if (pkgConfig.config.map !== undefined &&
-            resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
-          const relPath = '.' + resolved.substr(pkgConfig.path.length);
-          const mapped = applyMap(relPath, pkgConfig.config.map, env);
-          if (mapped !== undefined) {
-            if (mapped === '@empty')
-              return { resolved: undefined, format: undefined };
-            resolved = pkgConfig.path + mapped;
+          else if (pkgConfig.config.map !== undefined &&
+              resolved.length >= pkgConfig.path.length && resolved.substr(0, pkgConfig.path.length) === pkgConfig.path) {
+            const relPath = '.' + resolved.substr(pkgConfig.path.length);
+            const mapped = applyMap(relPath, pkgConfig.config.map, env);
+            if (mapped !== undefined) {
+              if (mapped === '@empty')
+                return { resolved: undefined, format: undefined };
+              resolved = pkgConfig.path + mapped;
+            }
           }
         }
       }
@@ -788,9 +800,7 @@ const resolveUtils = {
   },
 
   async getPackageConfig (resolved, cache) {
-    let separatorIndex = resolved.length - 1;
-    if (resolved[separatorIndex] !== '/')
-      separatorIndex++;
+    let separatorIndex = resolved.length;
     let rootSeparatorIndex = resolved.indexOf('/');
     while (separatorIndex > rootSeparatorIndex) {
       let parentPath = resolved.substr(0, separatorIndex);
@@ -819,9 +829,7 @@ const resolveUtils = {
   },
   
   getPackageConfigSync (resolved, cache) {
-    let separatorIndex = resolved.length - 1;
-    if (resolved[separatorIndex] !== '/')
-      separatorIndex++;
+    let separatorIndex = resolved.length;
     let rootSeparatorIndex = resolved.indexOf('/');
     while (separatorIndex > rootSeparatorIndex) {
       let parentPath = resolved.substr(0, separatorIndex);
