@@ -424,7 +424,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     if (resolvedPkg) {
       if (name.indexOf('\\') !== -1)
         throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
-      const config = utils.getJspmConfig(parentPath, cache);
+      const config = await utils.getJspmConfig(parentPath, cache);
       if (!config)
         throwInvalidModuleName(`Cannot import jspm package ${name} when resolver is not initialized to a jspm project.`);
       resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
@@ -440,7 +440,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   }
   // Plain name resolution
   else {
-    const config = utils.getJspmConfig(parentPath, cache);
+    const config = await utils.getJspmConfig(parentPath, cache);
 
     if (name.indexOf('\\') !== -1)
       throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
@@ -483,7 +483,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     }
   }
 
-  const config = utils.getJspmConfig(resolvedPath, cache);
+  const config = await utils.getJspmConfig(resolvedPath, cache);
   const realpath = config === undefined && resolvedPath.indexOf('/node_modules/') !== -1;
 
   if (resolvedPath[resolvedPath.length - 1] === '/')
@@ -569,7 +569,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     if (resolvedPkg) {
       if (name.indexOf('\\') !== -1)
         throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
-      const config = utils.getJspmConfig(parentPath, cache);
+      const config = utils.getJspmConfigSync(parentPath, cache);
       if (!config)
         throwInvalidModuleName(`Cannot import jspm package ${name} when resolver is not initialized to a jspm project.`);
       resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
@@ -585,7 +585,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   }
   // Plain name resolution
   else {
-    const config = utils.getJspmConfig(parentPath, cache);
+    const config = utils.getJspmConfigSync(parentPath, cache);
 
     if (name.indexOf('\\') !== -1)
       throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
@@ -628,7 +628,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     }
   }
 
-  const config = utils.getJspmConfig(resolvedPath, cache);
+  const config = utils.getJspmConfigSync(resolvedPath, cache);
   const realpath = config === undefined && resolvedPath.indexOf('/node_modules/') !== -1;
 
   if (resolvedPath[resolvedPath.length - 1] === '/')
@@ -668,7 +668,122 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
 }
 
 const resolveUtils = {
-  getJspmConfig (parentPath, cache) {
+  async getJspmConfig (parentPath, cache) {
+    let innerConfig;
+    parentPath = parentPath.substr(0, parentPath.lastIndexOf('/'));
+    let separatorIndex = parentPath.length;
+    let rootSeparatorIndex = parentPath.indexOf('/');
+    do {
+      let dir = parentPath.substr(0, separatorIndex);
+      if (dir.endsWith('/' + 'node_modules'))
+        return;
+      
+      if (cache && dir in cache.jspmConfigCache) {
+        let config = cache.jspmConfigCache[dir];
+        if (config !== null) {
+          if (innerConfig !== undefined) {
+            const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
+            if (!nestedPkg || nestedPkg.path.length > 1)
+              return innerConfig;
+            return config;
+          }
+          innerConfig = config;
+        }
+      }
+      else if (!cache || cache.pjsonConfigCache[dir] !== null) {
+        let pjson;
+        try {
+          pjson = JSON.parse(await this.readFile(path.join(dir, 'package.json')));
+
+          if (cache)
+            cache.pjsonConfigCache[dir] = processPjsonConfig(pjson);
+        }
+        catch (e) {
+          if (e instanceof SyntaxError) {
+            e.code = 'INVALID_CONFIG';
+            throw e;
+          }
+          if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
+            throw e;
+          
+          if (cache)
+            cache.jspmConfigCache[dir] = cache.pjsonConfigCache[dir] = null;
+        }
+
+        if (pjson) {
+          let jspmPath;
+          if (pjson.configFiles && pjson.configFiles.jspm && !pjson.configFiles.jspm.startsWith('..'))
+            jspmPath = path.resolve(dir, pjson.configFiles.jspm);
+          else
+            jspmPath = path.join(dir, 'jspm.json');
+
+          let jspmJson;
+          try {
+            jspmJson = JSON.parse(await this.readFile(jspmPath));
+          }
+          catch (e) {
+            if (e instanceof SyntaxError) {
+              e.code = 'INVALID_CONFIG';
+              throw e;
+            }
+            if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
+              throw e;
+            
+            if (cache)
+              cache.jspmConfigCache[dir] = null;
+          }
+
+          if (jspmJson !== undefined) {
+            let dirSep = (isWindows ? dir.replace(winSepRegEx, '/') : dir) + '/';
+            let config = {
+              basePath: dirSep,
+              localPackagePathDev: dirSep,
+              localPackagePathProduction: dirSep,
+              jspmPackagesPath: dirSep + 'jspm_packages/',
+              resolve: jspmJson.resolve || {},
+              dependencies: jspmJson.dependencies || {}
+            };
+
+            if (pjson && typeof pjson.directories === 'object') {
+              if (typeof pjson.directories.packages === 'string' && !pjson.directories.packages.startsWith('..')) {
+                config.jspmPackagesPath = path.resolve(dir, pjson.directories.packages) + '/';
+                if (isWindows)
+                  config.jspmPackagesPath = config.jspmPackagesPath.replace(winSepRegEx, '/');
+              }
+              if (typeof pjson.directories.lib === 'string' && !pjson.directories.lib.startsWith('..')) {
+                config.localPackagePathDev = path.resolve(dir, pjson.directories.lib) + '/';
+                if (isWindows)
+                  config.localPackagePathDev = config.localPackagePathDev.replace(winSepRegEx, '/');
+                config.localPackagePathProduction = config.localPackagePathDev;
+              }
+              if (typeof pjson.directories.dist === 'string' && !pjson.directories.dist.startsWith('..')) {
+                config.localPackagePathProduction = path.resolve(dir, pjson.directories.dist) + '/';
+                if (isWindows)
+                  config.localPackagePathProduction = config.localPackagePathProduction.replace(winSepRegEx, '/');
+              }
+            }
+
+            if (cache)
+              cache.jspmConfigCache[dir] = config;
+
+            if (innerConfig !== undefined) {
+              const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
+              if (!nestedPkg || nestedPkg.path.length > 1)
+                return innerConfig;
+              return config;
+            }
+            innerConfig = config;
+          }
+        }
+      }
+
+      separatorIndex = parentPath.lastIndexOf('/', separatorIndex - 1);
+    }
+    while (separatorIndex > rootSeparatorIndex)
+
+    return innerConfig;
+  },
+  getJspmConfigSync (parentPath, cache) {
     let innerConfig;
     parentPath = parentPath.substr(0, parentPath.lastIndexOf('/'));
     let separatorIndex = parentPath.length;
@@ -694,6 +809,9 @@ const resolveUtils = {
         let pjson;
         try {
           pjson = JSON.parse(this.readFileSync(path.join(dir, 'package.json')));
+
+          if (cache)
+            cache.pjsonConfigCache[dir] = processPjsonConfig(pjson);
         }
         catch (e) {
           if (e instanceof SyntaxError) {
@@ -1049,8 +1167,6 @@ function applyMain (mainMap, env) {
     return mapped.substr(2);
   return mapped;
 }
-
-resolve.processPjsonConfig = processPjsonConfig;
 
 function processPjsonConfig (pjson) {
   const pcfg = {
