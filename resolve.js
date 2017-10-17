@@ -9,6 +9,13 @@ const winSepRegEx = /\\/g;
 const winDrivePathRegEx = /^[a-z]:\\/i;
 const encodedSepRegEx = /%(5C|2F)/gi;
 
+async function findIndexAsync (promises) {
+  for (let i = 0; i < promises.length; i++)
+    if (await promises[i] === true)
+      return i;
+  return -1;
+}
+
 function throwModuleNotFound (name, parent) {
   let e = new Error(`Cannot find module ${name}${parent ? ` from ${parent}` : ''}.`);
   e.code = 'MODULE_NOT_FOUND';
@@ -65,32 +72,41 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
   // for perf, in parallel we check x, x.mjs and x.js
   // (unless already has one of these extensions)
   if (!path.endsWith('.mjs') && !path.endsWith('.js')) {
-    let results = await Promise.all([
+    switch (await findIndexAsync([
       this.isFile(path, cache),
       cjsResolve === false ? this.isFile(path + '.mjs', cache) : Promise.resolve(false),
       this.isFile(path + '.js', cache)
-    ]);
-    if (results[0] === true)
-      resolved = path;
-    else if (results[1] === true)
-      resolved = path + '.mjs';
-    else if (results[2] === true)
-      resolved = path + '.js';
-    else if (await this.isFile(resolved = path + '.json', cache));
-    else if (await this.isFile(resolved = path + '.node', cache));
-    else {
-      let results = await Promise.all([
-        cjsResolve === false ? this.isFile(path + '/index.mjs') : Promise.resolve(false),
-        this.isFile(path + '/index.js')
-      ]);
-      if (results[0] === true)
-        resolved = path + '/index.mjs';
-      else if (results[1] === true)
-        resolved = path + '/index.js';
-      else if (await this.isFile(resolved = path + '/index.json', cache));
-      else if (await this.isFile(resolved = path + '/index.node', cache));
-      else
-        throwModuleNotFound(path);
+    ])) {
+      case 0:
+        resolved = path;
+      break;
+      case 1:
+        resolved = path + '.mjs';
+      break;
+      case 2:
+        resolved = path + '.js';
+      break;
+      default:
+        if (await this.isFile(resolved = path + '.json', cache));
+        else if (await this.isFile(resolved = path + '.node', cache));
+        else {
+          switch (await findIndexAsync([
+            cjsResolve === false ? this.isFile(path + '/index.mjs') : Promise.resolve(false),
+            this.isFile(path + '/index.js')
+          ])) {
+            case 0:
+              resolved = path + '/index.mjs';
+            break;
+            case 1:
+              resolved = path + '/index.js';
+            break;
+            default:
+              if (await this.isFile(resolved = path + '/index.json', cache));
+              else if (await this.isFile(resolved = path + '/index.node', cache));
+              else
+                throwModuleNotFound(path);  
+          }
+        }
     }
   }
   else {
@@ -1168,6 +1184,7 @@ function applyMain (mainMap, env) {
   return mapped;
 }
 
+exports.processPjsonConfig = processPjsonConfig;
 function processPjsonConfig (pjson) {
   const pcfg = {
     mains: typeof pjson.mains === 'object' ? pjson.mains : undefined,
