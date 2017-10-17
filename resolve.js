@@ -62,18 +62,43 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
     return { resolved: path, format: undefined };
   }
   let resolved;
-  if (await this.isFile(path, cache))
-    resolved = path;
-  else if (cjsResolve === false && await this.isFile(resolved = path + '.mjs', cache));
-  else if (await this.isFile(resolved = path + '.js', cache));
-  else if (await this.isFile(resolved = path + '.json', cache));
-  else if (await this.isFile(resolved = path + '.node', cache));
-  else if (cjsResolve === false && await this.isFile(resolved = path + '/index.mjs', cache));
-  else if (await this.isFile(resolved = path + '/index.js', cache));
-  else if (await this.isFile(resolved = path + '/index.json', cache));
-  else if (await this.isFile(resolved = path + '/index.node', cache));
-  else
-    throwModuleNotFound(path);
+  // for perf, in parallel we check x, x.mjs and x.js
+  // (unless already has one of these extensions)
+  if (!path.endsWith('.mjs') && !path.endsWith('.js')) {
+    let results = await Promise.all([
+      this.isFile(path, cache),
+      this.isFile(path + '.mjs', cache),
+      this.isFile(path + '.js', cache)
+    ]);
+    if (results[0] === true)
+      resolved = path;
+    else if (results[1] === true)
+      resolved = path + '.mjs';
+    else if (results[2] === true)
+      resolved = path + '.js';
+    else if (await this.isFile(resolved = path + '.json', cache));
+    else if (await this.isFile(resolved = path + '.node', cache));
+    else if (cjsResolve === false && await this.isFile(resolved = path + '/index.mjs', cache));
+    else if (await this.isFile(resolved = path + '/index.js', cache));
+    else if (await this.isFile(resolved = path + '/index.json', cache));
+    else if (await this.isFile(resolved = path + '/index.node', cache));
+    else
+      throwModuleNotFound(path);
+  }
+  else {
+    if (await this.isFile(path, cache))
+      resolved = path;
+    else if (cjsResolve === false && await this.isFile(resolved = path + '.mjs', cache));
+    else if (await this.isFile(resolved = path + '.js', cache));
+    else if (await this.isFile(resolved = path + '.json', cache));
+    else if (await this.isFile(resolved = path + '.node', cache));
+    else if (cjsResolve === false && await this.isFile(resolved = path + '/index.mjs', cache));
+    else if (await this.isFile(resolved = path + '/index.js', cache));
+    else if (await this.isFile(resolved = path + '/index.json', cache));
+    else if (await this.isFile(resolved = path + '/index.node', cache));
+    else
+      throwModuleNotFound(path);
+  }
   if (realpath)
     resolved = await this.realpath(resolved, cache);
   if (resolved.endsWith('.mjs')) {
@@ -87,7 +112,7 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
     return { resolved, format: 'addon' };
   if (resolved.endsWith('.js')) {
     if (cjsResolve === false) {
-      const pcfg = await this.getPackageConfig(resolved, cache);
+      const pcfg = await this.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
         return { resolved, format: pcfg.config.esm === true ? 'esm' : 'cjs' };
     }
@@ -128,7 +153,7 @@ function fileResolveSync (path, cjsResolve, realpath, cache) {
     return { resolved, format: 'addon' };
   if (resolved.endsWith('.js')) {
     if (cjsResolve === false) {
-      const pcfg = this.getPackageConfigSync(resolved, cache);
+      const pcfg = this.getPackageConfigSync(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
         return { resolved, format: pcfg.config.esm === true ? 'esm' : 'cjs' };
     }
@@ -349,13 +374,13 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache) {
-    if (!cache.jspmConfigCache)
+    if (cache.jspmConfigCache === undefined)
       cache.jspmConfigCache = {};
-    if (!cache.pjsonConfigCache)
+    if (cache.pjsonConfigCache === undefined)
       cache.pjsonConfigCache = {};
-    if (!cache.isFileCache)
+    if (cache.isFileCache === undefined)
       cache.isFileCache = {};
-    if (!cache.isDirCache)
+    if (cache.isDirCache === undefined)
       cache.isDirCache = {};
   }
 
@@ -407,7 +432,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
 
     if (name.indexOf('\\') !== -1)
       throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
-    const parentPkgConfig = await utils.getPackageConfig(parentPath, cache);
+    const parentPkgConfig = await utils.getPackageConfig(parentPath.substr(0, parentPath.lastIndexOf('/')), cache);
     if (parentPkgConfig && parentPkgConfig.config.map) {
       const mapped = applyMap(name, parentPkgConfig.config.map, env);
       if (mapped !== undefined) {
@@ -494,13 +519,13 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache) {
-    if (!cache.jspmConfigCache)
+    if (cache.jspmConfigCache === undefined)
       cache.jspmConfigCache = {};
-    if (!cache.pjsonConfigCache)
+    if (cache.pjsonConfigCache === undefined)
       cache.pjsonConfigCache = {};
-    if (!cache.isFileCache)
+    if (cache.isFileCache === undefined)
       cache.isFileCache = {};
-    if (!cache.isDirCache)
+    if (cache.isDirCache === undefined)
       cache.isDirCache = {};
   }
 
@@ -552,7 +577,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
 
     if (name.indexOf('\\') !== -1)
       throwInvalidModuleName(`Package request ${name} must use "/" as a separator not "\".`);
-    const parentPkgConfig = utils.getPackageConfigSync(parentPath, cache);
+    const parentPkgConfig = utils.getPackageConfigSync(parentPath.substr(0, parentPath.lastIndexOf('/')), cache);
     if (parentPkgConfig && parentPkgConfig.config.map) {
       const mapped = applyMap(name, parentPkgConfig.config.map, env);
       if (mapped !== undefined) {
@@ -643,7 +668,7 @@ const resolveUtils = {
       
       if (cache && dir in cache.jspmConfigCache) {
         let config = cache.jspmConfigCache[dir];
-        if (config !== undefined) {
+        if (config !== null) {
           if (innerConfig !== undefined) {
             const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
             if (!nestedPkg || nestedPkg.path.length > 1)
@@ -653,7 +678,7 @@ const resolveUtils = {
           innerConfig = config;
         }
       }
-      else {
+      else if (!cache || cache.pjsonConfigCache[dir] !== null) {
         let pjson;
         try {
           pjson = JSON.parse(this.readFileSync(path.join(dir, 'package.json')));
@@ -667,7 +692,7 @@ const resolveUtils = {
             throw e;
           
           if (cache)
-            cache.jspmConfigCache[dir] = cache.pjsonConfigCache[dir] = undefined;
+            cache.jspmConfigCache[dir] = cache.pjsonConfigCache[dir] = null;
         }
 
         if (pjson) {
@@ -690,7 +715,7 @@ const resolveUtils = {
               throw e;
             
             if (cache)
-              cache.jspmConfigCache[dir] = undefined;
+              cache.jspmConfigCache[dir] = null;
           }
 
           if (jspmJson !== undefined) {
@@ -771,7 +796,7 @@ const resolveUtils = {
       let parentPath = resolved.substr(0, separatorIndex);
       if (parentPath.endsWith('/node_modules/'))
         break;
-      let pcfg;
+      let pcfg = null;
       if (cache && parentPath in cache.pjsonConfigCache) {
         pcfg = cache.pjsonConfigCache[parentPath];
       }
@@ -787,7 +812,7 @@ const resolveUtils = {
         if (cache)
           cache.pjsonConfigCache[parentPath] = pcfg;
       }
-      if (pcfg !== undefined)
+      if (pcfg !== null)
         return { path: parentPath + '/', config: pcfg };
       separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
     }
@@ -802,7 +827,7 @@ const resolveUtils = {
       let parentPath = resolved.substr(0, separatorIndex);
       if (parentPath.endsWith('/node_modules/'))
         break;
-      let pcfg;
+      let pcfg = null;
       if (cache && parentPath in cache.pjsonConfigCache) {
         pcfg = cache.pjsonConfigCache[parentPath];
       }
@@ -818,7 +843,7 @@ const resolveUtils = {
         if (cache)
           cache.pjsonConfigCache[parentPath] = pcfg;
       }
-      if (pcfg !== undefined)
+      if (pcfg !== null)
         return { path: parentPath + '/', config: pcfg };
       separatorIndex = resolved.lastIndexOf('/', separatorIndex - 1);
     }
@@ -830,12 +855,17 @@ const resolveUtils = {
     if (cached !== undefined)
       return cache.isDirCache[path];
     return new Promise((resolve, reject) => {
+      // console.log('STATDIR ' + path);
       fs.stat(path, (err, stats) => {
         if (err) {
-          if (err.code === 'ENOENT' || err.code ===  'ENOTDIR')
+          if (err.code === 'ENOENT' || err.code ===  'ENOTDIR') {
+            if (cache)
+              cache.isDirCache[path] = false;
             resolve(false);
-          else
+          }
+          else {
             reject(err);
+          }
         }
         else {
           if (cache)
@@ -854,8 +884,11 @@ const resolveUtils = {
       var stats = fs.statSync(path);
     }
     catch (e) {
-      if (e.code === 'ENOENT' || e.code === 'ENOTDIR')
+      if (e.code === 'ENOENT' || e.code === 'ENOTDIR') {
+        if (cache)
+          cache.isDirCache[path] = false;
         return false;
+      }
       throw e;
     }
     if (cache)
@@ -866,14 +899,19 @@ const resolveUtils = {
   async isFile (path, cache) {
     const cached = cache && cache.isFileCache[path];
     if (cached !== undefined)
-      return cache.isFileCache[path];
+      return cached;
     return new Promise((resolve, reject) => {
+      // console.log('STATFILE ' + path);
       fs.stat(path, (err, stats) => {
         if (err) {
-          if (err.code === 'ENOENT' || err.code === 'ENOTDIR')
+          if (err.code === 'ENOENT' || err.code === 'ENOTDIR') {
+            if (cache)
+              cache.isFileCache[path] = false;
             resolve(false);
-          else
+          }
+          else {
             reject(err);
+          }
         }
         else {
           if (cache)
@@ -887,13 +925,16 @@ const resolveUtils = {
   isFileSync (path, cache) {
     const cached = cache && cache.isFileCache[path];
     if (cached !== undefined)
-      return cache.isFileCache[path];
+      return cached;
     try {
       var stats = fs.statSync(path);
     }
     catch (e) {
-      if (e.code === 'ENOENT' || e.code === 'ENOTDIR')
+      if (e.code === 'ENOENT' || e.code === 'ENOTDIR') {
+        if (cache)
+          cache.isFileCache[path] = false;
         return false;
+      }
       throw e;
     }
     if (cache)
@@ -903,6 +944,7 @@ const resolveUtils = {
 
   async realpath (path) {
     return new Promise((resolve, reject) => {
+      // console.log('REALPATH ' + path);
       fs.realpath(path, (err, realpath) => {
         if (err)
           reject(err);
@@ -923,6 +965,7 @@ const resolveUtils = {
 
   readFile (path) {
     return new Promise((resolve, reject) => {
+      // console.log('READ ' +  path);
       fs.readFile(path, (err, source) => err ? reject(err) : resolve(source.toString()));
     });
   },
