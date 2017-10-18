@@ -1184,7 +1184,7 @@ function applyMain (mainMap, env) {
   return mapped;
 }
 
-exports.processPjsonConfig = processPjsonConfig;
+resolve.processPjsonConfig = processPjsonConfig;
 function processPjsonConfig (pjson) {
   const pcfg = {
     mains: typeof pjson.mains === 'object' ? pjson.mains : undefined,
