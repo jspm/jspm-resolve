@@ -928,7 +928,7 @@ const resolveUtils = {
     if (parentPackageName) {
       let packageConfig = config.dependencies[parentPackageName];
       if (packageConfig && packageConfig.resolve)
-        mapped = applyMap(name, packageConfig.resolve) || applyMap(name, config.resolve);
+        return applyMap(name, packageConfig.resolve) || applyMap(name, config.resolve);
     }
     return applyMap(name, config.resolve);
   },
@@ -1177,6 +1177,8 @@ function applyMap (name, parentMap, env) {
 
 function applyMain (mainMap, env) {
   let mapped = conditionMap(mainMap, env);
+  if (!mapped)
+    return;
   if (mapped === '@empty')
     return mapped;
   if (mapped[0] === '.' && mapped[1] === '/')
