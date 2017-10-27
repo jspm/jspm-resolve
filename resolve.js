@@ -495,7 +495,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return await nodeModuleResolve.call(utils, name, parentPath, env, cache);
+      return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, cache);
     }
   }
 
@@ -640,7 +640,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return nodeModuleResolveSync.call(utils, name, parentPath, env, cache);
+      return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, cache);
     }
   }
 
