@@ -130,6 +130,32 @@ is interpreted as:
 }
 ```
 
+In addition if there is a `"bin"` object with an entry exactly matching the `"name"` field in the package.json file,
+then that will be treated as a bin map with the highest precedence:
+
+```json
+{
+  "name": "pkg",
+  "main": "x",
+  "browser": "y",
+  "bin": {
+    "pkg": "./bin.js"
+  }
+}
+```
+
+is interpreted as:
+
+```json
+{
+  "mains": {
+    "bin": "./bin.js",
+    "browser": "./y",
+    "default": "./x"
+  }
+}
+```
+
 The `"./"` map can be used to map the entire root.
 
 #### JS Extension Module Format Configuration
@@ -510,6 +536,7 @@ When handling conditional resolution, the environment conditional state is requi
 {
   browser: boolean,
   node: boolean,
+  bin: boolean,
   production: boolean,
   dev: boolean,
   react-native: boolean,

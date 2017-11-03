@@ -376,6 +376,7 @@ function setDefaultEnv (env, defaultEnv) {
 }
 
 const defaultEnv = {
+  bin: false,
   browser: false,
   node: true,
   production: false,
@@ -1194,9 +1195,21 @@ function processPjsonConfig (pjson) {
     esm: pjson.esm === true ? true : false
   };
 
+  if (typeof pjson.name === 'string' && typeof pjson.bin === 'object' && typeof pjson.bin[pjson.name] === 'string') {
+    const bin = pjson.bin[pjson.name];
+    const mapped = bin.startsWith('./') ? bin.substr(2) : bin;
+    if (!pjson.mains)
+      pjson.mains = { bin: mapped };
+    else
+      pjson.mains.bin = mapped;
+  }
+
   if (typeof pjson['react-native'] === 'string') {
     const mapped = pjson['react-native'].startsWith('./') ? pjson['react-native'].substr(2) : pjson['react-native'];
-    pcfg.mains = { 'react-native': mapped };
+    if (!pjson.mains)
+      pcfg.mains = { 'react-native': mapped };
+    else
+      pjson.mains['react-native'] = mapped;
   }
 
   if (typeof pjson.electron === 'string') {
