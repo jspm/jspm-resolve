@@ -1198,18 +1198,18 @@ function processPjsonConfig (pjson) {
   if (typeof pjson.name === 'string' && typeof pjson.bin === 'object' && typeof pjson.bin[pjson.name] === 'string') {
     const bin = pjson.bin[pjson.name];
     const mapped = bin.startsWith('./') ? bin.substr(2) : bin;
-    if (!pjson.mains)
-      pjson.mains = { bin: mapped };
+    if (!pcfg.mains)
+      pcfg.mains = { bin: mapped };
     else
-      pjson.mains.bin = mapped;
+      pcfg.mains.bin = mapped;
   }
 
   if (typeof pjson['react-native'] === 'string') {
     const mapped = pjson['react-native'].startsWith('./') ? pjson['react-native'].substr(2) : pjson['react-native'];
-    if (!pjson.mains)
+    if (!pcfg.mains)
       pcfg.mains = { 'react-native': mapped };
     else
-      pjson.mains['react-native'] = mapped;
+      pcfg.mains['react-native'] = mapped;
   }
 
   if (typeof pjson.electron === 'string') {
