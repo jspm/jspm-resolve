@@ -130,7 +130,7 @@ is interpreted as:
 }
 ```
 
-In addition if there is a `"bin"` object with an entry exactly matching the `"name"` field in the package.json file,
+In addition if there is a `"bin"` string, or object with an entry exactly matching the `"name"` field in the package.json file,
 then that will be treated as a bin map with the highest precedence:
 
 ```json

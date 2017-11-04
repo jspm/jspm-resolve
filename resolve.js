@@ -1195,7 +1195,14 @@ function processPjsonConfig (pjson) {
     esm: pjson.esm === true ? true : false
   };
 
-  if (typeof pjson.name === 'string' && typeof pjson.bin === 'object' && typeof pjson.bin[pjson.name] === 'string') {
+  if (typeof pjson.bin === 'string') {
+    const mapped = pjson.bin.startsWith('./') ? pjson.bin.substr(2) : pjson.bin;
+    if (!pcfg.mains)
+      pcfg.mains = { bin: mapped };
+    else
+      pcfg.mains.bin = mapped;
+  }
+  else if (typeof pjson.bin === 'object' && typeof pjson.name === 'string' &&  typeof pjson.bin[pjson.name] === 'string') {
     const bin = pjson.bin[pjson.name];
     const mapped = bin.startsWith('./') ? bin.substr(2) : bin;
     if (!pcfg.mains)
