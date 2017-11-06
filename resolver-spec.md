@@ -130,7 +130,7 @@ is interpreted as:
 }
 ```
 
-In addition if there is a `"bin"` string, or object with an entry exactly matching the `"name"` field in the package.json file,
+In addition if there is a `"bin"` string, or object with exactly one entry, or an entry exactly matching the `"name"` field in the package.json file,
 then that will be treated as a bin map with the highest precedence:
 
 ```json
@@ -630,6 +630,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 >          1. Set _resolved_ to the resolved file path of the substring of _name_ from the index of the last leading _"/"_.
 >    1. Otherwise if _name_ starts with _"."_ then,
 >       1. Set _resolved_ to the path resolution of _name_ relative to _parentPath_.
+>    1. Otherwise if running in Windows, and _name_ starts with a letter (uppercase or lowercase) in the a-z range followed by _":"_ then,
+>       1. Set _resolved_ to the value of _name_.
 >    1. Otherwise,
 >       1. If _name_ is not a valid file URL then,
 >          1. Throw an _Invalid Module Name_ error.

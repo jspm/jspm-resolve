@@ -448,11 +448,17 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     }
     // URL
     else {
-      const url = tryParseUrl(name);
-      if (url.protocol === 'file:')
-        resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
-      else
-        throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
+      let charCode;
+      if (isWindows && name[1] === ':' && (charCode = name.charCodeAt(0)) && (charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123)) {
+        resolvedPath = percentDecode(name);
+      }
+      else {
+        const url = tryParseUrl(name);
+        if (url.protocol === 'file:')
+          resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
+        else
+          throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
+      }
     }
   }
   // Plain name resolution
@@ -593,11 +599,17 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     }
     // URL
     else {
-      const url = tryParseUrl(name);
-      if (url.protocol === 'file:')
-        resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
-      else
-        throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
+      let charCode;
+      if (isWindows && name[1] === ':' && (charCode = name.charCodeAt(0)) && (charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123)) {
+        resolvedPath = percentDecode(name);
+      }
+      else {
+        const url = tryParseUrl(name);
+        if (url.protocol === 'file:')
+          resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
+        else
+          throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
+      }
     }
   }
   // Plain name resolution
@@ -1195,20 +1207,24 @@ function processPjsonConfig (pjson) {
     esm: pjson.esm === true ? true : false
   };
 
-  if (typeof pjson.bin === 'string') {
-    const mapped = pjson.bin.startsWith('./') ? pjson.bin.substr(2) : pjson.bin;
-    if (!pcfg.mains)
-      pcfg.mains = { bin: mapped };
-    else
-      pcfg.mains.bin = mapped;
-  }
-  else if (typeof pjson.bin === 'object' && typeof pjson.name === 'string' &&  typeof pjson.bin[pjson.name] === 'string') {
-    const bin = pjson.bin[pjson.name];
-    const mapped = bin.startsWith('./') ? bin.substr(2) : bin;
-    if (!pcfg.mains)
-      pcfg.mains = { bin: mapped };
-    else
-      pcfg.mains.bin = mapped;
+  if (pjson.bin) {
+    let bin;
+    if (typeof pjson.bin !== 'object') {
+      bin = pjson.bin;
+    }
+    else {
+      if (typeof pjson.name === 'string' && pjson.bin[pjson.name] !== undefined)
+        bin = pjson.bin[pjson.name];
+      else if (Object.keys(pjson.bin).length === 1)
+        bin = Object.keys(pjson.bin)[0];
+    }
+    if (typeof bin === 'string') {
+      const mapped = bin.startsWith('./') ? bin.substr(2) : bin;
+      if (!pcfg.mains)
+        pcfg.mains = { bin: mapped };
+      else
+        pcfg.mains.bin = mapped;
+    }
   }
 
   if (typeof pjson['react-native'] === 'string') {
