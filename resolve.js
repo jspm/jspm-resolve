@@ -186,6 +186,52 @@ function fileResolveSync (path, cjsResolve, realpath, cache) {
   throwInvalidModuleName(`Cannot load unknown file type ${resolved}`);
 }
 
+async function format (resolved, { cjsResolve, cache } = {}) {
+  if (resolved[resolved.length - 1] === '/')
+    return undefined;
+  if (resolved.endsWith('.mjs')) {
+    if (cjsResolve === true)
+      throwInvalidModuleName(`Cannot load ES module ${resolved} from CommonJS parent.`);
+    return 'esm';
+  }
+  if (resolved.endsWith('.json'))
+    return 'json';
+  if (resolved.endsWith('.node'))
+    return 'addon';
+  if (resolved.endsWith('.js')) {
+    if (cjsResolve === false) {
+      const pcfg = await this.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
+      if (pcfg !== undefined)
+        return pcfg.config.esm === true ? 'esm' : 'cjs';
+    }
+    return cjsResolve === true ?  'cjs' : 'esm';
+  }
+  return undefined;
+}
+
+function formatSync (resolved, { cjsResolve, cache } = {}) {
+  if (resolved[resolved.length - 1] === '/')
+    return undefined;
+  if (resolved.endsWith('.mjs')) {
+    if (cjsResolve === true)
+      throwInvalidModuleName(`Cannot load ES module ${resolved} from CommonJS parent.`);
+    return 'esm';
+  }
+  if (resolved.endsWith('.json'))
+    return 'json';
+  if (resolved.endsWith('.node'))
+    return 'addon';
+  if (resolved.endsWith('.js')) {
+    if (cjsResolve === false) {
+      const pcfg = this.getPackageConfigSync(resolved.substr(0, resolved.lastIndexOf('/')), cache);
+      if (pcfg !== undefined)
+        return pcfg.config.esm === true ? 'esm' : 'cjs';
+    }
+    return cjsResolve === true ?  'cjs' : 'esm';
+  }
+  return undefined;
+}
+
 function tryParseUrl (url) {
   try {
     return new URL(url);
@@ -1132,6 +1178,8 @@ const resolveUtils = {
 
 resolve.applyMap = applyMap;
 resolve.sync = resolveSync;
+resolve.format = format;
+resolve.formatSync = formatSync;
 resolve.utils = resolveUtils;
 
 module.exports = resolve;

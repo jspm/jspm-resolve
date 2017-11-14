@@ -203,6 +203,8 @@ suite('Standard Cases', () => {
     var { resolved, format } = await jspmResolve('pkg2', sfPath, { cache });
     assert.equal(format, 'esm');
 
+    assert.equal(await jspmResolve.format(resolved), 'esm');
+
     var { resolved, format } = await jspmResolve('../../../resolve.js', sfPath, { cache });
     assert.equal(format, 'cjs');
   });
@@ -400,6 +402,8 @@ suite('Standard Cases Sync', () => {
 
     var { resolved, format } = jspmResolve.sync('pkg2', sfPath, { cache: syncCache });
     assert.equal(format, 'esm');
+
+    assert.equal(jspmResolve.formatSync(resolved), 'esm');
 
     var { resolved, format } = jspmResolve.sync('../../../resolve.js', sfPath, { cache: syncCache });
     assert.equal(format, 'cjs');
