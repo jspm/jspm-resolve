@@ -1178,8 +1178,8 @@ const resolveUtils = {
 
 resolve.applyMap = applyMap;
 resolve.sync = resolveSync;
-resolve.format = format;
-resolve.formatSync = formatSync;
+resolve.format = format.bind(resolveUtils);
+resolve.formatSync = formatSync.bind(resolveUtils);
 resolve.utils = resolveUtils;
 
 module.exports = resolve;
