@@ -9,6 +9,8 @@ const winSepRegEx = /\\/g;
 const winDrivePathRegEx = /^[a-z]:\\/i;
 const encodedSepRegEx = /%(5C|2F)/gi;
 
+const seenCacheAndEnv = new WeakMap();
+
 async function findIndexAsync (promises) {
   for (let i = 0; i < promises.length; i++)
     if (await promises[i] === true)
@@ -189,6 +191,8 @@ function fileResolveSync (path, cjsResolve, realpath, cache) {
 async function format (resolved, { cjsResolve, cache } = {}) {
   if (resolved[resolved.length - 1] === '/')
     return undefined;
+  if (cache && seenCacheAndEnv.has(cache) === false)
+    initCache(cache);
   if (resolved.endsWith('.mjs')) {
     if (cjsResolve === true)
       throwInvalidModuleName(`Cannot load ES module ${resolved} from CommonJS parent.`);
@@ -212,6 +216,8 @@ async function format (resolved, { cjsResolve, cache } = {}) {
 function formatSync (resolved, { cjsResolve, cache } = {}) {
   if (resolved[resolved.length - 1] === '/')
     return undefined;
+  if (cache && seenCacheAndEnv.has(cache) === false)
+    initCache(cache);
   if (resolved.endsWith('.mjs')) {
     if (cjsResolve === true)
       throwInvalidModuleName(`Cannot load ES module ${resolved} from CommonJS parent.`);
@@ -418,7 +424,19 @@ function setDefaultEnv (env, defaultEnv) {
     env.production = !env.dev;
   }
   env.default = true;
-  return env;
+  seenCacheAndEnv.set(env, true);
+}
+
+function initCache (cache) {
+  if (cache.jspmConfigCache === undefined)
+    cache.jspmConfigCache = {};
+  if (cache.pjsonConfigCache === undefined)
+    cache.pjsonConfigCache = {};
+  if (cache.isFileCache === undefined)
+    cache.isFileCache = {};
+  if (cache.isDirCache === undefined)
+    cache.isDirCache = {};
+  seenCacheAndEnv.set(cache, true);
 }
 
 const defaultEnv = {
@@ -448,18 +466,15 @@ async function resolve (name, parentPath = process.cwd() + '/', {
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
-  if (cache) {
-    if (cache.jspmConfigCache === undefined)
-      cache.jspmConfigCache = {};
-    if (cache.pjsonConfigCache === undefined)
-      cache.pjsonConfigCache = {};
-    if (cache.isFileCache === undefined)
-      cache.isFileCache = {};
-    if (cache.isDirCache === undefined)
-      cache.isDirCache = {};
+  if (cache && seenCacheAndEnv.has(cache) === false)
+    initCache(cache);
+  if (env) {
+    if (seenCacheAndEnv.has(env) === false)
+      setDefaultEnv(env, defaultEnv);
   }
-
-  env = env ? setDefaultEnv(env, defaultEnv) : defaultEnv;
+  else {
+    env = defaultEnv;
+  }
 
   let resolvedPath;
 
@@ -599,18 +614,15 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
-  if (cache) {
-    if (cache.jspmConfigCache === undefined)
-      cache.jspmConfigCache = {};
-    if (cache.pjsonConfigCache === undefined)
-      cache.pjsonConfigCache = {};
-    if (cache.isFileCache === undefined)
-      cache.isFileCache = {};
-    if (cache.isDirCache === undefined)
-      cache.isDirCache = {};
+  if (cache && seenCacheAndEnv.has(cache) === false)
+    initCache(cache);
+  if (env) {
+    if (seenCacheAndEnv.has(env) === false)
+      setDefaultEnv(env, defaultEnv);
   }
-
-  env = env ? setDefaultEnv(env, defaultEnv) : defaultEnv;
+  else {
+    env = defaultEnv;
+  }
 
   let resolvedPath;
 
