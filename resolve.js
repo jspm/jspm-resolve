@@ -188,7 +188,9 @@ function fileResolveSync (path, cjsResolve, realpath, cache) {
   throwInvalidModuleName(`Cannot load unknown file type ${resolved}`);
 }
 
-async function format (resolved, { cjsResolve, cache } = {}) {
+async function format (resolved, { cjsResolve = false, cache } = {}) {
+  if (isWindows)
+    resolved = resolved.replace(winSepRegEx, '/');
   if (resolved[resolved.length - 1] === '/')
     return undefined;
   if (cache && seenCacheAndEnv.has(cache) === false)
@@ -213,7 +215,9 @@ async function format (resolved, { cjsResolve, cache } = {}) {
   return undefined;
 }
 
-function formatSync (resolved, { cjsResolve, cache } = {}) {
+function formatSync (resolved, { cjsResolve = false, cache } = {}) {
+  if (isWindows)
+    resolved = resolved.replace(winSepRegEx, '/');
   if (resolved[resolved.length - 1] === '/')
     return undefined;
   if (cache && seenCacheAndEnv.has(cache) === false)
