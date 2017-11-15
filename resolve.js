@@ -144,7 +144,7 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
     }
     return { resolved, format: cjsResolve === true ?  'cjs' : 'esm' };
   }
-  throwInvalidModuleName(`Cannot load unknown file type ${resolved}`);
+  return { resolved, format: undefined };
 }
 
 function fileResolveSync (path, cjsResolve, realpath, cache) {
@@ -185,7 +185,7 @@ function fileResolveSync (path, cjsResolve, realpath, cache) {
     }
     return { resolved, format: cjsResolve === true ?  'cjs' : 'esm' };
   }
-  throwInvalidModuleName(`Cannot load unknown file type ${resolved}`);
+  return { resolved, format: undefined };
 }
 
 async function format (resolved, { cjsResolve = false, cache } = {}) {
