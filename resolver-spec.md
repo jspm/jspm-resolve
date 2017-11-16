@@ -158,6 +158,32 @@ is interpreted as:
 
 The `"./"` map can be used to map the entire root.
 
+Relative browser maps that map a non-JS or JSON extension are taken to map a JS extension:
+
+```json
+{
+  "browser": {
+    "./x": "./z",
+    "./y.js": "./z"
+  }
+}
+```
+
+is interpreted as:
+
+```json
+{
+  "map": {
+    "./x.js": {
+      "browser": "./z"
+    },
+    "./y.js": {
+      "browser": "./z"
+    }
+  }
+}
+```
+
 #### JS Extension Module Format Configuration
 
 The package.json file is also used to specify which packages treat `.js` extensions as CommonJS modules as opposed

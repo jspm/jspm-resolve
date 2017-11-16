@@ -64,7 +64,7 @@ function percentDecode (path) {
   return decodeURIComponent(path);
 }
 
-async function fileResolve (path, cjsResolve, realpath, cache) {
+async function fileResolve (path, cjsResolve, realpath, env, cache) {
   if (path[path.length - 1] === '/') {
     if (!await this.isDir(path, cache))
       throwModuleNotFound(path);
@@ -108,6 +108,19 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
               else
                 throwModuleNotFound(path);  
           }
+          // index main lookups can themselves be mapped
+          const pcfg = await this.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
+          if (pcfg !== undefined && pcfg.config.map !== undefined) {
+            const relPath = '.' + resolved.substr(pcfg.path.length - 1);
+            const mapped = applyMap(relPath, pcfg.config.map, env);
+            if (mapped !== undefined) {
+              if (mapped === '@empty')
+                return { resolved: undefined, format: undefined };
+              resolved = pcfg.path + mapped;
+              // yes this is the one case that can possibly be circular!
+              return fileResolve.call(this, resolved, cjsResolve, realpath, env, cache);
+            }
+          }
         }
     }
   }
@@ -119,9 +132,23 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
     else if (await this.isFile(resolved = path + '.json', cache));
     else if (await this.isFile(resolved = path + '.node', cache));
     else if (cjsResolve === false && await this.isFile(resolved = path + '/index.mjs', cache));
-    else if (await this.isFile(resolved = path + '/index.js', cache));
-    else if (await this.isFile(resolved = path + '/index.json', cache));
-    else if (await this.isFile(resolved = path + '/index.node', cache));
+    else if (await this.isFile(resolved = path + '/index.js', cache) ||
+             await this.isFile(resolved = path + '/index.json', cache) ||
+             await this.isFile(resolved = path + '/index.node', cache)) {
+      // index main lookups can themselves be mapped
+      const pcfg = await this.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
+      if (pcfg !== undefined && pcfg.config.map !== undefined) {
+        const relPath = '.' + resolved.substr(pcfg.path.length);
+        const mapped = applyMap(relPath, pcfg.config.map, env);
+        if (mapped !== undefined) {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
+          resolved = pcfg.path + mapped;
+          // yes this is the one case that can possibly be circular!
+          return fileResolve.call(this, resolved, cjsResolve, realpath, env, cache);
+        }
+      }
+    }
     else
       throwModuleNotFound(path);
   }
@@ -147,7 +174,7 @@ async function fileResolve (path, cjsResolve, realpath, cache) {
   return { resolved, format: undefined };
 }
 
-function fileResolveSync (path, cjsResolve, realpath, cache) {
+function fileResolveSync (path, cjsResolve, realpath, env, cache) {
   if (path[path.length - 1] === '/') {
     if (!this.isDirSync(path, cache))
       throwModuleNotFound(path);
@@ -161,9 +188,23 @@ function fileResolveSync (path, cjsResolve, realpath, cache) {
   else if (this.isFileSync(resolved = path + '.json', cache));
   else if (this.isFileSync(resolved = path + '.node', cache));
   else if (cjsResolve === false && this.isFileSync(resolved = path + '/index.mjs', cache));
-  else if (this.isFileSync(resolved = path + '/index.js', cache));
-  else if (this.isFileSync(resolved = path + '/index.json', cache));
-  else if (this.isFileSync(resolved = path + '/index.node', cache));
+  else if (this.isFileSync(resolved = path + '/index.js', cache) ||
+           this.isFileSync(resolved = path + '/index.json', cache) ||
+           this.isFileSync(resolved = path + '/index.node', cache)) {
+    // index main lookups can themselves be mapped
+    const pcfg = this.getPackageConfigSync(resolved.substr(0, resolved.lastIndexOf('/')), cache);
+    if (pcfg !== undefined && pcfg.config.map !== undefined) {
+      const relPath = '.' + resolved.substr(pcfg.path.length - 1);
+      const mapped = applyMap(relPath, pcfg.config.map, env);
+      if (mapped !== undefined) {
+        if (mapped === '@empty')
+          return { resolved: undefined, format: undefined };
+        resolved = pcfg.path + mapped;
+        // yes this is the one case that can possibly be circular!
+        return fileResolveSync.call(this, resolved, cjsResolve, realpath, env, cache);
+      }
+    }
+  }
   else
     throwModuleNotFound(path);
   if (realpath)
@@ -351,7 +392,7 @@ async function nodeModuleResolve (name, parentPath, env, cjsResolve, cache) {
         }
       }
       try {
-        return await fileResolve.call(this, resolved, cjsResolve, true, cache);
+        return await fileResolve.call(this, resolved, cjsResolve, true, env, cache);
       }
       catch (e) {
         if (e.code !== 'MODULE_NOT_FOUND')
@@ -397,7 +438,7 @@ function nodeModuleResolveSync (name, parentPath, env, cjsResolve, cache) {
         }
       }
       try {
-        return fileResolveSync.call(this, resolved, cjsResolve, true, cache);
+        return fileResolveSync.call(this, resolved, cjsResolve, true, env, cache);
       }
       catch (e) {
         if (e.code !== 'MODULE_NOT_FOUND')
@@ -543,7 +584,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
           else {
             resolvedPath = parentPkgConfig.path + mapped.substr(2);
           }
-          return await fileResolve.call(utils, resolvedPath, cjsResolve, false, cache);
+          return await fileResolve.call(utils, resolvedPath, cjsResolve, false, env, cache);
         }
         else {
           name = mapped;
@@ -575,14 +616,14 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   const realpath = config === undefined && resolvedPath.indexOf('/node_modules/') !== -1;
 
   if (resolvedPath[resolvedPath.length - 1] === '/')
-    return await fileResolve.call(utils, resolvedPath, cjsResolve, realpath, cache);
+    return await fileResolve.call(utils, resolvedPath, cjsResolve, realpath, env, cache);
   
   const pkgConfig = await utils.getPackageConfig(resolvedPath, cache);
   if (pkgConfig !== undefined) {
     if (config !== undefined && pkgConfig.path === config.basePath) {
       if (resolvedPath.length === config.jspmPackagesPath.length - 1 && resolvedPath === config.jspmPackagesPath.substr(0, config.jspmPackagesPath.length - 1) ||
           resolvedPath.length >= config.jspmPackagesPath.length && resolvedPath.substr(0, config.jspmPackagesPath.length) === config.jspmPackagesPath)
-        return await fileResolve.call(utils, resolvedPath, cjsResolve, realpath, cache);
+        return await fileResolve.call(utils, resolvedPath, cjsResolve, realpath, env, cache);
       pkgConfig.path = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
     }
     
@@ -607,7 +648,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     }
   }
 
-  return await fileResolve.call(utils, resolvedPath, cjsResolve, realpath, cache);
+  return await fileResolve.call(utils, resolvedPath, cjsResolve, realpath, env, cache);
 }
 
 function resolveSync (name, parentPath = process.cwd() + '/', {
@@ -691,7 +732,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
           else {
             resolvedPath = parentPkgConfig.path + mapped.substr(2);
           }
-          return fileResolveSync.call(utils, resolvedPath, cjsResolve, false, cache);
+          return fileResolveSync.call(utils, resolvedPath, cjsResolve, false, env, cache);
         }
         else {
           name = mapped;
@@ -723,14 +764,14 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   const realpath = config === undefined && resolvedPath.indexOf('/node_modules/') !== -1;
 
   if (resolvedPath[resolvedPath.length - 1] === '/')
-    return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, cache);
+    return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, env, cache);
 
   const pkgConfig = utils.getPackageConfigSync(resolvedPath, cache);
   if (pkgConfig !== undefined) {
     if (config !== undefined && pkgConfig.path === config.basePath) {
       if (resolvedPath.length === config.jspmPackagesPath.length - 1 && resolvedPath === config.jspmPackagesPath.substr(0, config.jspmPackagesPath.length - 1) ||
           resolvedPath.length >= config.jspmPackagesPath.length && resolvedPath.substr(0, config.jspmPackagesPath.length) === config.jspmPackagesPath)
-        return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, cache);
+        return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, env, cache);
       pkgConfig.path = env.dev ? config.localPackagePathDev : config.localPackagePathProduction;
     }
     
@@ -755,7 +796,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     }
   }
 
-  return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, cache);
+  return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, env, cache);
 }
 
 const resolveUtils = {
@@ -1324,6 +1365,8 @@ function processPjsonConfig (pjson) {
         let mapping = pjson.browser[p];
         if (mapping === false)
           mapping = '@empty';
+        if (p[0] === '.' && p[1] === '/' && !p.endsWith('.js'))
+          p += '.js';
         pcfg.map[p] = {
           browser: mapping
         };

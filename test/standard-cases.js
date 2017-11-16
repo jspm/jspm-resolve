@@ -142,6 +142,9 @@ suite('Standard Cases', () => {
     var { resolved } = await jspmResolve('c', sfPath, { cache, env: { browser: true } });
     assert.equal(resolved, sfPath + 'c-browser.js');
 
+    var { resolved } = await jspmResolve(pkgPath.substr(0, pkgPath.length - 1), undefined, { cache, env: { browser: true }});
+    assert.equal(resolved, pkgPath + 'c-browser.js');
+
     try {
       var { resolved } = await jspmResolve('c', sfPath, { cache, env: { browser: false, node: false } });
     }
@@ -341,6 +344,9 @@ suite('Standard Cases Sync', () => {
 
     var { resolved } = jspmResolve.sync('c', sfPath, { env: { browser: true }, cache: syncCache });
     assert.equal(resolved, sfPath + 'c-browser.js');
+
+    var { resolved } = jspmResolve.sync(pkgPath.substr(0, pkgPath.length - 1), undefined, { cache: syncCache, env: { browser: true }});
+    assert.equal(resolved, pkgPath + 'c-browser.js');
 
     try {
       var { resolved } = jspmResolve.sync('c', sfPath, { env: { browser: false, node: false }, cache: syncCache });

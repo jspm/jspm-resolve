@@ -8,5 +8,8 @@
       "node": "./c-node"
     },
     "./fail": "fail"
+  },
+  "browser": {
+    "./index": "./c-browser"
   }
 }
