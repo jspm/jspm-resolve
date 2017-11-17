@@ -211,6 +211,14 @@ suite('Standard Cases', () => {
     var { resolved, format } = await jspmResolve('../../../resolve.js', sfPath, { cache });
     assert.equal(format, 'cjs');
   });
+
+  test('Package name', async () => {
+    var packageName = await jspmResolve.packagePath(pkgPath + 'test', { cache });
+    assert.equal(packageName, pkgPath.substr(0, pkgPath.length - 1));
+
+    var packageName = await jspmResolve.packagePath(sfPath, { cache });
+    assert.equal(packageName, undefined);
+  });
 });
 
 suite('Standard Cases Sync', () => {
@@ -413,5 +421,13 @@ suite('Standard Cases Sync', () => {
 
     var { resolved, format } = jspmResolve.sync('../../../resolve.js', sfPath, { cache: syncCache });
     assert.equal(format, 'cjs');
+  });
+
+  test('Package name', async () => {
+    var packageName = jspmResolve.packagePathSync(pkgPath + 'test', { cache: syncCache });
+    assert.equal(packageName, pkgPath.substr(0, pkgPath.length - 1));
+
+    var packageName = jspmResolve.packagePathSync(sfPath, { cache: syncCache });
+    assert.equal(packageName, undefined);
   });
 });

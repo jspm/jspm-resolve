@@ -229,7 +229,7 @@ function fileResolveSync (path, cjsResolve, realpath, env, cache) {
   return { resolved, format: undefined };
 }
 
-async function format (resolved, { cjsResolve = false, cache } = {}) {
+async function format (resolved, { cjsResolve = false, cache, utils = resolveUtils } = {}) {
   if (isWindows)
     resolved = resolved.replace(winSepRegEx, '/');
   if (resolved[resolved.length - 1] === '/')
@@ -247,7 +247,7 @@ async function format (resolved, { cjsResolve = false, cache } = {}) {
     return 'addon';
   if (resolved.endsWith('.js')) {
     if (cjsResolve === false) {
-      const pcfg = await this.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
+      const pcfg = await utils.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
         return pcfg.config.esm === true ? 'esm' : 'cjs';
     }
@@ -256,7 +256,7 @@ async function format (resolved, { cjsResolve = false, cache } = {}) {
   return undefined;
 }
 
-function formatSync (resolved, { cjsResolve = false, cache } = {}) {
+function formatSync (resolved, { cjsResolve = false, cache, utils = resolveUtils } = {}) {
   if (isWindows)
     resolved = resolved.replace(winSepRegEx, '/');
   if (resolved[resolved.length - 1] === '/')
@@ -274,7 +274,7 @@ function formatSync (resolved, { cjsResolve = false, cache } = {}) {
     return 'addon';
   if (resolved.endsWith('.js')) {
     if (cjsResolve === false) {
-      const pcfg = this.getPackageConfigSync(resolved.substr(0, resolved.lastIndexOf('/')), cache);
+      const pcfg = utils.getPackageConfigSync(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
         return pcfg.config.esm === true ? 'esm' : 'cjs';
     }
@@ -799,6 +799,37 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   return fileResolveSync.call(utils, resolvedPath, cjsResolve, realpath, env, cache);
 }
 
+async function packagePath (path, { cache, utils = resolveUtils } = {}) {
+  if (path.indexOf('\\') !== -1)
+    path = path.replace(winSepRegEx, '/');
+  if (cache && seenCacheAndEnv.has(cache) === false)
+    initCache(cache);
+  const config = await utils.getJspmConfig(path, cache);
+  if (!config)
+    return;
+  const pkg = parsePackagePath(path, config.jspmPackagesPath);
+  if (!pkg)
+    return;
+  pkg.path = '';
+  return packageToPath(pkg, config.jspmPackagesPath);
+}
+
+function packagePathSync (path, { cache, utils = resolveUtils } = {}) {
+  if (path.indexOf('\\') !== -1)
+    path = path.replace(winSepRegEx, '/');
+  if (cache && seenCacheAndEnv.has(cache) === false)
+    initCache(cache);
+  const config = utils.getJspmConfigSync(path, cache);
+  if (!config)
+    return;
+  const pkg = parsePackagePath(path, config.jspmPackagesPath);
+  if (!pkg)
+    return;
+  pkg.path = '';
+  return packageToPath(pkg, config.jspmPackagesPath);
+}
+
+
 const resolveUtils = {
   async getJspmConfig (parentPath, cache) {
     let innerConfig;
@@ -1235,8 +1266,10 @@ const resolveUtils = {
 
 resolve.applyMap = applyMap;
 resolve.sync = resolveSync;
-resolve.format = format.bind(resolveUtils);
-resolve.formatSync = formatSync.bind(resolveUtils);
+resolve.format = format;
+resolve.formatSync = formatSync;
+resolve.packagePath = packagePath;
+resolve.packagePathSync = packagePathSync;
 resolve.utils = resolveUtils;
 
 module.exports = resolve;
