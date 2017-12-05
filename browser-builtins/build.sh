@@ -1,0 +1,1 @@
+jspm build assert buffer console crypto domain events http https os path process punycode querystring stream string_decoder sys timers tty url util vm zlib --browser --format cjs -d ../node-browser-builtins

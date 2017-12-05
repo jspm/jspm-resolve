@@ -358,9 +358,15 @@ function resolvePath (path) {
   return outStr;
 }
 
-async function nodeModuleResolve (name, parentPath, env, cjsResolve, cache) {
-  if (nodeCoreModules[name])
+async function nodeModuleResolve (name, parentPath, env, cjsResolve, browserBuiltins, cache) {
+  if (nodeCoreModules[name]) {
+    if (browserBuiltins) {
+      if (nodeCoreBrowserUnimplemented.indexOf(name) !== -1)
+        return { resolved: undefined, format: undefined };
+      return { resolved: browserBuiltinsDir + name + '.js', format: 'cjs' };
+    }
     return { resolved: name, format: 'builtin' };
+  }
   let separatorIndex = parentPath.lastIndexOf('/');
   let rootSeparatorIndex = parentPath.indexOf('/');
   while (separatorIndex > rootSeparatorIndex) {
@@ -404,9 +410,15 @@ async function nodeModuleResolve (name, parentPath, env, cjsResolve, cache) {
   throwModuleNotFound(name, parentPath);
 }
 
-function nodeModuleResolveSync (name, parentPath, env, cjsResolve, cache) {
-  if (nodeCoreModules[name])
+function nodeModuleResolveSync (name, parentPath, env, cjsResolve, browserBuiltins, cache) {
+  if (nodeCoreModules[name]) {
+    if (browserBuiltins) {
+      if (nodeCoreBrowserUnimplemented.indexOf(name) !== -1)
+        return { resolved: undefined, format: undefined };
+      return { resolved: browserBuiltinsDir + name + '.js', format: 'cjs' };
+    }
     return { resolved: name, format: 'builtin' };
+  }
   let separatorIndex = parentPath.lastIndexOf('/');
   let rootSeparatorIndex = parentPath.indexOf('/');
   while (separatorIndex > rootSeparatorIndex) {
@@ -503,11 +515,16 @@ const nodeCoreModules = {
   string_decoder: true, sys: true, timers: true, tls: true, tty: true, url: true, util: true, vm: true, zlib: true
 };
 
+const browserBuiltinsDir = path.resolve(__dirname, 'node-browser-builtins').replace(winSepRegEx, '/') + '/';
+const nodeCoreBrowserUnimplemented = ['child_process', 'cluster', 'dgram', 'dns', 'fs', 'module', 'net', 'readline', 'repl', 'tls'];
+
 async function resolve (name, parentPath = process.cwd() + '/', {
   env,
   cache,
   utils = resolveUtils,
-  cjsResolve = false
+  cjsResolve = false,
+  browserBuiltins = true, // when env.browser is set, use browser builtins
+  // TODO: relativeFallback = false // if plain name not found, try relative
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
@@ -610,7 +627,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, cache);
+      return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
     }
   }
 
@@ -657,7 +674,9 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   env,
   cache,
   utils = resolveUtils,
-  cjsResolve = false
+  cjsResolve = false,
+  browserBuiltins = true, // when env.browser is set, use browser builtins
+  // TODO: relativeFallback = false // if plain name not found, try relative
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
@@ -760,7 +779,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, cache);
+      return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
     }
   }
 

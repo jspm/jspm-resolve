@@ -9,6 +9,7 @@ const sfPath = `${fixturesPath}standard-cases/`;
 const pPath = `${sfPath}jspm_packages/`;
 const pkgPath = `${sfPath}jspm_packages/ra/pkg@version/`;
 const pkg2Path = `${sfPath}jspm_packages/ra/pkg@version2/`;
+const browserBuiltinsPath = path.resolve(__dirname, '../node-browser-builtins').replace(winSepRegEx, '/') + '/';
 
 suite('Standard Cases', () => {
   const cache = {};
@@ -167,7 +168,7 @@ suite('Standard Cases', () => {
     assert.equal(resolved, `${nodePath}mocha/index.js`);
 
     var { resolved } = await jspmResolve('mocha/', sfPath, { cache });
-    assert.equal(resolved,  `${nodePath}mocha/`);
+    assert.equal(resolved, `${nodePath}mocha/`);
 
     var { resolved, format } = await jspmResolve('fs', sfPath, { cache });
     assert.equal(resolved, 'fs');
@@ -378,7 +379,7 @@ suite('Standard Cases Sync', () => {
     assert.equal(resolved, `${nodePath}mocha/index.js`);
 
     var { resolved } = jspmResolve.sync('mocha/', sfPath, { cache: syncCache });
-    assert.equal(resolved,  `${nodePath}mocha/`);
+    assert.equal(resolved, `${nodePath}mocha/`);
 
     var { resolved, format } = jspmResolve.sync('fs', sfPath, { cache: syncCache });
     assert.equal(resolved, 'fs');
@@ -392,6 +393,17 @@ suite('Standard Cases Sync', () => {
       return false;
     }
     assert(false);
+  });
+
+  test('Builtins', () => {
+    var { resolved } = jspmResolve.sync('process', sfPath, { env: { browser: true } });
+    assert.equal(resolved, `${browserBuiltinsPath}process.js`);
+
+    var { resolved } = jspmResolve.sync('process', sfPath, { env: { browser: true }, browserBuiltins: false });
+    assert.equal(resolved, 'process');
+
+    var { resolved } = jspmResolve.sync('child_process', sfPath, { env: { browser: true } });
+    assert.equal(resolved, undefined);
   });
 
   test('Empty module', () => {
