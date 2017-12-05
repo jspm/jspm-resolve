@@ -587,6 +587,8 @@ async function resolve (name, parentPath = process.cwd() + '/', {
           return await fileResolve.call(utils, resolvedPath, cjsResolve, false, env, cache);
         }
         else {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
           name = mapped;
         }
       }
@@ -735,6 +737,8 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
           return fileResolveSync.call(utils, resolvedPath, cjsResolve, false, env, cache);
         }
         else {
+          if (mapped === '@empty')
+            return { resolved: undefined, format: undefined };
           name = mapped;
         }
       }
