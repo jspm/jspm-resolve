@@ -524,7 +524,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   utils = resolveUtils,
   cjsResolve = false,
   browserBuiltins = true, // when env.browser is set, use browser builtins
-  // TODO: relativeFallback = false // if plain name not found, try relative
+  relativeFallback = false // if plain name not found, try relative
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
@@ -601,7 +601,14 @@ async function resolve (name, parentPath = process.cwd() + '/', {
           else {
             resolvedPath = parentPkgConfig.path + mapped.substr(2);
           }
-          return await fileResolve.call(utils, resolvedPath, cjsResolve, false, env, cache);
+          try {
+            return await fileResolve.call(utils, resolvedPath, cjsResolve, false, env, cache);
+          }
+          catch (err) {
+            if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
+              return resolve('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
+            throw err;
+          }
         }
         else {
           if (mapped === '@empty')
@@ -627,7 +634,14 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
+      try {
+        return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
+      }
+      catch (err) {
+        if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
+          return resolve('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
+        throw err;
+      }
     }
   }
 
@@ -676,7 +690,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   utils = resolveUtils,
   cjsResolve = false,
   browserBuiltins = true, // when env.browser is set, use browser builtins
-  // TODO: relativeFallback = false // if plain name not found, try relative
+  relativeFallback = false // if plain name not found, try relative
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
@@ -753,7 +767,14 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
           else {
             resolvedPath = parentPkgConfig.path + mapped.substr(2);
           }
-          return fileResolveSync.call(utils, resolvedPath, cjsResolve, false, env, cache);
+          try {
+            return fileResolveSync.call(utils, resolvedPath, cjsResolve, false, env, cache);
+          }
+          catch (err) {
+            if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
+              return resolveSync('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
+            throw err;
+          }
         }
         else {
           if (mapped === '@empty')
@@ -779,7 +800,14 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
+      try {
+        return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
+      }
+      catch (err) {
+        if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
+          return resolveSync('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
+        throw err;
+      }
     }
   }
 
