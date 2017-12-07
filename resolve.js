@@ -882,6 +882,8 @@ function packagePathSync (path, { cache, utils = resolveUtils } = {}) {
 
 
 const resolveUtils = {
+  // NB could take a projectDir argument here through resolver
+  // to avoid deep backtracking for outer config
   async getJspmConfig (parentPath, cache) {
     let innerConfig;
     parentPath = parentPath.substr(0, parentPath.lastIndexOf('/'));
@@ -914,6 +916,10 @@ const resolveUtils = {
         }
         catch (e) {
           if (e instanceof SyntaxError) {
+            // dont allow outer config to invalidate inner
+            if (innerConfig)
+              return innerConfig;
+            e.stack = `Unable to parse JSON file ${path.join(dir, 'package.json')}\n` + e.stack;
             e.code = 'INVALID_CONFIG';
             throw e;
           }
@@ -937,6 +943,9 @@ const resolveUtils = {
           }
           catch (e) {
             if (e instanceof SyntaxError) {
+              if (innerConfig)
+                return innerConfig;
+              e.stack = `Unable to parse JSON file ${jspmPath}\n` + e.stack;
               e.code = 'INVALID_CONFIG';
               throw e;
             }
@@ -1029,6 +1038,10 @@ const resolveUtils = {
         }
         catch (e) {
           if (e instanceof SyntaxError) {
+            // dont allow outer config to invalidate inner
+            if (innerConfig)
+              return innerConfig;
+            e.stack = `Unable to parse JSON file ${path.join(dir, 'package.json')}\n` + e.stack;
             e.code = 'INVALID_CONFIG';
             throw e;
           }
@@ -1052,6 +1065,9 @@ const resolveUtils = {
           }
           catch (e) {
             if (e instanceof SyntaxError) {
+              if (innerConfig)
+                return innerConfig;
+              e.stack = `Unable to parse JSON file ${jspmPath}\n` + e.stack;
               e.code = 'INVALID_CONFIG';
               throw e;
             }
@@ -1148,6 +1164,11 @@ const resolveUtils = {
           pcfg = processPjsonConfig(pjson);
         }
         catch (e) {
+          if (e instanceof SyntaxError) {
+            e.stack = `Unable to parse JSON file ${parentPath + '/package.json'}\n` + e.stack;
+            e.code = 'INVALID_CONFIG';
+            throw e;
+          }
           if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
             throw e;
         }
@@ -1177,6 +1198,11 @@ const resolveUtils = {
           pcfg = processPjsonConfig(pjson);
         }
         catch (e) {
+          if (e instanceof SyntaxError) {
+            e.stack = `Unable to parse JSON file ${parentPath + '/package.json'}\n` + e.stack;
+            e.code = 'INVALID_CONFIG';
+            throw e;
+          }
           if (!e || (e.code !== 'ENOENT' && e.code !== 'ENOTDIR'))
             throw e;
         }
