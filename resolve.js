@@ -889,13 +889,15 @@ const resolveUtils = {
     parentPath = parentPath.substr(0, parentPath.lastIndexOf('/'));
     let separatorIndex = parentPath.length;
     let rootSeparatorIndex = parentPath.indexOf('/');
+    let firstRead = true;
     do {
       let dir = parentPath.substr(0, separatorIndex);
       if (dir.endsWith('/' + 'node_modules'))
         return;
-      
       if (cache && dir in cache.jspmConfigCache) {
         let config = cache.jspmConfigCache[dir];
+        if (firstRead && cache.pjsonConfigCache[dir] !== undefined)
+          firstRead = false;
         if (config !== null) {
           if (innerConfig !== undefined) {
             const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
@@ -910,6 +912,7 @@ const resolveUtils = {
         let pjson;
         try {
           pjson = JSON.parse(await this.readFile(path.join(dir, 'package.json')));
+          firstRead = false;
 
           if (cache)
             cache.pjsonConfigCache[dir] = processPjsonConfig(pjson);
@@ -917,9 +920,9 @@ const resolveUtils = {
         catch (e) {
           if (e instanceof SyntaxError) {
             // dont allow outer config to invalidate inner
-            if (innerConfig)
+            if (!firstRead)
               return innerConfig;
-            e.stack = `Unable to parse JSON file ${path.join(dir, 'package.json')}\n` + e.stack;
+            e.stack = `Unable to parse JSON file ${path.join(dir, 'package.json')} getting jspm configuration for ${parentPath}\n` + e.stack;
             e.code = 'INVALID_CONFIG';
             throw e;
           }
@@ -943,9 +946,7 @@ const resolveUtils = {
           }
           catch (e) {
             if (e instanceof SyntaxError) {
-              if (innerConfig)
-                return innerConfig;
-              e.stack = `Unable to parse JSON file ${jspmPath}\n` + e.stack;
+              e.stack = `Unable to parse JSON file ${jspmPath} getting jspm configuration for ${parentPath}\n` + e.stack;
               e.code = 'INVALID_CONFIG';
               throw e;
             }
@@ -1011,6 +1012,7 @@ const resolveUtils = {
     parentPath = parentPath.substr(0, parentPath.lastIndexOf('/'));
     let separatorIndex = parentPath.length;
     let rootSeparatorIndex = parentPath.indexOf('/');
+    let firstRead = true;
     do {
       let dir = parentPath.substr(0, separatorIndex);
       if (dir.endsWith('/' + 'node_modules'))
@@ -1018,6 +1020,8 @@ const resolveUtils = {
       
       if (cache && dir in cache.jspmConfigCache) {
         let config = cache.jspmConfigCache[dir];
+        if (firstRead && cache.pjsonConfigCache[dir] !== undefined)
+          firstRead = false;
         if (config !== null) {
           if (innerConfig !== undefined) {
             const nestedPkg = parsePackagePath(innerConfig.basePath, config.jspmPackagesPath);
@@ -1032,6 +1036,7 @@ const resolveUtils = {
         let pjson;
         try {
           pjson = JSON.parse(this.readFileSync(path.join(dir, 'package.json')));
+          firstRead = false;
 
           if (cache)
             cache.pjsonConfigCache[dir] = processPjsonConfig(pjson);
@@ -1039,9 +1044,9 @@ const resolveUtils = {
         catch (e) {
           if (e instanceof SyntaxError) {
             // dont allow outer config to invalidate inner
-            if (innerConfig)
+            if (!firstRead)
               return innerConfig;
-            e.stack = `Unable to parse JSON file ${path.join(dir, 'package.json')}\n` + e.stack;
+            e.stack = `Unable to parse JSON file ${path.join(dir, 'package.json')} getting jspm configuration for ${parentPath}\n` + e.stack;
             e.code = 'INVALID_CONFIG';
             throw e;
           }
@@ -1065,9 +1070,7 @@ const resolveUtils = {
           }
           catch (e) {
             if (e instanceof SyntaxError) {
-              if (innerConfig)
-                return innerConfig;
-              e.stack = `Unable to parse JSON file ${jspmPath}\n` + e.stack;
+              e.stack = `Unable to parse JSON file ${jspmPath} getting jspm configuration for ${parentPath}\n` + e.stack;
               e.code = 'INVALID_CONFIG';
               throw e;
             }
