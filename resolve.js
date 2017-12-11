@@ -573,7 +573,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     else {
       let charCode;
       if (isWindows && name[1] === ':' && (charCode = name.charCodeAt(0)) && (charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123)) {
-        resolvedPath = percentDecode(name);
+        resolvedPath = percentDecode(name).replace(winSepRegEx, '/');
       }
       else {
         const url = tryParseUrl(name);
@@ -739,7 +739,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     else {
       let charCode;
       if (isWindows && name[1] === ':' && (charCode = name.charCodeAt(0)) && (charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123)) {
-        resolvedPath = percentDecode(name);
+        resolvedPath = percentDecode(name).replace(winSepRegEx, '/');
       }
       else {
         const url = tryParseUrl(name);
