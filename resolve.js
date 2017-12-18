@@ -518,6 +518,13 @@ const nodeCoreModules = {
 const browserBuiltinsDir = path.resolve(__dirname, 'node-browser-builtins').replace(winSepRegEx, '/') + '/';
 const nodeCoreBrowserUnimplemented = ['child_process', 'cluster', 'dgram', 'dns', 'fs', 'module', 'net', 'readline', 'repl', 'tls'];
 
+function hasWinDrivePrefix (name) {
+  if (name[1] !== ':')
+    return false;
+  const charCode = name.charCodeAt(0);
+  return charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123;
+}
+
 async function resolve (name, parentPath = process.cwd() + '/', {
   env,
   cache,
@@ -550,7 +557,10 @@ async function resolve (name, parentPath = process.cwd() + '/', {
         resolvedPath = resolvePath(percentDecode(name.substr(1 + isWindows)));
     }
     else {
-      resolvedPath = resolvePath(percentDecode(isWindows ? name.substr(1) : name));
+      let path = isWindows ? name.substr(1) : name;
+      if (isWindows && !hasWinDrivePrefix(path))
+        path = name;
+      resolvedPath = resolvePath(percentDecode(path));
     }
   }
   // Relative path
@@ -572,7 +582,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     // URL
     else {
       let charCode;
-      if (isWindows && name[1] === ':' && (charCode = name.charCodeAt(0)) && (charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123)) {
+      if (isWindows && hasWinDrivePrefix(name)) {
         resolvedPath = percentDecode(name).replace(winSepRegEx, '/');
       }
       else {
@@ -716,7 +726,10 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
         resolvedPath = resolvePath(percentDecode(name.substr(1 + isWindows)));
     }
     else {
-      resolvedPath = resolvePath(percentDecode(isWindows ? name.substr(1) : name));
+      let path = isWindows ? name.substr(1) : name;
+      if (isWindows && !hasWinDrivePrefix(path))
+        path = name;
+      resolvedPath = resolvePath(path);
     }
   }
   // Relative path
@@ -738,7 +751,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     // URL
     else {
       let charCode;
-      if (isWindows && name[1] === ':' && (charCode = name.charCodeAt(0)) && (charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123)) {
+      if (isWindows && hasWinDrivePrefix(name)) {
         resolvedPath = percentDecode(name).replace(winSepRegEx, '/');
       }
       else {
