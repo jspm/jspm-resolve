@@ -24,6 +24,6 @@ export async function resolve (name, parentUrl) {
       decodeURI(parentUrl).substr(filePrefix.length), { cache });
   if (format === undefined)
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
-    const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
+  const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
   return { url, format };
 }
