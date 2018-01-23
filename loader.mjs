@@ -38,7 +38,5 @@ export async function resolve (name, parentUrl) {
   if (format === undefined)
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
   const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
-  if (cjsReplace && format === 'cjs')
-    format = 'commonjs';
-  return { url, format };
+  return { url, format: cjsReplace && format === 'commonjs' ? 'cjs' : format };
 }
