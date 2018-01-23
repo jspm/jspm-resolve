@@ -202,7 +202,7 @@ suite('Standard Cases', () => {
   
   test('Module format', async () => {
     var { resolved, format } = await jspmResolve('pkg', sfPath, { cache });
-    assert.equal(format, 'cjs');
+    assert.equal(format, 'commonjs');
 
     var { resolved, format } = await jspmResolve('pkg2', sfPath, { cache });
     assert.equal(format, 'esm');
@@ -210,7 +210,7 @@ suite('Standard Cases', () => {
     assert.equal(await jspmResolve.format(resolved), 'esm');
 
     var { resolved, format } = await jspmResolve('../../../resolve.js', sfPath, { cache });
-    assert.equal(format, 'cjs');
+    assert.equal(format, 'commonjs');
   });
 
   test('Package name', async () => {
@@ -424,7 +424,7 @@ suite('Standard Cases Sync', () => {
   
   test('Module format', () => {
     var { resolved, format } = jspmResolve.sync('pkg', sfPath, { cache: syncCache });
-    assert.equal(format, 'cjs');
+    assert.equal(format, 'commonjs');
 
     var { resolved, format } = jspmResolve.sync('pkg2', sfPath, { cache: syncCache });
     assert.equal(format, 'esm');
@@ -432,7 +432,7 @@ suite('Standard Cases Sync', () => {
     assert.equal(jspmResolve.formatSync(resolved), 'esm');
 
     var { resolved, format } = jspmResolve.sync('../../../resolve.js', sfPath, { cache: syncCache });
-    assert.equal(format, 'cjs');
+    assert.equal(format, 'commonjs');
   });
 
   test('Package name', async () => {
