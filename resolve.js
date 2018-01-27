@@ -1504,7 +1504,7 @@ function processPjsonConfig (pjson) {
     const mapped = pjson.main.startsWith('./') ? pjson.main.substr(2) : pjson.main;
     if (!pcfg.mains)
       pcfg.mains = { default: mapped };
-    else
+    else if (!pcfg.mains.default)
       pcfg.mains.default = mapped;
   }
 
