@@ -346,8 +346,21 @@ function resolvePath (path) {
   }
   // finish reading out the last segment
   if (segmentIndex !== -1) {
-    let nextSegment = { segment: path.substr(segmentIndex), next: undefined, prev: curSegment };
-    curSegment.next = nextSegment;
+    if (path[segmentIndex] === '.') {
+      if (path[segmentIndex + 1] === '.') {
+        curSegment = curSegment.prev || curSegment;
+        curSegment.next = undefined;
+      }
+      // not a . trailer
+      else if (segmentIndex + 1 !== path.length) {
+        let nextSegment = { segment: path.substr(segmentIndex), next: undefined, prev: curSegment };
+        curSegment.next = nextSegment;
+      }
+    }
+    else {
+      let nextSegment = { segment: path.substr(segmentIndex), next: undefined, prev: curSegment };
+      curSegment.next = nextSegment;
+    }
   }
 
   curSegment = headSegment;
@@ -567,6 +580,8 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && name[2] === '/')) {
     name = name.replace(winSepRegEx, '/');
     resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + percentDecode(name));
+    if (resolvedPath[resolvedPath.length - 1] === '/')
+      resolvedPath = resolvedPath.substr(0, resolvedPath.length - 1);
   }
   // Exact package request or URL request
   else if (name.indexOf(':') !== -1) {
@@ -736,6 +751,8 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && name[2] === '/')) {
     name = name.replace(winSepRegEx, '/');
     resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + percentDecode(name));
+    if (resolvedPath[resolvedPath.length - 1] === '/')
+      resolvedPath = resolvedPath.substr(0, resolvedPath.length - 1);
   }
   // Exact package request or URL request
   else if (name.indexOf(':') !== -1) {
