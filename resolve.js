@@ -577,7 +577,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     }
   }
   // Relative path
-  else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && name[2] === '/')) {
+  else if (name[0] === '.' && (name.length === 1 || (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && (name.length === 2 || name[2] === '/')))) {
     name = name.replace(winSepRegEx, '/');
     resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + percentDecode(name));
     if (resolvedPath[resolvedPath.length - 1] === '/')
@@ -748,7 +748,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     }
   }
   // Relative path
-  else if (name[0] === '.' && (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && name[2] === '/')) {
+  else if (name[0] === '.' && (name.length === 1 || (name[1] === '/' && (name = name.substr(2), true) || name[1] === '.' && (name.length === 2 || name[2] === '/')))) {
     name = name.replace(winSepRegEx, '/');
     resolvedPath = resolvePath(parentPath.substr(0, parentPath.lastIndexOf('/') + 1) + percentDecode(name));
     if (resolvedPath[resolvedPath.length - 1] === '/')

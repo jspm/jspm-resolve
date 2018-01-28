@@ -129,6 +129,9 @@ suite('Standard Cases', () => {
 
     var { resolved } = await jspmResolve('../', pkgPath + 'sub/path.js', { cache });
     assert.equal(resolved, `${pkgPath}index.js`);
+
+    var { resolved } = await jspmResolve('..', pkgPath + 'sub/path.js', { cache: cache });
+    assert.equal(resolved, `${pkgPath}index.js`);
   });
   
   test('Cross-package resolves', async () => {
@@ -342,6 +345,9 @@ suite('Standard Cases Sync', () => {
     }
 
     var { resolved } = jspmResolve.sync('../', pkgPath + 'sub/path.js', { cache: syncCache });
+    assert.equal(resolved, `${pkgPath}index.js`);
+
+    var { resolved } = jspmResolve.sync('..', pkgPath + 'sub/path.js', { cache: syncCache });
     assert.equal(resolved, `${pkgPath}index.js`);
   });
   
