@@ -9,12 +9,12 @@ let cjsReplace = false;
 {
   const nodeVersion = process.versions.node.split('.');
   if (nodeVersion[0] === '8') {
-    const minor = parseInt(nodeVersion[1]);
-    cjsReplace = minor < 9 || minor === 9 && parseInt(nodeVersion[2]) < 4;
+    const minor = parseInt(nodeVersion[1])
+    cjsReplace = minor < 9 || minor === 9 && parseInt(nodeVersion[2]) < 5;
   }
   else if (nodeVersion[0] === '9') {
     const minor = parseInt(nodeVersion[1]);
-    cjsReplace = minor < 4 || minor === 4 && parseInt(nodeVersion[2]) < 1;
+    cjsReplace = minor < 5 || minor === 5 && parseInt(nodeVersion[2]) < 1;
   }
 }
 
