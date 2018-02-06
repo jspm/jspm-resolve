@@ -167,9 +167,9 @@ async function fileResolve (path, cjsResolve, realpath, env, cache) {
     if (cjsResolve === false) {
       const pcfg = await this.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
-        return { resolved, format: pcfg.config.esm === true ? 'esm' : 'commonjs' };
+        return { resolved, format: pcfg.config.esm === true ? 'esm' : 'cjs' };
     }
-    return { resolved, format: cjsResolve === true ?  'commonjs' : 'esm' };
+    return { resolved, format: cjsResolve === true ?  'cjs' : 'esm' };
   }
   return { resolved, format: undefined };
 }
@@ -222,9 +222,9 @@ function fileResolveSync (path, cjsResolve, realpath, env, cache) {
     if (cjsResolve === false) {
       const pcfg = this.getPackageConfigSync(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
-        return { resolved, format: pcfg.config.esm === true ? 'esm' : 'commonjs' };
+        return { resolved, format: pcfg.config.esm === true ? 'esm' : 'cjs' };
     }
-    return { resolved, format: cjsResolve === true ?  'commonjs' : 'esm' };
+    return { resolved, format: cjsResolve === true ?  'cjs' : 'esm' };
   }
   return { resolved, format: undefined };
 }
@@ -249,9 +249,9 @@ async function format (resolved, { cjsResolve = false, cache, utils = resolveUti
     if (cjsResolve === false) {
       const pcfg = await utils.getPackageConfig(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
-        return pcfg.config.esm === true ? 'esm' : 'commonjs';
+        return pcfg.config.esm === true ? 'esm' : 'cjs';
     }
-    return cjsResolve === true ?  'commonjs' : 'esm';
+    return cjsResolve === true ?  'cjs' : 'esm';
   }
   return undefined;
 }
@@ -276,9 +276,9 @@ function formatSync (resolved, { cjsResolve = false, cache, utils = resolveUtils
     if (cjsResolve === false) {
       const pcfg = utils.getPackageConfigSync(resolved.substr(0, resolved.lastIndexOf('/')), cache);
       if (pcfg !== undefined)
-        return pcfg.config.esm === true ? 'esm' : 'commonjs';
+        return pcfg.config.esm === true ? 'esm' : 'cjs';
     }
-    return cjsResolve === true ?  'commonjs' : 'esm';
+    return cjsResolve === true ?  'cjs' : 'esm';
   }
   return undefined;
 }
@@ -376,7 +376,7 @@ async function nodeModuleResolve (name, parentPath, env, cjsResolve, browserBuil
     if (browserBuiltins) {
       if (nodeCoreBrowserUnimplemented.indexOf(name) !== -1)
         return { resolved: undefined, format: undefined };
-      return { resolved: browserBuiltinsDir + name + '.js', format: 'commonjs' };
+      return { resolved: browserBuiltinsDir + name + '.js', format: 'cjs' };
     }
     return { resolved: name, format: 'builtin' };
   }
@@ -428,7 +428,7 @@ function nodeModuleResolveSync (name, parentPath, env, cjsResolve, browserBuilti
     if (browserBuiltins) {
       if (nodeCoreBrowserUnimplemented.indexOf(name) !== -1)
         return { resolved: undefined, format: undefined };
-      return { resolved: browserBuiltinsDir + name + '.js', format: 'commonjs' };
+      return { resolved: browserBuiltinsDir + name + '.js', format: 'cjs' };
     }
     return { resolved: name, format: 'builtin' };
   }

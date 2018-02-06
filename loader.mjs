@@ -5,19 +5,6 @@ const winPathRegEx = /^[a-z]:\//i;
 const isWindows = process.platform === 'win32';
 const filePrefix = 'file://' + (isWindows ? '/' : '');
 
-let cjsReplace = false;
-{
-  const nodeVersion = process.versions.node.split('.');
-  if (nodeVersion[0] === '8') {
-    const minor = parseInt(nodeVersion[1])
-    cjsReplace = minor < 9 || minor === 9 && parseInt(nodeVersion[2]) < 5;
-  }
-  else if (nodeVersion[0] === '9') {
-    const minor = parseInt(nodeVersion[1]);
-    cjsReplace = minor < 5 || minor === 5 && parseInt(nodeVersion[2]) < 1;
-  }
-}
-
 const cache = {};
 
 module._nodeModulePaths = () => [];
@@ -38,5 +25,5 @@ export async function resolve (name, parentUrl) {
   if (format === undefined)
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
   const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
-  return { url, format: cjsReplace && format === 'commonjs' ? 'cjs' : format };
+  return { url, format };
 }
