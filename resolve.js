@@ -510,7 +510,6 @@ function initCache (cache) {
 }
 
 const defaultEnv = {
-  bin: false,
   browser: false,
   node: true,
   production: false,
@@ -1465,13 +1464,6 @@ function processPjsonConfig (pjson) {
         bin = pjson.bin[pjson.name];
       else if (Object.keys(pjson.bin).length === 1)
         bin = Object.keys(pjson.bin)[0];
-    }
-    if (typeof bin === 'string') {
-      const mapped = bin.startsWith('./') ? bin.substr(2) : bin;
-      if (!pcfg.mains)
-        pcfg.mains = { bin: mapped };
-      else
-        pcfg.mains.bin = mapped;
     }
   }
 

@@ -562,7 +562,6 @@ When handling conditional resolution, the environment conditional state is requi
 {
   browser: boolean,
   node: boolean,
-  bin: boolean,
   production: boolean,
   dev: boolean,
   react-native: boolean,
