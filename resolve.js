@@ -1451,7 +1451,7 @@ function processPjsonConfig (pjson) {
   const pcfg = {
     mains: typeof pjson.mains === 'object' ? pjson.mains : undefined,
     map: typeof pjson.map === 'object' ? pjson.map : undefined,
-    esm: pjson.esm === true ? true : false
+    esm: pjson.mode === 'esm' ? true : false
   };
 
   if (pjson.bin) {

@@ -32,17 +32,10 @@ This detection is based on detecting both a `package.json` and a `jspm.json` jsp
 
 ### Module Format Handling
 
-By default ES modules load dependencies as ES modules and CommonJS modules load dependencies as CommonJS modules.
-ES modules switch to CommonJS interpretation when loading through node_modules or a package without an "esm": false
-property.
+`"mode": "esm"` can be set to indicate packages which should load `".js"` extension files
+as ES modules.
 
-It is assumed that jspm will install packages with "esm": false set for npm backwards compatibility.
-
-"esm": true will be assumed for the project package, and on publishing through jspm itself. In this way the whole
-problem of module format distinction is handled automatically for the user.
-
-No support is provided for the package.json "module" property as these workflows are untested against these interop
-patterns so would likely not work anyway.
+No support is provided for the package.json "module" property as these workflows are untested against these interop patterns so may not work anyway.
 
 In addition, a module which ends in `.mjs`, is always loaded as an ES module.
 
@@ -191,16 +184,13 @@ to ES modules. This is set via the `esm` boolean package.json property:
 
 ```json
 {
-  "esm": Boolean
+  "mode": String
 }
 ```
 
-By default, this property is assumed to be `true` so we have a future-friendly default value.
+By default, this property is assumed to be `"cjs"` so we have a backwards-compatible default value.
 
-When jspm installs a package from npm, it will automatically inject `"esm": false` into the package.json file on install,
-ensuring full npm compatibility. And when publishing a package to npm through jspm, it will automatically inject `"esm": true` to opt-out of this automatic default.
-
-This way, new packages in jspm can assume `.js` extensions for ES modules.
+Setting `"mode": "esm"` allows `.js` extensions in the package to be loaded as ES modules.
 
 ### jspm Config File
 
@@ -394,7 +384,7 @@ For resolving map configurations within packages, the resolver reads the `packag
 >    1. Let _pjson_ be set to the cached output of the JSON parser applied to the contents of _"${path}/package.json"_, throwing a _Configuration Error_ on invalid JSON.
 >    1. Let _mains_ be equal to the value of _pjson.mains_ if an object or _undefined_ otherwise.
 >    1. Let _map_ be set to the value of _pjson.map_ if an object or _undefined_ otherwise.
->    1. Let _esm_ be set to the value of _pjson.esm_ if a boolean or _false_ otherwise.
+>    1. Let _esm_ be set _true_ if _pjson.mode is equal to _"esm"_ or _false_ otherwise.
 >    1. If _pjson.react-native_ is a _string_ then,
 >       1. Set _mains_ to an object if _undefined_.
 >       1. If _mains.react-native_ is _undefined_ then,

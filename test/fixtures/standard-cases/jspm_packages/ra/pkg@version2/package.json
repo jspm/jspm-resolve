@@ -7,5 +7,5 @@
       "default": "./b"
     }
   },
-  "esm": true
+  "mode": "esm"
 }
