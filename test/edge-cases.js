@@ -8,6 +8,11 @@ const fixturesPath = path.resolve(__dirname, 'fixtures').replace(winSepRegEx, '/
 const pbPath = fixturesPath + 'project-boundaries' + '/';
 
 suite('jspm project nesting', () => {
+  test('Different forms', async () => {
+    var { resolved } = await jspmResolve('https://not-a-file/file');
+    assert.equal(resolved, 'https://not-a-file/file');
+  });
+
   test('Custom project folders', async () => {
     var { resolved } = await jspmResolve('x', pbPath);
     assert.equal(resolved, `${pbPath}lib/x.js`);

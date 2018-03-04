@@ -604,7 +604,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
         if (url.protocol === 'file:')
           resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
         else
-          throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
+          return { resolved: name, format: undefined };
       }
     }
   }
@@ -775,7 +775,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
         if (url.protocol === 'file:')
           resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
         else
-          throwInvalidModuleName(`${name} is not a valid module name. It must be a file:/// URL or an absolute URL.`);
+          return { resolved: name, format: undefined };
       }
     }
   }
