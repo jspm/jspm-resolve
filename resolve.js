@@ -24,6 +24,12 @@ function throwModuleNotFound (name, parent) {
   throw e;
 }
 
+function throwURLName (name) {
+  let e = new Error(`URL ${name} is not a valid file:/// URL to resolve.`);
+  e.code = 'MODULE_NAME_URL_NOT_FILE';
+  throw e;
+}
+
 function throwInvalidModuleName (msg) {
   let e = new Error(msg);
   e.code = 'INVALID_MODULE_NAME';
@@ -604,7 +610,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
         if (url.protocol === 'file:')
           resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
         else
-          return { resolved: name, format: undefined };
+          throwURLName(name);
       }
     }
   }
@@ -775,7 +781,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
         if (url.protocol === 'file:')
           resolvedPath = percentDecode(isWindows ? url.pathname.substr(1) : url.pathname);
         else
-          return { resolved: name, format: undefined };
+          throwURLName(name);
       }
     }
   }

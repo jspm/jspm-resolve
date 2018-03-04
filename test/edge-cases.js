@@ -9,8 +9,12 @@ const pbPath = fixturesPath + 'project-boundaries' + '/';
 
 suite('jspm project nesting', () => {
   test('Different forms', async () => {
-    var { resolved } = await jspmResolve('https://not-a-file/file');
-    assert.equal(resolved, 'https://not-a-file/file');
+    try {
+      await jspmResolve('https://not-a-file/file');
+    }
+    catch (err) {
+      assert.equal(err.code, 'MODULE_NAME_URL_NOT_FILE')
+    }
   });
 
   test('Custom project folders', async () => {
