@@ -549,7 +549,6 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   utils = resolveUtils,
   cjsResolve = false,
   browserBuiltins = true, // when env.browser is set, use browser builtins
-  relativeFallback = false, // if plain name not found, try relative
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
@@ -632,14 +631,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
           else {
             resolvedPath = parentPkgConfig.path + mapped.substr(2);
           }
-          try {
-            return await fileResolve.call(utils, resolvedPath, cjsResolve, false, env, cache);
-          }
-          catch (err) {
-            if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
-              return resolve('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
-            throw err;
-          }
+          return await fileResolve.call(utils, resolvedPath, cjsResolve, false, env, cache);
         }
         else {
           if (mapped === '@empty')
@@ -665,14 +657,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty' || !resolveNodeModules)
         return { resolved: undefined, format: undefined };
-      try {
-        return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
-      }
-      catch (err) {
-        if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
-          return resolve('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
-        throw err;
-      }
+      return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
     }
   }
 
@@ -721,7 +706,6 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   utils = resolveUtils,
   cjsResolve = false,
   browserBuiltins = true, // when env.browser is set, use browser builtins
-  relativeFallback = false, // if plain name not found, try relative
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
@@ -804,14 +788,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
           else {
             resolvedPath = parentPkgConfig.path + mapped.substr(2);
           }
-          try {
-            return fileResolveSync.call(utils, resolvedPath, cjsResolve, false, env, cache);
-          }
-          catch (err) {
-            if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
-              return resolveSync('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
-            throw err;
-          }
+          return fileResolveSync.call(utils, resolvedPath, cjsResolve, false, env, cache);
         }
         else {
           if (mapped === '@empty')
@@ -837,14 +814,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
     else {
       if (name === '@empty' || !resolveNodeModules)
         return { resolved: undefined, format: undefined };
-      try {
-        return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
-      }
-      catch (err) {
-        if (relativeFallback && err && err.code === 'MODULE_NOT_FOUND')
-          return resolveSync('./' + name, parentPath, { env, cache, utils, cjsResolve, browserBuiltins, relativeFallback: false });
-        throw err;
-      }
+      return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
     }
   }
 
