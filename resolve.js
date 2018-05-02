@@ -549,7 +549,8 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   utils = resolveUtils,
   cjsResolve = false,
   browserBuiltins = true, // when env.browser is set, use browser builtins
-  relativeFallback = false // if plain name not found, try relative
+  relativeFallback = false, // if plain name not found, try relative
+  resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
@@ -662,7 +663,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
       resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
     }
     else {
-      if (name === '@empty')
+      if (name === '@empty' || !resolveNodeModules)
         return { resolved: undefined, format: undefined };
       try {
         return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
@@ -720,7 +721,8 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   utils = resolveUtils,
   cjsResolve = false,
   browserBuiltins = true, // when env.browser is set, use browser builtins
-  relativeFallback = false // if plain name not found, try relative
+  relativeFallback = false, // if plain name not found, try relative
+  resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
@@ -833,7 +835,7 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
       resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
     }
     else {
-      if (name === '@empty')
+      if (name === '@empty' || !resolveNodeModules)
         return { resolved: undefined, format: undefined };
       try {
         return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
