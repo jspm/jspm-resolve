@@ -482,10 +482,6 @@ function nodeModuleResolveSync (name, parentPath, env, cjsResolve, browserBuilti
 }
 
 function setDefaultEnv (env, defaultEnv) {
-  for (let condition in defaultEnv) {
-    if (typeof env[condition] !== 'boolean' && typeof defaultEnv[condition] === 'boolean')
-      env[condition] = defaultEnv[condition];
-  }
   if (typeof env.browser === 'boolean') {
     if (typeof env.node !== 'boolean')
       env.node = !env.browser;
@@ -500,6 +496,7 @@ function setDefaultEnv (env, defaultEnv) {
     env.production = !env.dev;
   }
   env.default = true;
+  env.module = true;
   seenCacheAndEnv.set(env, true);
 }
 
