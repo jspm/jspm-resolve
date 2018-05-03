@@ -133,6 +133,14 @@ suite('Standard Cases', () => {
     var { resolved } = await jspmResolve('..', pkgPath + 'sub/path.js', { cache: cache });
     assert.equal(resolved, `${pkgPath}index.js`);
   });
+
+  test('Custom extensions', async () => {
+    var { resolved } = await jspmResolve('pkg2/custom.ext', sfPath, { cache });
+    assert.equal(resolved, pkg2Path + 'custom.ext');
+
+    var { resolved } = await jspmResolve('pkg2/custom.ext', sfPath, { cache });
+    assert.equal(resolved, pkg2Path + 'custom.ext');
+  });
   
   test('Cross-package resolves', async () => {
     var { resolved } = await jspmResolve('ra:pkg@version2', sfPath, { cache });
@@ -349,6 +357,14 @@ suite('Standard Cases Sync', () => {
 
     var { resolved } = jspmResolve.sync('..', pkgPath + 'sub/path.js', { cache: syncCache });
     assert.equal(resolved, `${pkgPath}index.js`);
+  });
+
+  test('Custom extensions', () => {
+    var { resolved } = jspmResolve.sync('pkg2/custom.ext', sfPath, { cache: syncCache });
+    assert.equal(resolved, pkg2Path + 'custom.ext');
+
+    var { resolved } = jspmResolve.sync('pkg2/custom.ext', sfPath, { cache: syncCache });
+    assert.equal(resolved, pkg2Path + 'custom.ext');
   });
   
   test('Cross-package resolves', () => {
