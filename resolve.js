@@ -377,7 +377,7 @@ function resolvePath (path) {
   return outStr;
 }
 
-async function nodeModuleResolve (name, parentPath, env, cjsResolve, browserBuiltins, cache) {
+function nodeBuiltinResolve (name, browserBuiltins) {
   if (nodeCoreModules[name]) {
     if (browserBuiltins) {
       if (nodeCoreBrowserUnimplemented.indexOf(name) !== -1)
@@ -386,6 +386,9 @@ async function nodeModuleResolve (name, parentPath, env, cjsResolve, browserBuil
     }
     return { resolved: name, format: 'builtin' };
   }
+}
+
+async function nodeModuleResolve (name, parentPath, env, cjsResolve, cache) {
   let separatorIndex = parentPath.lastIndexOf('/');
   let rootSeparatorIndex = parentPath.indexOf('/');
   while (separatorIndex > rootSeparatorIndex) {
@@ -429,15 +432,7 @@ async function nodeModuleResolve (name, parentPath, env, cjsResolve, browserBuil
   throwModuleNotFound(name, parentPath);
 }
 
-function nodeModuleResolveSync (name, parentPath, env, cjsResolve, browserBuiltins, cache) {
-  if (nodeCoreModules[name]) {
-    if (browserBuiltins) {
-      if (nodeCoreBrowserUnimplemented.indexOf(name) !== -1)
-        return { resolved: undefined, format: undefined };
-      return { resolved: browserBuiltinsDir + name + '.js', format: 'cjs' };
-    }
-    return { resolved: name, format: 'builtin' };
-  }
+function nodeModuleResolveSync (name, parentPath, env, cjsResolve, cache) {
   let separatorIndex = parentPath.lastIndexOf('/');
   let rootSeparatorIndex = parentPath.indexOf('/');
   while (separatorIndex > rootSeparatorIndex) {
@@ -652,9 +647,9 @@ async function resolve (name, parentPath = process.cwd() + '/', {
       resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
     }
     else {
-      if (name === '@empty' || !resolveNodeModules)
+      if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
+      return nodeBuiltinResolve(name, env.browser && browserBuiltins) || resolveNodeModules && await nodeModuleResolve.call(utils, name, parentPath, env, cjsResolve, cache)
     }
   }
 
@@ -809,9 +804,9 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
       resolvedPath = packageToPath(resolvedPkg, config.jspmPackagesPath);
     }
     else {
-      if (name === '@empty' || !resolveNodeModules)
+      if (name === '@empty')
         return { resolved: undefined, format: undefined };
-      return nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, env.browser && browserBuiltins, cache);
+      return nodeBuiltinResolve(name, env.browser && browserBuiltins) || resolveNodeModules && nodeModuleResolveSync.call(utils, name, parentPath, env, cjsResolve, cache);
     }
   }
 
