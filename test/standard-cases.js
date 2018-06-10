@@ -31,6 +31,11 @@ suite('Standard Cases', () => {
     assert.equal(resolved, `${sfPath}e/index.json`);
   });
 
+  test('Main', async () => {
+    var { resolved } = await jspmResolve('.', sfPath, { cache });
+    assert.equal(resolved, `${sfPath}lib.js`);
+  });
+
   test('Global map config', async () => {
     var { resolved } = await jspmResolve('a', sfPath, { cache });
     assert.equal(resolved, `${sfPath}b.js`);
@@ -254,6 +259,11 @@ suite('Standard Cases Sync', () => {
 
     var { resolved } = jspmResolve.sync('./e', sfPath, { cache: syncCache });
     assert.equal(resolved, `${sfPath}e/index.json`);
+  });
+
+  test('Main', async () => {
+    var { resolved } = jspmResolve.sync('.', sfPath, { cache: syncCache });
+    assert.equal(resolved, `${sfPath}lib.js`);
   });
 
   test('Global map config', () => {

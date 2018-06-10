@@ -1438,7 +1438,7 @@ function processPjsonConfig (pjson) {
   }
 
   if (typeof pjson['react-native'] === 'string') {
-    const mapped = pjson['react-native'].startsWith('./') ? pjson['react-native'].substr(2) : pjson['react-native'];
+    const mapped = stripLeadingDotsAndTrailingSlash(pjson['react-native']);
     if (!pcfg.mains)
       pcfg.mains = { 'react-native': mapped };
     else
@@ -1446,7 +1446,7 @@ function processPjsonConfig (pjson) {
   }
 
   if (typeof pjson.electron === 'string') {
-    const mapped = pjson.electron.startsWith('./') ? pjson.electron.substr(2) : pjson.electron;
+    const mapped = stripLeadingDotsAndTrailingSlash(pjson.electron);
     if (!pcfg.mains)
       pcfg.mains = { electron: mapped };
     else
@@ -1455,7 +1455,7 @@ function processPjsonConfig (pjson) {
 
   if (pjson.browser) {
     if (typeof pjson.browser === 'string') {
-      const mapped = pjson.browser.startsWith('./') ? pjson.browser.substr(2) : pjson.browser;
+      const mapped = stripLeadingDotsAndTrailingSlash(pjson.browser);
       if (!pcfg.mains)
         pcfg.mains = { browser: mapped };
       else
@@ -1480,7 +1480,7 @@ function processPjsonConfig (pjson) {
   }
 
   if (pjson.main) {
-    const mapped = pjson.main.startsWith('./') ? pjson.main.substr(2) : pjson.main;
+    const mapped = stripLeadingDotsAndTrailingSlash(pjson.main);
     if (!pcfg.mains)
       pcfg.mains = { default: mapped };
     else if (!pcfg.mains.default)
@@ -1488,4 +1488,12 @@ function processPjsonConfig (pjson) {
   }
 
   return pcfg;
+}
+
+function stripLeadingDotsAndTrailingSlash (main) {
+  if (main.startsWith('./'))
+    main = main.substr(2);
+  if (main[main.length - 1] === '/')
+    main = main.substr(0, main.length - 1);
+  return main;
 }
