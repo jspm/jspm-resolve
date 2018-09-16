@@ -1,4 +1,6 @@
 {
+  "name": "standard-case",
+  "mode": "cjs",
   "main": "./lib/",
   "map": {
     "a": "./b",

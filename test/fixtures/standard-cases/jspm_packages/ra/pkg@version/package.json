@@ -1,13 +1,13 @@
 {
+  "main": "index.js",
   "map": {
-    "x": "./y",
+    "x": "./y.js",
     "./z": "./a",
     "p": "pkg2",
     "c": {
-      "browser": "./c-browser",
-      "node": "./c-node"
-    },
-    "./fail": "fail"
+      "browser": "./c-browser.js",
+      "node": "./c-node.js"
+    }
   },
   "browser": {
     "./index": "./c-browser"

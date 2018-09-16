@@ -19,13 +19,13 @@ suite('jspm project nesting', () => {
 
   test('Custom project folders', async () => {
     var { resolved } = await jspmResolve('x', pbPath);
-    assert.equal(resolved, `${pbPath}lib/x.js`);
+    assert.equal(resolved, `${pbPath}x.js`);
 
     var { resolved } = await jspmResolve('x', pbPath, { env: { production: true } });
-    assert.equal(resolved, `${pbPath}lib/x.js`);
+    assert.equal(resolved, `${pbPath}x.js`);
 
     var { resolved } = await jspmResolve('x', `${pbPath}config/`);
-    assert.equal(resolved, `${pbPath}lib/x.js`);
+    assert.equal(resolved, `${pbPath}x.js`);
 
     var { resolved } = await jspmResolve('y', `${pbPath}config/`);
     assert.equal(resolved, `${pbPath}config/node_modules/y/index.js`);
@@ -40,21 +40,23 @@ suite('jspm project nesting', () => {
     assert.equal(resolved, `${pbPath}config/node_modules/y/`);
 
     try {
-      var { resolved } = await jspmResolve(`${pbPath}config/node_modules/z/`);
+      var { resolved } = await jspmResolve('z/', `${pbPath}config/node_modules/z/`);
+      assert(false, 'Should error');
     }
     catch (e) {
-      assert(e);
-      return;
+      assert.equal(e.code, 'MODULE_NOT_FOUND');
     }
-    assert(false, 'Should error');
+
+    var { resolved } = jspmResolve.sync(`${pbPath}config/node_modules/z/`);
+    assert.equal(resolved, `${pbPath}config/node_modules/z/`);
   });
 
   test('Linked project', async () => {
     var { resolved } = await jspmResolve('pkg/', pbPath);
-    assert.equal(resolved, `${pbPath}x/jspm_packages/link/standard-cases@master/`);
+    assert.equal(resolved, `${pbPath}jspm_packages/link/standard-cases@master/`);
 
-    var { resolved } = await jspmResolve('pkg', `${pbPath}x/jspm_packages/link/standard-cases@master/`);
-    assert.equal(resolved, `${pbPath}x/jspm_packages/r/a/c@v/index.js`);
+    var { resolved } = await jspmResolve('pkg', `${pbPath}jspm_packages/link/standard-cases@master/`);
+    assert.equal(resolved, `${pbPath}jspm_packages/r/a/c@v/index.js`);
   });
 
   test('Basic nesting rules', () => {

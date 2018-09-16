@@ -18,17 +18,17 @@ through contextual relative map configuration.
 
 ### Package Boundaries
 
-jspm projects have two levels of package boundaries - the base-level project boundary containing the package.json and jspm.lock file, and the dependency package boundaries, denoted by their jspm_packages/package@version paths.
+jspm projects have two levels of package boundaries - the base-level project boundary containing the package.json and jspm.json file, and the dependency package boundaries, denoted by their jspm_packages/package@version paths.
 
-Within a jspm project, only the package.json and files in these two levels are read and used by jspm to influence resolution, and these are the only files that influence resolution in combination with the jspm.lock resolutions.
+Within a jspm project, only the package.json and files in these two levels are read and used by jspm to influence resolution, and these are the only files that influence resolution in combination with the jspm.json resolutions.
 
 If not resolving within a jspm project, the first package.json file in the folder hierarchy forms the package boundary.
 
 #### jspm Project Boundaries
 
-The detection of the jspm project for a given path is based on checking if the current path matches a jspm_packages dependency path, and if so using that boundary, or otherwise checking for a jspm.lock file down the folder hierarchy until one is found.
+The detection of the jspm project for a given path is based on checking if the current path matches a jspm_packages dependency path, and if so using that boundary, or otherwise checking for a jspm.json file down the folder hierarchy until one is found.
 
-If a jspm_packages match is made without there being a corresponding jspm.lock file, an error is thrown. If a package.json file is not found along with the jspm.lock file, an error is also thrown.
+If a jspm_packages match is made without there being a corresponding jspm.json file, an error is thrown. If a package.json file is not found along with the jspm.json file, an error is also thrown.
 
 If hitting a node_modules path segment, or reaching the root of the file system, the above check immediately stops and treats the project boundary as a non-jspm package boundary, and matching
 the first package.json file instead.
@@ -133,13 +133,13 @@ would support `import 'pkg/x'` resolving to `pkg/src/x` under the development co
 
 ### jspm Config File
 
-jspm resolution information is provided through a `jspm.lock` file which must be in the same folder as the package.json file forming the package boundary.
+jspm resolution information is provided through a `jspm.json` file which must be in the same folder as the package.json file forming the package boundary.
 
-The `jspm.lock` jspm configuration file stores jspm configuration and version lock information for jspm projects.
+The `jspm.json` jspm configuration file stores jspm configuration and version lock information for jspm projects.
 
 The following properties are the only ones which affect the jspm resolution of a module:
 
-`jspm.lock`:
+`jspm.json`:
 ```js
 {
   // Top-level dependency versions
@@ -287,13 +287,13 @@ Given a file path, we can determine the base project folder with the following a
 >          1. If _packagePath_ matches the package name regular expression then,
 >             1. Let _projectPath_ be the substring _checkPath_ before the last _"jspm_packages"_ path segment.
 >             1. Return _projectPath_.
->    1. If the file _"jspm.lock"_ exists in the folder _checkPath_ then,
+>    1. If the file _"jspm.json"_ exists in the folder _checkPath_ then,
 >       1. Return _checkPath_.
 
 > **READ_JSPM_CONFIG(projectPath: String)**
-> 1. If the file at _"${packagePath}/jspm.lock"_ does not exist then,
+> 1. If the file at _"${packagePath}/jspm.json"_ does not exist then,
 >    1. Return _undefined_.
-> 1. Return parsed contents of _"${packagePath}/jspm.lock"_, throwing a _Configuration Error_ on invalid JSON.
+> 1. Return parsed contents of _"${packagePath}/jspm.json"_, throwing a _Configuration Error_ on invalid JSON.
 
 The return value of the above method is an object of the form `{ projectPath, jspmConfig, packageConfig }`.
 
@@ -451,6 +451,8 @@ The parent pathname is assumed a valid fully-resolved path in the environment. A
 
 While jspm_packages should always be "mode": "esm", support for CommonJS packages in jspm_packages is included as the package "mode" is always respected. This is tracked in the third argument to the resolver.
 
+_Note that most of the complexity of the resolver comes from handling legacy CJS package mode fallbacks properly. In the path of deprecating legacy support over 70% of the implementation can be removed._
+
 The resolution algorithm breaks down into the following high-level process to get the fully resolved path:
 
 > **JSPM_RESOLVE(name: String, parentPath: String, cjsResolve: false)**
@@ -466,10 +468,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. If _name_ starts with _"//"_ and _name_ does not start with _"///"_ then,
 >       1. Throw an _Invalid Module Name_ error.
 >    1. Otherwise if _name_ starts with _"/"_ or _name_ starts with _"/"_ then,
->       1. If in a Windows environment,
->          1. Set _resolved_ to the resolved file path of the substring of _name_ from the index after the last leading _"/"_.
->       1. Otherwise,
->          1. Set _resolved_ to the resolved file path of the substring of _name_ from the index of the last leading _"/"_.
+>       1. Set _resolved_ to the resolved file path of _name_.
 >    1. Otherwise if _name_ starts with _"."_ then,
 >       1. Set _resolved_ to the path resolution of _name_ relative to _parentPath_.
 >    1. Otherwise if running in Windows, and _name_ starts with a letter (uppercase or lowercase) in the a-z range followed by _":"_ then,
@@ -478,25 +477,20 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. If _name_ is not a valid file URL then,
 >          1. Throw an _Invalid Module Name_ error.
 >       1. Set _resolved_ to the absolute file system path of the file URL _name_.
->    1. Return _FINALIZE_RESOLVE(resolved, projectPath, cjsResolve)_.
+>    1. Let _packagePath_ and _packageConfig_ be the destructured values of _GET_PACKAGE_CONFIG(resolved, projectPath)_.
+>    1. If _cjsResolve_ is equal to _true_ or _packageConfig.mode_ is equal to _"cjs"_ then,
+>       1. Return _LEGACY_PACKAGE_RESOLVE(resolved, !cjsResolve, packagePath, packageConfig)_.
+>    1. Return _FINALIZE_RESOLVE(resolved)_.
 > 1. If _name_ contains any _"\"_ character then,
 >    1. Throw an _Invalid Module Name_ error.
-> 1. Let _parentPackagePath_ be _undefined_.
-> 1. Let _packageConfig_ be _undefined_.
-> 1. If _projectPath_ is not _undefined_ then,
->    1. Let _parentPackage_ be the result of _PARSE_PACKAGE_PATH(parentPath, projectPath)_.
-> 1. If _parentPackage_ is _undefined_ then,
->    1. Set _parentPackagePath_ to _projectPath_.
->    1. Set _packageConfig_ to the result of _READ_PACKAGE_CONFIG(parentPackagePath)_.
-> 1. Otherwise,
->    1. Set _parentPackagePath_ to the result of _PACKAGE_TO_PATH(parentPackage.name, projectPath)_.
->    1. Set _packageConfig_ to the result of _READ_PACKAGE_CONFIG(parentPackagePath)_.
+> 1. Let _parentPackage_, _parentPackagePath_ and _packageConfig_ be the _package_, _packagePath_ and _packageConfig_ destructured values
+ of _GET_PACKAGE_CONFIG(parentPath, projectPath)_.
 > 1. Note: The following reads the package.json and provides support for importing a package by its own package.json name.
 > 1. If _packageConfig?.name_ is not _undefined_ and _name_ is equal to or contains segment prefix _packageConfig.name_ then,
 >    1. Let _subPath_ be the substring of _name_ of length _packageConfig.name_.
 >    1. Let _resolved_ be _"${parentPackagePath}${subPath}"_.
 >    1. If _cjsResolve_ is equal to _true_ or _packageConfig.mode_ is equal to _"cjs"_ then,
->       1. Return _LEGACY_PACKAGE_RESOLVE(_${parentPackagePath}${subPath}", !cjsResolve, parentPackagePath, packageConfig)_.
+>       1. Return _LEGACY_PACKAGE_RESOLVE("${parentPackagePath}${subPath}", !cjsResolve, parentPackagePath, packageConfig)_.
 >    1. If _subPath_ is the empty string then,
 >       1. If _packageConfig.main_ is _undefined_ then,
 >          1. Throw a _Module Not Found_ error.
@@ -510,14 +504,16 @@ The resolution algorithm breaks down into the following high-level process to ge
 >          1. If _mapped_ is equal to _"@notfound_ then,
 >             1. Throw a _Module Not Found_ error.
 >          1. Set _resolved_ to the path resolution of _mapped_ relative to base _parentPackagePath_.
->    1. Return _FINALIZE_RESOLVE(resolved, projectPath, cjsResolve)_.
+>    1. Return _FINALIZE_RESOLVE(resolved)_.
 > 1. Note: The following provides support for parent package package.json plain name maps.
 > 1. If _packageConfig?.map_ is not _undefined_ then,
 >    1. Let _mapped_ be the value of _APPLY_MAP(name, packageConfig.map)_
 >    1. If _mapped_ is not _undefined_ then,
 >       1. If _mapped_ starts with _"./"_ then,
 >          1. Let _resolved_ be the path resolution of _mapped_ relative to base _parentPackagePath_.
->          1. Return _FINALIZE_RESOLVE(resolved, projectPath, cjsResolve)_.
+>          1. If _cjsResolve_ is equal to _true_ or _packageConfig.mode_ is equal to _"cjs"_ then,
+>             1. Return _LEGACY_FINALIZE_RESOLVE(resolved, !cjsResolve)_.
+>          1. Return _FINALIZE_RESOLVE(resolved)_.
 >       1. Otherwise, set _name_ to _mapped_.
 >       1. If _IS_PLAIN(name)_ is _false_ then,
 >          1. Throw an _Invalid Configuration_ error.
@@ -536,7 +532,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >             1. If _mapped_ is not a valid exact package name,
 >                1. Throw an _Invalid Configuration_ error.
 >             1. Set _packageName_ to _mapped_.
->    1. If _packageName_ is _undefined_ and _jspmConfig?.resolve_ is not _undefined_ then,
+>    1. Otherwise, if _packageName_ is _undefined_ and _jspmConfig?.resolve_ is not _undefined_ then,
 >       1. Let _mapped_ be the value of _APPLY_MAP(name, jspmConfig.resolve)_.
 >       1. If _mapped_ is not _undefined_ then,
 >          1. If _mapped_ is not a valid exact package name,
@@ -565,27 +561,34 @@ The resolution algorithm breaks down into the following high-level process to ge
 >                1. If _mapped_ is equal to _"@notfound_ then,
 >                   1. Throw a _Module Not Found_ error.
 >                1. Set _resolved_ to the path resolution of _mapped_ relative to base _packagePath_.
->       1. Return _FINALIZE_RESOLVE(resolved, projectPath, cjsResolve)_.
+>       1. Return _FINALIZE_RESOLVE(resolved)_.
 > 1. If _name_ is a builtin module or _"@empty"_ then,
 >    1.  Return the object _{ resolved, format: "builtin" }_.
 > 1. Return the result of _NODE_MODULES_RESOLVE(name, parentPath, !cjsResolve)_.
 
-> **FINALIZE_RESOLVE(resolved: String, projectPath: String, cjsResolve: Boolean)**
-> 1. Note: This checks if the package boundary of the resolved path is CommonJS and if so uses legacy resolution, otherwise
-resolves without file extensions and directory lookups.
-> 1. If _cjsResolve_ is _true_ then,
->    1. Return _LEGACY_FINALIZE_RESOLVE(resolved, false)_.
+> **GET_PACKAGE_CONFIG(resolved: String, projectPath: String)**
 > 1. If _resolved_ is not contained within _projectPath_ then,
->    1. Let _projectPath_ be the result of _GET_PROJECT_PATH(resolved)_.
->    1. Let _packageConfig_ be the result of _READ_PACKAGE_CONFIG(projectPath)_.
->    1. If _packageConfig?.mode_ is set to _"cjs"_ then,
->       1. Return _LEGACY_FINALIZE_RESOLVE(resolved, true)_.
+>    1. Set _projectPath_ to the result of _GET_PROJECT_PATH(resolved)_.
+> 1. Otherwise if the file at _"jspm.json" does not exist in _projectPath_ then,
+>    1. For each parent path _packagePath_ of _resolved_, including _resolved_ in descending order,
+>       1. If _packagePath_ ends in a _"node_modules"_ segment then,
+>          1. Set _projectPath_ to _undefined_.
+>          1. Break the loop.
+>       1. If the file at _"${packagePath}/package.json"_ exists then,
+>          1. Set _projectPath_ to _packagePath_.
+>          1. Break the loop.
+> 1. Let _package_, _packagePath_ and _packageConfig_ be _undefined_.
 > 1. If _projectPath_ is not _undefined_ then,
->    1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_PATH(resolved, projectPath)_.
-> 1. If _resolvedPackage_ is not _undefined_ then,
->    1. Let _packageConfig_ be the result of _READ_PACKAGE_CONFIG(PACKAGE_TO_PATH(resolvedPackage.name, projectPath))_.
->    1. If _packageConfig?.mode_ is set to _"cjs"_ then,
->       1. Return _LEGACY_FINALIZE_RESOLVE(resolved, true)_.
+>    1. Set _package_ to the result of _PARSE_PACKAGE_PATH(resolved, projectPath)_.
+>    1. If _package_ is _undefined_ then,
+>       1. Set _packagePath_ to _projectPath_.
+>       1. Set _packageConfig_ to the result of _READ_PACKAGE_CONFIG(packagePath)_.
+>    1. Otherwise,
+>       1. Set _packagePath_ to the result of _PACKAGE_TO_PATH(package.name, projectPath)_.
+>       1. Set _packageConfig_ to the result of _READ_PACKAGE_CONFIG(packagePath)_.
+> 1. Return the object with values _{ package, packagePath, packageConfig }_.
+
+> **FINALIZE_RESOLVE(resolved: String)**
 > 1. If _resolved_ does not end with _".js"_ or _".mjs"_ then,
 >    1. Return _{ resolved, format: "unknown" }_.
 > 1. Return _{ resolved, format: "esm" }_.
@@ -610,6 +613,8 @@ resolves without file extensions and directory lookups.
 ?          1. Set _resolved_ to _"${packagePath}/${packageConfig.main}_.
 >    1. Otherwise,
 >       1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath, mjs)_.
+> 1. Otherwise if _resolved_ does not end with a trailing path separator then,
+>    1. Set _resolved_ to _LEGACY_FILE_RESOLVE(packagePath, mjs)_.
 > 1. If _packageConfig?.map_ is not _undefined_ and _resolved_ is contained in _packagePath_ then,
 >    1. Set _resolved_ to _LEGACY_FILE_RESOLVE(resolved, mjs)_, continuing and leaving it unchanged on a _Module Not Found_ error.
 >    1. Let _relPath_ be the string _"."_ concatenated with the substring of _resolved_ of length _packagePath_.

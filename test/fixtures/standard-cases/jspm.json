@@ -2,5 +2,13 @@
   "resolve": {
     "pkg": "ra:pkg@version",
     "pkg2": "ra:pkg@version2"
+  },
+  "dependencies": {
+    "ra:pkg@version": {
+      "resolve": {
+        "self": "ra:pkg@version",
+        "pkg2": "ra:pkg@version2"
+      }
+    }
   }
 }

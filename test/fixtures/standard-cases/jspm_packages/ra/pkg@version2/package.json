@@ -1,11 +1,10 @@
 {
-  "mains": {
-    "module": "./a"
-  },
+  "main": "a.js",
   "map": {
-    "./a": {
-      "default": "./b"
-    }
+    "./a.js": {
+      "default": "./b.js"
+    },
+    "./fail": "@notfound"
   },
   "mode": "esm"
 }
