@@ -479,7 +479,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Set _resolved_ to the absolute file system path of the file URL _name_.
 >    1. Let _packagePath_ and _packageConfig_ be the destructured values of _GET_PACKAGE_CONFIG(resolved, projectPath)_.
 >    1. If _cjsResolve_ is equal to _true_ or _packageConfig.mode_ is equal to _"cjs"_ then,
->       1. Return _LEGACY_PACKAGE_RESOLVE(resolved, !cjsResolve, packagePath, packageConfig)_.
+>       1. Let _realpath_ be the boolean indicating if _resolved_ is not contained within _projectPath_ or _"${projectPath}/jspm.json"_ does not exist.
+>       1. Return _LEGACY_PACKAGE_RESOLVE(resolved, !cjsResolve, realpath, packagePath, packageConfig)_.
 >    1. Return _FINALIZE_RESOLVE(resolved)_.
 > 1. If _name_ contains any _"\"_ character then,
 >    1. Throw an _Invalid Module Name_ error.
@@ -490,6 +491,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Let _subPath_ be the substring of _name_ of length _packageConfig.name_.
 >    1. Let _resolved_ be _"${parentPackagePath}${subPath}"_.
 >    1. If _cjsResolve_ is equal to _true_ or _packageConfig.mode_ is equal to _"cjs"_ then,
+>       1. Let _realpath_ be the boolean indicating if _"${projectPath}/jspm.json"_ does not exist.
 >       1. Return _LEGACY_PACKAGE_RESOLVE("${parentPackagePath}${subPath}", !cjsResolve, parentPackagePath, packageConfig)_.
 >    1. If _subPath_ is the empty string then,
 >       1. If _packageConfig.main_ is _undefined_ then,
@@ -512,7 +514,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. If _mapped_ starts with _"./"_ then,
 >          1. Let _resolved_ be the path resolution of _mapped_ relative to base _parentPackagePath_.
 >          1. If _cjsResolve_ is equal to _true_ or _packageConfig.mode_ is equal to _"cjs"_ then,
->             1. Return _LEGACY_FINALIZE_RESOLVE(resolved, !cjsResolve)_.
+>             1. Let _realpath_ be the boolean indicating if _"${projectPath}/jspm.json"_ does not exist.
+>             1. Return _LEGACY_FINALIZE_RESOLVE(resolved, !cjsResolve, realpath)_.
 >          1. Return _FINALIZE_RESOLVE(resolved)_.
 >       1. Otherwise, set _name_ to _mapped_.
 >       1. If _IS_PLAIN(name)_ is _false_ then,
@@ -546,7 +549,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Let _resolved_ be _${packagePath}${subPath}"_.
 >       1. Let _packageConfig_ be the result of _READ_PACKAGE_CONFIG(packagePath)_.
 >       1. If _cjsResolve_ is equal to _true_ or _packageConfig?.mode_ is equal to _"cjs"_ then,
->          1. Return _LEGACY_PACKAGE_RESOLVE(_${packagePath}${subPath}", !cjsResolve, packagePath, packageConfig)_.
+>          1. Return _LEGACY_PACKAGE_RESOLVE(_${packagePath}${subPath}", !cjsResolve, false, packagePath, packageConfig)_.
 >       1. If _packageConfig_ is not _undefined_ then,
 >          1. If _subPath_ is the empty string then,
 >             1. If _packageConfig.main_ is _undefined_ then,
@@ -601,11 +604,11 @@ The resolution algorithm breaks down into the following high-level process to ge
 >          1. Break the inner loop.
 >       1. If the file at _"${packagePath}/package.json"_ exists then,
 >          1. Let _packageConfig_ be the result of _READ_PACKAGE_CONFIG("${packagePath}/package.json")_.
->          1. Return _LEGACY_PACKAGE_RESOLVE(resolved, mjs, packagePath, packageConfig)_.
->    1. Return the result of _LEGACY_FINALIZE_RESOLVE(resolved, mjs)_, continuing the loop for a _Module Not Found_ error, and propagating the error otherwise.
+>          1. Return _LEGACY_PACKAGE_RESOLVE(resolved, mjs, true, packagePath, packageConfig)_.
+>    1. Return the result of _LEGACY_FINALIZE_RESOLVE(resolved, mjs, true)_, continuing the loop for a _Module Not Found_ error, and propagating the error otherwise.
 > 1. Throw a _Module Not Found_ error.
 
-> **LEGACY_PACKAGE_RESOLVE(resolved: String, mjs: Boolean, packagePath: String, packageConfig: Object)**
+> **LEGACY_PACKAGE_RESOLVE(resolved: String, mjs: Boolean, realpath: String, packagePath: String, packageConfig: Object)**
 > 1. Note: This implements legacy package resolution in combination with map support.
 > 1. If _resolved_ is equal to _packagePath_ then,
 >    1. If _packageConfig?.main_ is not _undefined_ then,
@@ -625,7 +628,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. If _mapped_ is equal to _"@notfound"_ then,
 >          1. Throw a _Module Not Found_ error.
 >       1. Set _resolved_ to the path resolution of _mapped_ relative to base _packagePath_.
-> 1. Return the result of _LEGACY_FINALIZE_RESOLVE(resolved, mjs)_.
+> 1. Return the result of _LEGACY_FINALIZE_RESOLVE(resolved, mjs, realpath)_.
 
 > **LEGACY_DIR_RESOLVE(dir: String, mjs: Boolean)**
 > 1. If _mjs_ is _true_ and the file at _"${path}/index.mjs"_ exists,
@@ -657,7 +660,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path, mjs)_.
 > 1. Return _resolved_.
 
-> **LEGACY_FINALIZE_RESOLVE(resolved: String, mjs: Boolean)**
+> **LEGACY_FINALIZE_RESOLVE(resolved: String, mjs: Boolean, realpath: Boolean)**
 > 1. Set _resolved_ to _LEGACY_FILE_RESOLVE(resolved, mjs)_.
 > 1. Let _format_ be equal to _"unknown"_.
 > 1. If _resolved_ ends with _".mjs"_ then,
@@ -670,5 +673,6 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Set _format_ to _"json"_.
 > 1. Otherwise if _resolved_ ends with _".node"_ then,
 >    1. Set _format_ to _"addon"_.
-> 1. Set _resolved_ to the real path of _resolved_.
+> 1. If _realpath_ then,
+>    1. Set _resolved_ to the real path of _resolved_.
 > 1. Return the object with properties _{ resolved, format }_.
