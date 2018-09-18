@@ -213,7 +213,7 @@ function hasWinDrivePrefix (name) {
   return charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123;
 }
 
-async function resolve (name, parentPath = process.cwd() + '/', {
+async function resolve (name, parentPath, {
   env,
   cache,
   utils = resolveUtils,
@@ -221,6 +221,12 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   browserBuiltinsDir = undefined, // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
+  // necessary for bins to not have extensions
+  let extensionlessFormat = false;
+  if (!parentPath) {
+    parentPath = process.cwd() + '/';
+    extensionlessFormat = true;
+  }
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache && seenCacheAndEnv.has(cache) === false)
@@ -273,9 +279,15 @@ async function resolve (name, parentPath = process.cwd() + '/', {
 
   if (resolved) {
     const { pkgPath, pkgConfig } = await getPackageConfig.call(utils, resolved, projectPath, cache);
-    if (cjsResolve || pkgConfig !== undefined && pkgConfig.mode === 'cjs')
-      return legacyPackageResolve.call(utils, resolved, parentPath, !cjsResolve, !(await utils.isFile(projectPath + '/jspm.json', cache)) || !resolved.startsWith(projectPath) || resolved[projectPath.length] !== '/', env, pkgPath, pkgConfig, cache);
-    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') ? 'esm' : 'unknown' };
+    if (cjsResolve || pkgConfig !== undefined && pkgConfig.mode === 'cjs') {
+      if (resolved[resolved.length - 1] === '/')
+        resolved = resolved.substr(0, resolved.length - 1);
+      const result = legacyPackageResolve.call(utils, resolved, parentPath, !cjsResolve, !(await utils.isFile(projectPath + '/jspm.json', cache)) || !resolved.startsWith(projectPath) || resolved[projectPath.length] !== '/', env, pkgPath, pkgConfig, cache);
+      if (result.format === 'unknown' && extensionlessFormat)
+        return { resolved: result.resolved, format: 'cjs' };
+      return result;
+    }
+    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') || extensionlessFormat ? 'esm' : 'unknown' };
   }
 
   // Plain name resolution
@@ -383,7 +395,7 @@ async function resolve (name, parentPath = process.cwd() + '/', {
   return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') ? 'esm' : 'unknown' };
 }
 
-function resolveSync (name, parentPath = process.cwd() + '/', {
+function resolveSync (name, parentPath, {
   env,
   cache,
   utils = resolveUtils,
@@ -391,6 +403,13 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
   browserBuiltinsDir = undefined, // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
+  // necessary for bins to not have extensions
+  let extensionlessFormat = false;
+  if (!parentPath) {
+    parentPath = process.cwd() + '/';
+    extensionlessFormat = true;
+  }
+
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache && seenCacheAndEnv.has(cache) === false)
@@ -443,9 +462,15 @@ function resolveSync (name, parentPath = process.cwd() + '/', {
 
   if (resolved) {
     const { pkgPath, pkgConfig } = getPackageConfigSync.call(utils, resolved, projectPath, cache);
-    if (cjsResolve || pkgConfig !== undefined && pkgConfig.mode === 'cjs')
-      return legacyPackageResolve.call(utils, resolved, parentPath, !cjsResolve, !(utils.isFileSync(projectPath + '/jspm.json', cache)) || !resolved.startsWith(projectPath) || resolved[projectPath.length] !== '/', env, pkgPath, pkgConfig, cache);
-    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') ? 'esm' : 'unknown' };
+    if (cjsResolve || pkgConfig !== undefined && pkgConfig.mode === 'cjs') {
+      if (resolved[resolved.length - 1] === '/')
+        resolved = resolved.substr(0, resolved.length - 1);
+      const result = legacyPackageResolve.call(utils, resolved, parentPath, !cjsResolve, !(utils.isFileSync(projectPath + '/jspm.json', cache)) || !resolved.startsWith(projectPath) || resolved[projectPath.length] !== '/', env, pkgPath, pkgConfig, cache);
+      if (result.format === 'unknown' && extensionlessFormat)
+        return { resolved: result.resolved, format: 'cjs' };
+      return result;
+    }
+    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') || extensionlessFormat ? 'esm' : 'unknown' };
   }
 
   // Plain name resolution
