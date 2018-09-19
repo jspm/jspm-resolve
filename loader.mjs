@@ -23,10 +23,17 @@ export async function resolve (name, parentUrl) {
   let { resolved, format } = await jspmResolve(name, parentUrl ? decodeURI(parentUrl).substr(filePrefix.length) : undefined, { cache });
   if (format === 'unknown')
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
-  if (format === 'builtin' && resolved === '@empty') {
-    format = 'esm';
-    resolved = '@jspm/node-builtins/' + resolved + '.js';
-  }
+  
+  if (format === 'builtin' && resolved === '@empty')
+    return { url: 'jspm:@empty', format: 'dynamic' };
   const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
   return { url, format };
+}
+
+export async function dynamicInstantiate(url) {
+  if (url === 'jspm:@empty')
+    return {
+      exports: ['default'],
+      execute: exports => exports.default.set({})
+    };
 }
