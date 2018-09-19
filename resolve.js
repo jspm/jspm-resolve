@@ -34,13 +34,13 @@ function throwInvalidConfig (msg) {
   throw e;
 }
 
-const packageRegEx = /^([a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^@<>:"/\|?*^\u0000-\u001F]+)(\/[\s\S]*|$)/;
+const packageRegEx = /^([a-z]+:(?:@[\-_\.a-zA-Z\d]+\/)?[-_\.a-zA-Z\d]+@[^@<>:"/\|?*^\u0000-\u001F]+)(\/[\s\S]*|$)/;
 function parsePackageName (name) {
   const packageMatch = name.match(packageRegEx);
   if (packageMatch)
     return { name: packageMatch[1], path: packageMatch[2] };
 }
-const packagePathRegEx = /^([a-z]+\/[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(?:\/[-_\.a-zA-Z\d]+)*@[^@<>:"/\|?*^\u0000-\u001F]+)(\/[\s\S]*|$)/;
+const packagePathRegEx = /^([a-z]+\/(?:@[-_\.a-zA-Z\d]+\/)?[-_\.a-zA-Z\d]+@[^@<>:"/\|?*^\u0000-\u001F]+)(\/[\s\S]*|$)/;
 function parsePackagePath (path, projectPath) {
   const jspmPackagesPath = projectPath + '/jspm_packages';
   if (!path.startsWith(jspmPackagesPath) || path[jspmPackagesPath.length] !=='/' && path.length !== jspmPackagesPath.length)
@@ -218,7 +218,7 @@ async function resolve (name, parentPath, {
   cache,
   utils = resolveUtils,
   cjsResolve = false,
-  browserBuiltinsDir = undefined, // when env.browser is set, resolves builtins to this directory
+  browserBuiltins = undefined, // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   // necessary for bins to not have extensions
@@ -345,7 +345,7 @@ async function resolve (name, parentPath, {
     if (resolvedPkgName) {
       const resolvedPkg = parsePackageName(resolvedPkgName);
       if (!resolvedPkg)
-        throwInvalidConfig(`${resolvedPkgName} is an invalid resolution in the jspm config file for ${config.projectPath}.`);
+        throwInvalidConfig(`${resolvedPkgName} is an invalid resolution in the jspm config file for ${projectPath}.`);
       
       let subPath = resolvedPkg.path;
       const pkgPath = packageToPath(resolvedPkg.name, projectPath);
@@ -381,7 +381,7 @@ async function resolve (name, parentPath, {
 
   // builtins
   if (!resolved) {
-    const builtinResolved = nodeBuiltinResolve(name, env.browser ? browserBuiltinsDir : undefined);
+    const builtinResolved = nodeBuiltinResolve(name, env.browser ? browserBuiltins : undefined);
     if (builtinResolved)
       return builtinResolved;
 
@@ -400,7 +400,7 @@ function resolveSync (name, parentPath, {
   cache,
   utils = resolveUtils,
   cjsResolve = false,
-  browserBuiltinsDir = undefined, // when env.browser is set, resolves builtins to this directory
+  browserBuiltins = undefined, // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   // necessary for bins to not have extensions
@@ -564,7 +564,7 @@ function resolveSync (name, parentPath, {
 
   // builtins
   if (!resolved) {
-    const builtinResolved = nodeBuiltinResolve(name, env.browser ? browserBuiltinsDir : undefined);
+    const builtinResolved = nodeBuiltinResolve(name, env.browser ? browserBuiltins : undefined);
     if (builtinResolved)
       return builtinResolved;
 
@@ -653,14 +653,14 @@ const nodeCoreBrowserUnimplemented = {
   child_process: true, cluster: true, dgram: true, dns: true, fs: true, module: true, net: true, readline: true, repl: true, tls: true
 };
 
-function nodeBuiltinResolve (name, browserBuiltinsDir) {
+function nodeBuiltinResolve (name, browserBuiltins) {
   if (builtins[name]) {
-    if (browserBuiltinsDir) {
-      if (browserBuiltinsDir[browserBuiltinsDir.length - 1] !== '/')
-        browserBuiltinsDir += '/';
+    if (browserBuiltins) {
+      if (browserBuiltins[browserBuiltins.length - 1] !== '/')
+        browserBuiltins += '/';
       if (nodeCoreBrowserUnimplemented[name])
-        return { resolved: browserBuiltinsDir + '@notfound.js', format: 'esm' };
-      return { resolved: browserBuiltinsDir + name + '.js', format: 'esm' };
+        return { resolved: browserBuiltins + '@notfound.js', format: 'esm' };
+      return { resolved: browserBuiltins + name + '.js', format: 'esm' };
     }
     return { resolved: name, format: 'builtin' };
   }

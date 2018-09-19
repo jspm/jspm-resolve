@@ -206,8 +206,11 @@ Package names in canonical form are names of the form `registry:package@version`
 Valid package names satisfy the JS regular expression:
 
 ```js
-/^[a-z]+:[@\-_\.a-zA-Z\d][-_\.a-zA-Z\d]*(\/[-_\.a-zA-Z\d]+)*@[^@<>:"/\|?*^\u0000-\u001F]+$/
+/^[a-z]+:(@[-_\.a-zA-Z\d]+\/)?[-_\.a-zA-Z\d]+@[^@<>:"/\|?*^\u0000-\u001F]+$/
 ```
+
+Package names must consist of either one or two path segments with a version - `registry:x@version` or `registry:@base/x@version`. The `@` prefix is required for two-segment
+package names in order to ensure the package boundary remains statically determinable for any project path.
 
 For compatibility with cross-platform file paths, the following character classes are not permitted in versions: `[@<>:"/\|?*^\u0000-\u001F]`.
 
@@ -452,6 +455,9 @@ The parent pathname is assumed a valid fully-resolved path in the environment. A
 While jspm_packages should always be "mode": "esm", support for CommonJS packages in jspm_packages is included as the package "mode" is always respected. This is tracked in the third argument to the resolver.
 
 _Note that most of the complexity of the resolver comes from handling legacy CJS package mode fallbacks properly. In the path of deprecating legacy support over 70% of the implementation can be removed._
+_For example, we support CommonJS packages within jspm_packages for legacy linking workflows which perform a hybrid resolution which is carefully defined just for this edge case yet unnecessary in the bulk of workflows._
+
+TODO: Write simplified resolution algorithm without hybrid resolutions first, consisting of only ESM and legacy fallback, to illustrate the bulk resolver logic simply.
 
 The resolution algorithm breaks down into the following high-level process to get the fully resolved path:
 

@@ -56,7 +56,7 @@ suite('jspm project nesting', () => {
     assert.equal(resolved, `${pbPath}jspm_packages/link/standard-cases@master/`);
 
     var { resolved } = await jspmResolve('pkg', `${pbPath}jspm_packages/link/standard-cases@master/`);
-    assert.equal(resolved, `${pbPath}jspm_packages/r/a/c@v/index.js`);
+    assert.equal(resolved, `${pbPath}jspm_packages/r/@a/c@v/index.js`);
   });
 
   test('Basic nesting rules', () => {

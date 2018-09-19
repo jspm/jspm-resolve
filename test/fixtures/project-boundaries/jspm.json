@@ -5,7 +5,7 @@
   "dependencies": {
     "link:standard-cases@master": {
       "resolve": {
-        "pkg": "r:a/c@v"
+        "pkg": "r:@a/c@v"
       }
     }
   }

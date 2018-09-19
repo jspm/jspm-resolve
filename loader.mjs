@@ -23,6 +23,10 @@ export async function resolve (name, parentUrl) {
   let { resolved, format } = await jspmResolve(name, parentUrl ? decodeURI(parentUrl).substr(filePrefix.length) : undefined, { cache });
   if (format === undefined)
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
+  if (format === 'builtin' && (resolved === '@empty' || resolved === '@notfound')) {
+    format = 'esm';
+    resolved = 'jspm-node-builtins/' + resolved + '.js';
+  }
   const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
   return { url, format };
 }
