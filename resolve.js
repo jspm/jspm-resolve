@@ -287,7 +287,7 @@ async function resolve (name, parentPath, {
         return { resolved: result.resolved, format: 'cjs' };
       return result;
     }
-    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') || extensionlessFormat ? 'esm' : 'unknown' };
+    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') || extensionlessFormat ? 'esm' : resolved.endsWith('.node') ? addon : 'unknown' };
   }
 
   // Plain name resolution
@@ -332,7 +332,7 @@ async function resolve (name, parentPath, {
         const resolved = parentPkgPath + mapped.substr(1);
         if (cjsResolve || parentPkgConfig.mode === 'cjs')
           return legacyFinalizeResolve.call(utils, resolved, parentPath, !cjsResolve, !(await utils.isFile(projectPath + '/jspm.json', cache)), cache);
-        return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') ? 'esm' : 'unknown' };
+        return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') ? 'esm' : resolved.endsWith('.node') ? 'addon' : 'unknown' };
       }
       validatePlain(name = mapped);
     }
@@ -375,7 +375,7 @@ async function resolve (name, parentPath, {
         }
       }
 
-      return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') ? 'esm' : 'unknown' };
+      return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') ? 'esm' : resolved.endsWith('.node') ? 'addon' : 'unknown' };
     }
   }
 
@@ -1151,6 +1151,7 @@ resolve.sync = resolveSync;
 resolve.packagePath = packagePath;
 resolve.packagePathSync = packagePathSync;
 resolve.utils = resolveUtils;
+resolve.builtins = builtins;
 
 module.exports = resolve;
 

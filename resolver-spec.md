@@ -45,7 +45,7 @@ The return value of the resolver itself is both resolved path and the module for
 
 Custom assets can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
 
-ES modules cannot resolve to `.json` or `.node` files currently.
+ES modules cannot resolve to `.json` files currently.
 
 ### Package Configuration
 
