@@ -941,7 +941,7 @@ const resolveUtils = {
     if (parentPackageName) {
       let packageConfig = config.dependencies[parentPackageName];
       if (packageConfig && packageConfig.resolve)
-        return applyMap(name, packageConfig.resolve);
+        return applyMap(name, packageConfig.resolve) || applyMap(name, config.resolve);
     }
     else {
       return applyMap(name, config.resolve);
