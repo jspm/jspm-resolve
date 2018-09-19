@@ -316,8 +316,6 @@ async function resolve (name, parentPath, {
         if (mapped !== undefined) {
           if (mapped === '@empty')
             return { resolved: '@empty', format: 'builtin' };
-          if (mapped === '@notfound')
-            throwModuleNotFound(resolved, parentPath);
           resolved = parentPkgPath + '/' + mapped;
         }
       }
@@ -368,8 +366,6 @@ async function resolve (name, parentPath, {
           if (mapped !== undefined) {
             if (mapped === '@empty')
               return { resolved: '@empty', format: 'builtin' };
-            if (mapped === '@notfound')
-              throwModuleNotFound(resolved, parentPath);
             resolved = pkgPath + '/' + mapped;
           }
         }
@@ -381,7 +377,7 @@ async function resolve (name, parentPath, {
 
   // builtins
   if (!resolved) {
-    const builtinResolved = nodeBuiltinResolve(name, env.browser ? browserBuiltins : undefined);
+    const builtinResolved = builtinResolve(name, env.browser ? browserBuiltins : undefined);
     if (builtinResolved)
       return builtinResolved;
 
@@ -499,8 +495,6 @@ function resolveSync (name, parentPath, {
         if (mapped !== undefined) {
           if (mapped === '@empty')
             return { resolved: '@empty', format: 'builtin' };
-          if (mapped === '@notfound')
-            throwModuleNotFound(resolved, parentPath);
           resolved = parentPkgPath + '/' + mapped;
         }
       }
@@ -551,8 +545,6 @@ function resolveSync (name, parentPath, {
           if (mapped !== undefined) {
             if (mapped === '@empty')
               return { resolved: '@empty', format: 'builtin' };
-            if (mapped === '@notfound')
-              throwModuleNotFound(resolved, parentPath);
             resolved = pkgPath + '/' + mapped;
           }
         }
@@ -564,7 +556,7 @@ function resolveSync (name, parentPath, {
 
   // builtins
   if (!resolved) {
-    const builtinResolved = nodeBuiltinResolve(name, env.browser ? browserBuiltins : undefined);
+    const builtinResolved = builtinResolve(name, env.browser ? browserBuiltins : undefined);
     if (builtinResolved)
       return builtinResolved;
 
@@ -640,9 +632,8 @@ function getPackageConfigSync (resolved, projectPath, cache) {
   return { pkg, pkgPath, pkgConfig };
 }
 
-// all builtins get checked for their corresponding ".dew" form
 const builtins = {
-  '@notfound': true, '@empty': true,
+  '@empty': true,
   assert: true, buffer: true, child_process: true, cluster: true, console: true, constants: true, crypto: true,
   dgram: true, dns: true, domain: true, events: true, fs: true, http: true, https: true, module: true, net: true,
   os: true, path: true, process: true, punycode: true, querystring: true, readline: true, repl: true, stream: true,
@@ -653,13 +644,13 @@ const nodeCoreBrowserUnimplemented = {
   child_process: true, cluster: true, dgram: true, dns: true, fs: true, module: true, net: true, readline: true, repl: true, tls: true
 };
 
-function nodeBuiltinResolve (name, browserBuiltins) {
+function builtinResolve (name, browserBuiltins) {
   if (builtins[name]) {
     if (browserBuiltins) {
       if (browserBuiltins[browserBuiltins.length - 1] !== '/')
         browserBuiltins += '/';
       if (nodeCoreBrowserUnimplemented[name])
-        return { resolved: browserBuiltins + '@notfound.js', format: 'esm' };
+        return { resolved: browserBuiltins + '@empty.js', format: 'esm' };
       return { resolved: browserBuiltins + name + '.js', format: 'esm' };
     }
     return { resolved: name, format: 'builtin' };
@@ -725,8 +716,6 @@ function legacyPackageResolve (resolvedPath, parentPath, mjs, realpath, env, pac
     if (mapped !== undefined) {
       if (mapped === '@empty')
         return { resolved: '@empty', format: 'builtin' };
-      if (mapped === '@notfound')
-        throwModuleNotFound(resolvedPath, parentPath);
       resolvedPath = packagePath + '/' + mapped;
     }
   }
@@ -1242,10 +1231,8 @@ function processPjsonConfig (pjson) {
   if (mainMap) {
     if (!pcfg.map)
       pcfg.map = {};
-    if (pcfg.main === undefined) {
-      pcfg.main = 'index';
-      mainMap.default = '@notfound';
-    }
+    if (pcfg.main === undefined)
+      pcfg.main = 'index.js';
     if (!pcfg.map['./' + pcfg.main])
       pcfg.map['./' + pcfg.main] = mainMap;
   }

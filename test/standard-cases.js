@@ -107,13 +107,9 @@ suite('Standard Cases', () => {
     var { resolved } = await jspmResolve('p/b.js', pkgPath, { cache });
     assert.equal(resolved, `${pkg2Path}b.js`);
 
-    try {
-      var { resolved } = await jspmResolve('p/fail', pkgPath, { cache });
-      assert(false);
-    }
-    catch (e) {
-      assert.equal(e.code, 'MODULE_NOT_FOUND');
-    }
+    // this used to be the @notfound error
+    var { resolved } = await jspmResolve('p/fail', pkgPath, { cache });
+    assert.equal(resolved, `${pkg2Path}fail`);
 
     var { resolved } = await jspmResolve('../', pkgPath + 'sub/path.js', { cache });
     assert.equal(resolved, pkgPath);
@@ -325,13 +321,8 @@ suite('Standard Cases Sync', () => {
     var { resolved } = jspmResolve.sync('p/b.js', pkgPath, { cache: syncCache });
     assert.equal(resolved, `${pkg2Path}b.js`);
 
-    try {
-      var { resolved } = jspmResolve.sync('p/fail', pkgPath, { cache: syncCache });
-      assert(false);
-    }
-    catch (e) {
-      assert.equal(e.code, 'MODULE_NOT_FOUND');
-    }
+    var { resolved } = jspmResolve.sync('p/fail', pkgPath, { cache: syncCache });
+    assert.equal(resolved, `${pkg2Path}fail`);
 
     var { resolved } = jspmResolve.sync('../', pkgPath + 'sub/path.js', { cache: syncCache });
     assert.equal(resolved, pkgPath);

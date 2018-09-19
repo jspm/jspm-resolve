@@ -21,11 +21,11 @@ export async function resolve (name, parentUrl) {
   if (name[name.length - 1] === '/')
     name = name.substr(0, name.length - 1);
   let { resolved, format } = await jspmResolve(name, parentUrl ? decodeURI(parentUrl).substr(filePrefix.length) : undefined, { cache });
-  if (format === undefined)
+  if (format === 'unknown')
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
-  if (format === 'builtin' && (resolved === '@empty' || resolved === '@notfound')) {
+  if (format === 'builtin' && resolved === '@empty') {
     format = 'esm';
-    resolved = 'jspm-node-builtins/' + resolved + '.js';
+    resolved = '@jspm/node-builtins/' + resolved + '.js';
   }
   const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
   return { url, format };

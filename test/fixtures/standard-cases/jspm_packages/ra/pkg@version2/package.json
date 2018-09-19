@@ -3,8 +3,7 @@
   "map": {
     "./a.js": {
       "default": "./b.js"
-    },
-    "./fail": "@notfound"
+    }
   },
   "mode": "esm"
 }

@@ -333,8 +333,7 @@ The process of reading the main, map and mode for a given module's package bound
 > 1. If _mainMap_ is not _undefined_ then,
 >    1. Set _map_ to an object if _undefined_.
 >    1. If _main_ is _undefined_ then,
->       1. Set _main_ to _"index"_.
->       1. Set _mainMap["default"]_ to _"@notfound"_.
+>       1. Set _main_ to _"index.js"_.
 >    1. If _map["./${main}"]_ is _undefined_ then,
 >       1. Set _map["./${main}"]_ to _mainMap_.
 > 1. If _pjson.browser_ is an _object_ then,
@@ -349,7 +348,7 @@ The process of reading the main, map and mode for a given module's package bound
 
 Existing "map" entries always take precedence over main aliases and the browser map.
 
-The handling of an "index" alias for the main ensures that conditional mains are properly supported
+The handling of an "index.js" alias for the main ensures that conditional mains are properly supported
 even if there is no default main, although this is a rare edge case.
 
 ### Matching and Applying Map Resolution
@@ -380,7 +379,7 @@ Applying the map is then the process of adding back the subpath after the match 
 > 1. If _match_ is _undefined_ then,
 >    1. Return _undefined_.
 > 1. Let _mapped_ be the value of _MAP_CONDITIONS(resolveMap[match])_.
-> 1. If _mapped_ is equal to _"@empty"_ or _"@notfound"_ then,
+> 1. If _mapped_ is equal to _"@empty"_ then,
 >    1. If _match_ is not equal to _name_ or _name_ ends with a _"/"_ separator then,
 >       1. Throw an _Invalid Module Name_ error.
 > 1. If _match_ starts with _"./"_ and _mapped_ does not start with _"./"_ then,
@@ -509,8 +508,6 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. If _mapped_ is not _undefined_ then,
 >          1. If _mapped_ is equal to _"@empty"_ then,
 >             1. Return _{ resolved: "@empty", format: "builtin" }_.
->          1. If _mapped_ is equal to _"@notfound_ then,
->             1. Throw a _Module Not Found_ error.
 >          1. Set _resolved_ to the path resolution of _mapped_ relative to base _parentPackagePath_.
 >    1. Return _FINALIZE_RESOLVE(resolved)_.
 > 1. Note: The following provides support for parent package package.json plain name maps.
@@ -567,8 +564,6 @@ The resolution algorithm breaks down into the following high-level process to ge
 >             1. If _mapped_ is not _undefined_ then,
 >                1. If _mapped_ is equal to _"@empty"_ then,
 >                   1. Return _{ resolved: "@empty", format: "builtin" }_.
->                1. If _mapped_ is equal to _"@notfound_ then,
->                   1. Throw a _Module Not Found_ error.
 >                1. Set _resolved_ to the path resolution of _mapped_ relative to base _packagePath_.
 >       1. Return _FINALIZE_RESOLVE(resolved)_.
 > 1. If _name_ is a builtin module or _"@empty"_ then,
@@ -631,8 +626,6 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. If _mapped_ is not _undefined_ then,
 >       1. If _mapped_ is equal to _"@empty"_ then,
 >          1. Return _{ resolved: "@empty", format: "builtin" }_.
->       1. If _mapped_ is equal to _"@notfound"_ then,
->          1. Throw a _Module Not Found_ error.
 >       1. Set _resolved_ to the path resolution of _mapped_ relative to base _packagePath_.
 > 1. Return the result of _LEGACY_FINALIZE_RESOLVE(resolved, mjs, realpath)_.
 
