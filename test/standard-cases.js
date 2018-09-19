@@ -9,7 +9,6 @@ const sfPath = `${fixturesPath}standard-cases/`;
 const pPath = `${sfPath}jspm_packages/`;
 const pkgPath = `${sfPath}jspm_packages/ra/pkg@version/`;
 const pkg2Path = `${sfPath}jspm_packages/ra/pkg@version2/`;
-const browserBuiltinsPath = path.resolve(__dirname, '../node-browser-builtins').replace(winSepRegEx, '/') + '/';
 
 suite('Standard Cases', () => {
   const cache = {};

@@ -7,6 +7,11 @@
       "resolve": {
         "pkg": "r:@a/c@v"
       }
+    },
+    "r:@a/c@v": {
+      "resolve": {
+        "fs": "link:standard-cases@master"
+      }
     }
   }
 }

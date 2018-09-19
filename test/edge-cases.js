@@ -39,6 +39,9 @@ suite('jspm project nesting', () => {
     var { resolved } = await jspmResolve('y/', `${pbPath}config/node_modules/z/`);
     assert.equal(resolved, `${pbPath}config/node_modules/y/`);
 
+    var { resolved } = await jspmResolve('fs', `${pbPath}jspm_packages/r/@a/c@v/index.js`);
+    assert.equal(resolved, `${pbPath}jspm_packages/link/standard-cases@master/lib.js`);
+
     try {
       var { resolved } = await jspmResolve('z/', `${pbPath}config/node_modules/z/`);
       assert(false, 'Should error');
@@ -68,8 +71,11 @@ suite('jspm project nesting', () => {
 });
 
 suite('Mapping edge cases', () => {
+
   // ".." and "." segments in package names must not be supported as would enable package boundary backtracking
   // can be detected with a simple validation - first checking \\ and throwing for that, then checking /\/..?(\/|$)/
+
+
 
   //- mapping into an absolute URL
   //- mapping into a backtracking URL
