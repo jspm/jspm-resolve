@@ -34,6 +34,6 @@ export async function dynamicInstantiate(url) {
   if (url === 'jspm:@empty')
     return {
       exports: ['default'],
-      execute: exports => exports.default.set({})
+      execute: exports => exports.default.set(Object.create(null))
     };
 }
