@@ -315,7 +315,7 @@ async function resolve (name, parentPath, {
         const mapped = applyMap('.' + subPath, parentPkgConfig.map, env);
         if (mapped !== undefined) {
           if (mapped === '@empty')
-            return { resolved: '@empty', format: 'builtin' };
+            return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
           resolved = parentPkgPath + '/' + mapped;
         }
       }
@@ -365,7 +365,7 @@ async function resolve (name, parentPath, {
           const mapped = applyMap('.' + subPath, pkgConfig.map, env);
           if (mapped !== undefined) {
             if (mapped === '@empty')
-              return { resolved: '@empty', format: 'builtin' };
+              return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
             resolved = pkgPath + '/' + mapped;
           }
         }
@@ -494,7 +494,7 @@ function resolveSync (name, parentPath, {
         const mapped = applyMap('.' + subPath, parentPkgConfig.map, env);
         if (mapped !== undefined) {
           if (mapped === '@empty')
-            return { resolved: '@empty', format: 'builtin' };
+            return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
           resolved = parentPkgPath + '/' + mapped;
         }
       }
@@ -544,7 +544,7 @@ function resolveSync (name, parentPath, {
           const mapped = applyMap('.' + subPath, pkgConfig.map, env);
           if (mapped !== undefined) {
             if (mapped === '@empty')
-              return { resolved: '@empty', format: 'builtin' };
+              return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
             resolved = pkgPath + '/' + mapped;
           }
         }
@@ -715,7 +715,7 @@ function legacyPackageResolve (resolvedPath, parentPath, mjs, realpath, env, pac
     const mapped = applyMap(relPath, pcfg.map, env);
     if (mapped !== undefined) {
       if (mapped === '@empty')
-        return { resolved: '@empty', format: 'builtin' };
+        return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
       resolvedPath = packagePath + '/' + mapped;
     }
   }
