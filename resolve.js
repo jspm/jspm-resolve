@@ -218,7 +218,7 @@ async function resolve (name, parentPath, {
   cache,
   utils = resolveUtils,
   cjsResolve = false,
-  browserBuiltins = undefined, // when env.browser is set, resolves builtins to this directory
+  browserBuiltins = 'jspm-node-builtins', // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   // necessary for bins to not have extensions
@@ -314,8 +314,8 @@ async function resolve (name, parentPath, {
       if (parentPkgConfig.map !== undefined) {
         const mapped = applyMap('.' + subPath, parentPkgConfig.map, env);
         if (mapped !== undefined) {
-          if (mapped === '@empty')
-            return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
+          if (mapped === '@empty' || mapped === '@empty.dew')
+            return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
           resolved = parentPkgPath + '/' + mapped;
         }
       }
@@ -364,8 +364,8 @@ async function resolve (name, parentPath, {
         if (pkgConfig.map !== undefined) {
           const mapped = applyMap('.' + subPath, pkgConfig.map, env);
           if (mapped !== undefined) {
-            if (mapped === '@empty')
-              return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
+            if (mapped === '@empty' || mapped === '@empty.dew')
+              return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
             resolved = pkgPath + '/' + mapped;
           }
         }
@@ -396,7 +396,7 @@ function resolveSync (name, parentPath, {
   cache,
   utils = resolveUtils,
   cjsResolve = false,
-  browserBuiltins = undefined, // when env.browser is set, resolves builtins to this directory
+  browserBuiltins = 'jspm-node-builtins', // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   // necessary for bins to not have extensions
@@ -493,8 +493,8 @@ function resolveSync (name, parentPath, {
       if (parentPkgConfig.map !== undefined) {
         const mapped = applyMap('.' + subPath, parentPkgConfig.map, env);
         if (mapped !== undefined) {
-          if (mapped === '@empty')
-            return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
+          if (mapped === '@empty' || mapped === '@empty.dew')
+            return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
           resolved = parentPkgPath + '/' + mapped;
         }
       }
@@ -543,8 +543,8 @@ function resolveSync (name, parentPath, {
         if (pkgConfig.map !== undefined) {
           const mapped = applyMap('.' + subPath, pkgConfig.map, env);
           if (mapped !== undefined) {
-            if (mapped === '@empty')
-              return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
+            if (mapped === '@empty' || mapped === '@empty.dew')
+              return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
             resolved = pkgPath + '/' + mapped;
           }
         }
@@ -633,7 +633,7 @@ function getPackageConfigSync (resolved, projectPath, cache) {
 }
 
 const builtins = {
-  '@empty': true,
+  '@empty': true, '@empty.dew': true,
   assert: true, buffer: true, child_process: true, cluster: true, console: true, constants: true, crypto: true,
   dgram: true, dns: true, domain: true, events: true, fs: true, http: true, https: true, module: true, net: true,
   os: true, path: true, process: true, punycode: true, querystring: true, readline: true, repl: true, stream: true,
@@ -714,8 +714,8 @@ function legacyPackageResolve (resolvedPath, parentPath, mjs, realpath, env, pac
     const relPath = '.' + resolvedPath.substr(packagePath.length);
     const mapped = applyMap(relPath, pcfg.map, env);
     if (mapped !== undefined) {
-      if (mapped === '@empty')
-        return env.browser ? { resolved: browserBuiltins + '@empty.js', format: 'esm' } : { resolved: '@empty', format: 'builtin' };
+      if (mapped === '@empty' || mapped === '@empty.dew')
+        return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
       resolvedPath = packagePath + '/' + mapped;
     }
   }

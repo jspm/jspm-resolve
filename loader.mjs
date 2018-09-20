@@ -24,16 +24,27 @@ export async function resolve (name, parentUrl) {
   if (format === 'unknown')
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
   
-  if (format === 'builtin' && resolved === '@empty')
-    return { url: 'jspm:@empty', format: 'dynamic' };
+  if (format === 'builtin') {
+    if (resolved === '@empty')
+      return { url: 'jspm:@empty', format: 'dynamic' };
+    if (resolved === '@empty.dew')
+      return { url: 'jspm:@empty.dew', format: 'dynamic' };
+  }
+
   const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
   return { url, format };
 }
 
 export async function dynamicInstantiate(url) {
+  const emptyReturn = Object.freeze(Object.create(null));
   if (url === 'jspm:@empty')
     return {
       exports: ['default'],
-      execute: exports => exports.default.set(Object.create(null))
+      execute: exports => exports.default.set(emptyReturn)
+    };
+  if (url === 'jspm@empty.dew')
+    return {
+      exports: ['dew'],
+      execute: exports => exports.dew.set(function () { return emptyReturn; })
     };
 }
