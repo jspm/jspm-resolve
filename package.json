@@ -1,6 +1,6 @@
 {
-  "name": "jspm-resolve",
-  "version": "3.0.0",
+  "name": "@jspm/resolve",
+  "version": "0.1.0",
   "description": "jspm 2.0 NodeJS resolver",
   "main": "resolve.js",
   "scripts": {
@@ -22,5 +22,6 @@
   "homepage": "https://github.com/jspm/resolve#readme",
   "devDependencies": {
     "mocha": "^4.1.0"
-  }
+  },
+  "files": ["resolve.js", "loader.mjs"]
 }
