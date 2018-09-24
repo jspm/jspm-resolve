@@ -1,7 +1,6 @@
 'use strict';
 
 const { URL } = require('url');
-const path = require('path');
 const fs = require('fs');
 
 const isWindows = process.platform === 'win32';
@@ -218,7 +217,7 @@ async function resolve (name, parentPath, {
   cache,
   utils = resolveUtils,
   cjsResolve = false,
-  browserBuiltins = 'jspm-node-builtins', // when env.browser is set, resolves builtins to this directory
+  browserBuiltins = undefined, // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   // necessary for bins to not have extensions
@@ -396,7 +395,7 @@ function resolveSync (name, parentPath, {
   cache,
   utils = resolveUtils,
   cjsResolve = false,
-  browserBuiltins = 'jspm-node-builtins', // when env.browser is set, resolves builtins to this directory
+  browserBuiltins = undefined, // when env.browser is set, resolves builtins to this directory
   resolveNodeModules = true // whether to do node_modules resolution
 } = {}) {
   // necessary for bins to not have extensions
