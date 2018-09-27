@@ -1241,14 +1241,14 @@ function processPjsonConfig (pjson) {
         mapping = '@empty';
       if (p[0] === '.' && p[1] === '/' && !p.endsWith('.js'))
         p += '.js';
-      if (pcfg.map[p] === mainMap) {
-        mainMap.browser = stripLeadingDotsAndTrailingSlash(mapping);
+      if (mainMap && pcfg.map[p] === mainMap) {
+        mainMap.browser = mapping;
         continue;
       }
       if (pcfg.map[p] !== undefined)
         continue;
       pcfg.map[p] = {
-        browser: stripLeadingDotsAndTrailingSlash(mapping)
+        browser: mapping
       };
     }
   }
