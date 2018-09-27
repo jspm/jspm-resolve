@@ -1236,15 +1236,19 @@ function processPjsonConfig (pjson) {
     if (!pcfg.map)
       pcfg.map = {};
     for (let p in pjson.browser) {
-      if (pcfg.map[p] !== undefined)
-        continue;
       let mapping = pjson.browser[p];
       if (mapping === false)
         mapping = '@empty';
       if (p[0] === '.' && p[1] === '/' && !p.endsWith('.js'))
         p += '.js';
+      if (pcfg.map[p] === mainMap) {
+        mainMap.browser = stripLeadingDotsAndTrailingSlash(mapping);
+        continue;
+      }
+      if (pcfg.map[p] !== undefined)
+        continue;
       pcfg.map[p] = {
-        browser: mapping
+        browser: stripLeadingDotsAndTrailingSlash(mapping)
       };
     }
   }
