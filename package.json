@@ -1,6 +1,6 @@
 {
   "name": "@jspm/resolve",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "jspm 2.0 NodeJS resolver",
   "main": "resolve.js",
   "scripts": {
