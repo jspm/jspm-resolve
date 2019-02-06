@@ -286,7 +286,7 @@ async function resolve (name, parentPath, {
         return { resolved: result.resolved, format: 'cjs' };
       return result;
     }
-    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') || extensionlessFormat ? 'esm' : resolved.endsWith('.node') ? addon : 'unknown' };
+    return { resolved, format: resolved.endsWith('.js') || resolved.endsWith('.mjs') || extensionlessFormat ? 'esm' : resolved.endsWith('.node') ? 'addon' : 'unknown' };
   }
 
   // Plain name resolution
