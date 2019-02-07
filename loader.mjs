@@ -20,7 +20,7 @@ module._resolveFilename = (request, parent, isMain) => {
 export async function resolve (name, parentUrl) {
   if (name[name.length - 1] === '/')
     name = name.substr(0, name.length - 1);
-  let { resolved, format } = await jspmResolve(name, parentUrl ? decodeURI(parentUrl).substr(filePrefix.length) : undefined, { cache });
+  let { resolved, format } = await jspmResolve(name, parentUrl ? decodeURIComponent(parentUrl).substr(filePrefix.length) : undefined, { cache });
   if (format === 'unknown')
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
   
@@ -31,7 +31,7 @@ export async function resolve (name, parentUrl) {
       return { url: 'jspm:@empty.dew', format: 'dynamic' };
   }
 
-  const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved);
+  const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved).replace(/#/g, encodeURIComponent);
   return { url, format };
 }
 
