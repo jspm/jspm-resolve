@@ -634,13 +634,13 @@ function getPackageConfigSync (resolved, projectPath, cache) {
 const builtins = {
   '@empty': true, '@empty.dew': true,
   assert: true, buffer: true, child_process: true, cluster: true, console: true, constants: true, crypto: true,
-  dgram: true, dns: true, domain: true, events: true, fs: true, http: true, https: true, module: true, net: true,
+  dgram: true, dns: true, domain: true, events: true, fs: true, http: true, http2: true, https: true, module: true, net: true,
   os: true, path: true, process: true, punycode: true, querystring: true, readline: true, repl: true, stream: true,
-  string_decoder: true, sys: true, timers: true, tls: true, tty: true, url: true, util: true, vm: true, zlib: true
+  string_decoder: true, sys: true, timers: true, tls: true, tty: true, url: true, util: true, vm: true, worker_threads: true, zlib: true
 };
 
 const nodeCoreBrowserUnimplemented = {
-  child_process: true, cluster: true, dgram: true, dns: true, fs: true, module: true, net: true, readline: true, repl: true, tls: true
+  child_process: true, cluster: true, dgram: true, dns: true, fs: true, http2: true, module: true, net: true, readline: true, repl: true, tls: true, worker_threads: true
 };
 
 function builtinResolve (name, browserBuiltins) {
