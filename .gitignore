@@ -1,4 +1,2 @@
-node_modules
-.DS_Store
-package-lock.json
-browser-builtins/jspm_packages
+jspm.json
+jspm_packages

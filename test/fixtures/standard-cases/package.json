@@ -1,7 +1,7 @@
 {
   "name": "standard-case",
   "mode": "cjs",
-  "main": "./lib/",
+  "main": "./lib.js",
   "map": {
     "a": "./b",
     "a/c": "./b",

@@ -3,8 +3,12 @@
   "version": "0.2.0",
   "description": "jspm 2.0 NodeJS resolver",
   "main": "resolve.js",
+  "dependencies": {
+    "@jspm/node-builtins": "^1.0.0"
+  },
+  "mode": "cjs",
   "scripts": {
-    "test": "mocha -u tdd"
+    "test": "jspm run-test.js"
   },
   "repository": {
     "type": "git",
@@ -23,5 +27,8 @@
   "devDependencies": {
     "mocha": "^4.1.0"
   },
-  "files": ["resolve.js", "loader.mjs"]
+  "files": [
+    "resolve.js",
+    "loader.mjs"
+  ]
 }
