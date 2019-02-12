@@ -594,7 +594,8 @@ function nodeModulesResolve (name, parentPath, cjsResolve, env, cache) {
     pkgSubpath = name.substr(pkgName.length);
   }
   else {
-    pkgName = name.substr(0, name.indexOf('/'));
+    const slashIndex = name.indexOf('/');
+    pkgName = slashIndex === -1 ? name : name.substr(0, slashIndex);
     pkgSubpath = name.substr(pkgName.length);
   }
   const rootSeparatorIndex = curParentPath.indexOf('/');
