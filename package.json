@@ -8,7 +8,7 @@
   },
   "mode": "cjs",
   "scripts": {
-    "test": "jspm run-test.js"
+    "test": "jspm test/test.js"
   },
   "repository": {
     "type": "git",
