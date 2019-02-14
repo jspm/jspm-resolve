@@ -222,7 +222,7 @@ async function resolve (name, parentPath, {
   // necessary for bins to not have extensions
   let isMain = false;
   if (!parentPath) {
-    parentPath = process.cwd() + '/';
+    parentPath = (process.env.PWD || process.cwd()) + '/';
     isMain = true;
   }
   if (parentPath.indexOf('\\') !== -1)
@@ -290,7 +290,7 @@ function resolveSync (name, parentPath, {
   // necessary for bins to not have extensions
   let isMain = false;
   if (!parentPath) {
-    parentPath = process.cwd() + '/';
+    parentPath = (process.env.PWD || process.cwd()) + '/';
     isMain = true;
   }
   if (parentPath.indexOf('\\') !== -1)
