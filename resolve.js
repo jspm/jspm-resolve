@@ -1075,6 +1075,16 @@ resolve.sync = resolveSync;
 resolve.utils = resolveUtils;
 resolve.builtins = builtins;
 
+const winPathRegEx = /^[a-z]:\//i;
+resolve.cjsResolve = function (request, parent) {
+  if (request.match(winPathRegEx))
+    request = '/' + request;
+  if (request[request.length - 1] === '/')
+    request = request.substr(0, request.length - 1);
+  const { resolved } = jspmResolve.sync(request, parent && parent.filename, { cjsResolve: true, cache: parent && parent.cache });
+  return resolved;
+};
+
 module.exports = resolve;
 
 function conditionMap (mapped, env) {

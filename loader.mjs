@@ -1,21 +1,12 @@
 import module from 'module';
 import jspmResolve from './resolve.js';
 
-const winPathRegEx = /^[a-z]:\//i;
-const isWindows = process.platform === 'win32';
-const filePrefix = 'file://' + (isWindows ? '/' : '');
+const filePrefix = 'file://' + (process.platform === 'win32' ? '/' : '');
 
 const cache = {};
 
 module._nodeModulePaths = () => [];
-module._resolveFilename = (request, parent, isMain) => {
-  if (request.match(winPathRegEx))
-    request = '/' + request;
-  if (request[request.length - 1] === '/')
-    request = request.substr(0, request.length - 1);
-  const { resolved } = jspmResolve.sync(request, parent && parent.filename, { cjsResolve: true, cache });
-  return resolved;
-};
+module._resolveFilename = (request, parent) => jspmResolve.cjsResolve(request, { ...parent, cache });
 
 export async function resolve (name, parentUrl) {
   if (name[name.length - 1] === '/')
