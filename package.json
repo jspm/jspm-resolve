@@ -3,9 +3,6 @@
   "version": "0.2.0",
   "description": "jspm 2.0 NodeJS resolver",
   "main": "resolve.js",
-  "dependencies": {
-    "@jspm/node-builtins": "^1.0.0"
-  },
   "mode": "cjs",
   "scripts": {
     "test": "jspm test/test.js"
@@ -25,6 +22,7 @@
   },
   "homepage": "https://github.com/jspm/resolve#readme",
   "devDependencies": {
+    "@jspm/core": "^1.0.0",
     "mocha": "^4.1.0"
   },
   "files": [
