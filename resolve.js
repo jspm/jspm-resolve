@@ -524,7 +524,7 @@ function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPa
 
 async function getPackageConfig (resolved, jspmProjectPath, cache) {
   if (!jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved.length !== jspmProjectPath.length && resolved[jspmProjectPath.length] !== '/')
-    return;
+    return {};
   const pkg = parsePackagePath(resolved, jspmProjectPath);
   const pkgPath = pkg ? packageToPath(pkg.name, jspmProjectPath) : jspmProjectPath;
   const pkgConfig = pkgPath ? await this.readPackageConfig(pkgPath, cache) : undefined;
@@ -533,7 +533,7 @@ async function getPackageConfig (resolved, jspmProjectPath, cache) {
 
 function getPackageConfigSync (resolved, jspmProjectPath, cache) {
   if (!jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved.length !== jspmProjectPath.length && resolved[jspmProjectPath.length] !== '/')
-    return;
+    return {};
   const pkg = parsePackagePath(resolved, jspmProjectPath);
   const pkgPath = pkg ? packageToPath(pkg.name, jspmProjectPath) : jspmProjectPath;
   const pkgConfig = pkgPath ? this.readPackageConfigSync(pkgPath, cache) : undefined;
@@ -607,6 +607,9 @@ function nodeModulesResolve (name, parentPath, cjsResolve, env, cache) {
       return nodePackageResolve.call(this, packagePath + pkgSubpath, parentPath, cjsResolve, true, env, packagePath, pcfg, cache);
     }
   }
+  const builtinResolved = builtinResolve(name, env.browser ? browserBuiltins : undefined);
+  if (builtinResolved)
+    return builtinResolved;
   throwModuleNotFound(name, parentPath);
 }
 
@@ -632,7 +635,7 @@ function nodePackageResolve (resolvedPath, parentPath, cjsResolve, realpath, env
         throw e;
     }
   }
-  if (pcfg.map !== undefined && resolvedPath.startsWith(packagePath) &&
+  if (pcfg && pcfg.map !== undefined && resolvedPath.startsWith(packagePath) &&
                                  (resolvedPath.length === packagePath.length || resolvedPath[packagePath.length] === '/')) {
     const relPath = '.' + resolvedPath.substr(packagePath.length);
     const mapped = applyMap(relPath, pcfg.map, env);
