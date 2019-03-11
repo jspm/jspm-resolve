@@ -31,27 +31,27 @@ that do not start with `/` or `./` or `../` and do not parse as valid URLs.
 
 Plain names are the module names that run through multiple remapping phases, although absolute URL names can be remapped as well through contextual relative map configuration.
 
-### Package Boundaries
+### Package Scopes
 
-jspm projects have two levels of package boundaries - the base-level project boundary containing the package.json and jspm.json file, and the dependency package boundaries, denoted by their jspm_packages/package@version paths.
+jspm projects have two levels of package scopes - the base-level project scope containing the package.json and jspm.json file, and the dependency package scopes, denoted by their jspm_packages/package@version paths.
 
 Within a jspm project, only the package.json and files in these two levels are read and used by jspm to influence resolution, and these are the only files that influence resolution in combination with the jspm.json resolutions.
 
 The only time intermediate package.json files are used is when interpreting the module format mode of a file.
 
-#### jspm Project Boundaries
+#### jspm Project Scopes
 
-The detection of the jspm project for a given path is based on checking if the current path matches a jspm_packages dependency path, and if so using that boundary, or otherwise checking for a jspm.json file down the folder hierarchy until one is found.
+The detection of the jspm project for a given path is based on checking if the current path matches a jspm_packages dependency path, and if so using that scope, or otherwise checking for a jspm.json file down the folder hierarchy until one is found.
 
 If a jspm_packages match is made without there being a corresponding jspm.json file, an error is thrown. If a package.json file is not found along with the jspm.json file, an error is also thrown.
 
-If hitting a node_modules path segment, or reaching the root of the file system, the above check immediately stops and treats the project boundary as a non-jspm package boundary, and matching the first package.json file instead.
+If hitting a node_modules path segment, or reaching the root of the file system, the above check immediately stops and treats the project scope as a non-jspm package scope, and matching the first package.json file instead.
 
 #### Module Format Handling
 
-Each package boundary is interpreted based on its "mode" being either "cjs" or "esm".
+Each package scope is interpreted based on its "type" being either "commonjs" or "module".
 
-By default jspm treats all package boundaries as `"mode": "esm"` unless (a) they are explicitly `"mode": "cjs"` or (b) they are packages located in a node_modules path.
+By default jspm treats all package scopes as `"type": "module"` unless (a) they are explicitly `"type": "commonjs"` or (b) they are packages located in a node_modules path.
 
 Custom assets can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
 
@@ -141,7 +141,7 @@ would support `import 'pkg/x'` resolving to `pkg/src/x` under the development co
 
 ### jspm Config File
 
-jspm resolution information is provided through a `jspm.json` file which must be in the same folder as the package.json file forming the package boundary.
+jspm resolution information is provided through a `jspm.json` file which must be in the same folder as the package.json file forming the package scope.
 
 The `jspm.json` jspm configuration file stores jspm configuration and version lock information for jspm projects.
 
@@ -195,7 +195,7 @@ Valid package names satisfy the JS regular expression:
 /^[a-z]+:(@[-_\.a-zA-Z\d]+\/)?[-_\.a-zA-Z\d]+@[^@<>:"/\|?*^\u0000-\u001F]+$/
 ```
 
-Package names must consist of either one or two path segments with a version - `registry:x@version` or `registry:@base/x@version`. The `@` prefix is required for two-segment package names in order to ensure the package boundary remains statically determinable for any project path.
+Package names must consist of either one or two path segments with a version - `registry:x@version` or `registry:@base/x@version`. The `@` prefix is required for two-segment package names in order to ensure the package scope remains statically determinable for any project path.
 
 For compatibility with cross-platform file paths, the following character classes are not permitted in versions: `[@<>:"/\|?*^\u0000-\u001F]`.
 
@@ -244,7 +244,7 @@ always be called against a valid package canonical name form.
 
 ### Reading Package and Project Configuration
 
-Package configuration is read based on checking the jspm project boundaries and returning the corresponding package.json
+Package configuration is read based on checking the jspm project scopes and returning the corresponding package.json
 configuration for a path.
 
 Given a file path, we can determine the base project folder with the following algorithm:
@@ -282,9 +282,9 @@ The process of reading the package.json configuration for a given package path i
 >    1. Return _undefined_.
 > 1. Let _source_ be the contents of the file _"${packagePath}/package.json"_
 > 1. Let _pjson_ be set to the cached output of the JSON parser applied to _source_, throwing a _Configuration Error_ on invalid JSON.
-> 1. Let _mode_ be set to _undefined_.
-> 1. If _pjson.mode_ is equal to _"cjs"_ or _"esm"_ then,
->    1. Set _mode_ to _pjson.mode_.
+> 1. Let _type_ be set to _undefined_.
+> 1. If _pjson.type_ is equal to _"commonjs"_ or _"module"_ then,
+>    1. Set _type_ to _pjson.type_.
 > 1. Let _main_ be equal to the value of _pjson.main_ if a string or _undefined_ otherwise.
 > 1. If _main_ is defined then,
 >    1. If _main_ starts with _"./"_ then,
@@ -314,7 +314,7 @@ The process of reading the package.json configuration for a given package path i
 >       1. If _target_ is equal to _false_ then,
 >          1. Set _target_ to _"@empty"_.
 >       1. Set _map[match] to the object _{ browser: pjson.browser[name] }_.
-> 1. Return the object with properties _{ path, main, map, mode }_.
+> 1. Return the object with properties _{ path, main, map, type }_.
 
 > **GET_PACKAGE_CONFIG(resolved: String, jspmProjectPath: String)**
 > 1. If _jspmProjectPath_ is _undefined_ then,
@@ -332,12 +332,12 @@ The process of reading the package.json configuration for a given package path i
 >    1. Set _config_ to the result of _READ_PACKAGE_JSON(packagePath)_.
 > 1. Return the object with values _{ package, path, config }_.
 
-> **GET_PACKAGE_BOUNDARY(modulePath: String)**
-> 1. Let _boundary_ be _modulePath_.
-> 1. While _boundary_ is not the file system root,
->    1. If the file at _"${boundary}/package.json_ exists then,
->       1. Return _boundary_.
->    1. Set _boundary_ to the parent path of _boundary_.
+> **GET_PACKAGE_SCOPE(modulePath: String)**
+> 1. Let _scope_ be _modulePath_.
+> 1. While _scope_ is not the file system root,
+>    1. If the file at _"${scope}/package.json_ exists then,
+>       1. Return _scope_.
+>    1. Set _scope_ to the parent path of _scope_.
 > 1. Return _undefined_.
 
 Existing "map" entries always take precedence over main aliases and the browser map.
@@ -353,7 +353,7 @@ Matching a map is based on finding the longest map target that matches the start
 Map configurations in the jspm configurations also support conditional objects which represent map branches based
 on environment conditionals.
 
-Match boundaries are taken to be the `/` separator or the end of the name. In this way the map `{ 'x/y': 'z' }` can match both `x/y` and `x/y/path`.
+Match scopes are taken to be the `/` separator or the end of the name. In this way the map `{ 'x/y': 'z' }` can match both `x/y` and `x/y/path`.
 
 Maps can also enforce a trailing separator to match directories separately to exact paths, for example with `{ 'x': './y/main.js', 'x/': './y/' }`.
 
@@ -437,7 +437,7 @@ Package name requests and plain name requests are both considered unescaped - th
 
 Absolute paths, URLs, URL-encoding, and relative segments are not supported in the parent path.
 
-_Note that most of the complexity of the resolver comes from handling legacy CJS package mode fallbacks properly. For example, we support CommonJS packages within jspm_packages for legacy linking workflows which perform a hybrid resolution which is carefully defined just for this edge case yet unnecessary in the bulk of workflows._
+_Note that most of the complexity of the resolver comes from handling legacy CJS package type fallbacks properly. For example, we support CommonJS packages within jspm_packages for legacy linking workflows which perform a hybrid resolution which is carefully defined just for this edge case yet unnecessary in the bulk of workflows._
 
 The resolution algorithm breaks down into the following high-level process to get the fully resolved path:
 
@@ -542,7 +542,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 
 > **FINALIZE_RESOLVE(resolved: String, jspmProjectPath: String, cjsResolve: Boolean, isMain: Boolean)**
 > 1. If _resolved_ ends in _".mjs"_ then,
->    1. Return _{ resolved, format: "esm" }_.
+>    1. Return _{ resolved, format: "module" }_.
 > 1. If _resolved_ ends in _".node"_ then,
 >    1. Return _{ resolved, format: "addon" }_.
 > 1. If _cjsResolve_ is _true_ and _resolved_ ends in _".json"_ then,
@@ -550,16 +550,16 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _isMain_ is _false_ and _resolved_ does not end with _".js"_ then,
 >    1. Return _{ resolved, format: "unknown" }_.
 > 1 .If _cjsResolve_ is _true_ the,
->    1. Return _{ resolved, format: "cjs" }_.
-> 1. Let _boundary_ be the result of _GET_PACKAGE_BOUNDARY(resolved)_.
-> 1. If _boundary_ is not _undefined_ then,
->    1. Let _pjson_ be the result of _READ_PACKAGE_JSON("${boundary}/package.json")_.
+>    1. Return _{ resolved, format: "commonjs" }_.
+> 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
+> 1. If _scope_ is not _undefined_ then,
+>    1. Let _pjson_ be the result of _READ_PACKAGE_JSON("${scope}/package.json")_.
 > 1. Let _cjs_ be _true_ if _jspmProjectPath_ is _undefined_.
-> 1. If _pjson?.mode_ is equal to _"cjs"_ then,
+> 1. If _pjson?.type_ is equal to _"commonjs"_ then,
 >    1. Set _cjs_ to _true_.
-> 1. If _pjson?.mode_ is equal to _"esm"_ then,
+> 1. If _pjson?.type_ is equal to _"module"_ then,
 >    1. Set _cjs_ to _false_.
-> 1. Return _{ resolved, format: cjs ? "cjs": "esm" }_.
+> 1. Return _{ resolved, format: cjs ? "commonjs": "module" }_.
 
 > **NODE_MODULES_RESOLVE(name: String, parentPath: String, cjsResolve: Boolean, isMain): String**
 > 1. For each parent folder _modulesPath_ of _parentPath_ in descending order of length,
@@ -623,20 +623,20 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Return _resolved_.
 
 > **NODE_FINALIZE_RESOLVE(resolved: String, cjsResolve: Boolean, realpath: Boolean, isMain: Boolean)**
-> 1. TODO: Add package boundary here if Node.js adopts it.
+> 1. TODO: Add package scope here if Node.js adopts it.
 > 1. Set _resolved_ to _LEGACY_FILE_RESOLVE(resolved, cjsResolve)_.
 > 1. Let _format_ be equal to _"unknown"_.
 > 1. If _isMain_ is _true_ then,
 >    1. If _cjsResolve_ is _true_ then,
->       1. Set _format_ to _"cjs"_.
+>       1. Set _format_ to _"commonjs"_.
 >    1. Otherwise,
->       1. Set _format_ to _"esm"_.
+>       1. Set _format_ to _"module"_.
 > 1. If _resolved_ ends with _".mjs"_ then,
 >    1. If _cjsResolve_ is _true_ then,
 >       1. Throw a _Invalid Module Name_ error.
->    1. Set _format_ to _"esm"_.
+>    1. Set _format_ to _"module"_.
 > 1. Otherwise if _resolved_ ends with _".js"_ then,
->    1. Set _format_ to _"cjs"_.
+>    1. Set _format_ to _"commonjs"_.
 > 1. Otherwise if _resolved_ ends with _".json"_ then,
 >    1. Set _format_ to _"json"_.
 > 1. Otherwise if _resolved_ ends with _".node"_ then,

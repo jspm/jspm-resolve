@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "description": "jspm 2.0 NodeJS resolver",
   "main": "resolve.js",
+  "type": "commonjs",
   "mode": "cjs",
   "scripts": {
     "test": "jspm test/test.js"

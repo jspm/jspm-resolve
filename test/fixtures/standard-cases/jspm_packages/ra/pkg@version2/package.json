@@ -5,7 +5,7 @@
       "default": "./b.js"
     }
   },
-  "mode": "esm",
+  "type": "module",
   "peerDependencies": {
     "pkg": "1.2.3"
   }

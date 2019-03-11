@@ -477,7 +477,7 @@ async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProject
       const mapped = applyMap('.' + subPath, pkgConfig.map, env);
       if (mapped !== undefined) {
         if (mapped === '@empty' || mapped === '@empty.dew')
-          return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
+          return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'module' } : { resolved: mapped, format: 'builtin' };
         resolved = pkgPath + '/' + mapped;
       }
     }
@@ -514,7 +514,7 @@ function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPa
       const mapped = applyMap('.' + subPath, pkgConfig.map, env);
       if (mapped !== undefined) {
         if (mapped === '@empty' || mapped === '@empty.dew')
-          return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
+          return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'module' } : { resolved: mapped, format: 'builtin' };
         resolved = pkgPath + '/' + mapped;
       }
     }
@@ -578,8 +578,8 @@ function builtinResolve (name, browserBuiltins) {
       if (browserBuiltins[browserBuiltins.length - 1] !== '/')
         browserBuiltins += '/';
       if (nodeCoreBrowserUnimplemented[name])
-        return { resolved: browserBuiltins + '@empty.js', format: 'esm' };
-      return { resolved: browserBuiltins + name + '.js', format: 'esm' };
+        return { resolved: browserBuiltins + '@empty.js', format: 'module' };
+      return { resolved: browserBuiltins + name + '.js', format: 'module' };
     }
     return { resolved: name, format: 'builtin' };
   }
@@ -641,7 +641,7 @@ function nodePackageResolve (resolvedPath, parentPath, cjsResolve, realpath, env
     const mapped = applyMap(relPath, pcfg.map, env);
     if (mapped !== undefined) {
       if (mapped === '@empty' || mapped === '@empty.dew')
-        return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'esm' } : { resolved: mapped, format: 'builtin' };
+        return env.browser ? { resolved: browserBuiltins + mapped + '.js', format: 'module' } : { resolved: mapped, format: 'builtin' };
       resolvedPath = packagePath + '/' + mapped;
     }
   }
@@ -650,7 +650,7 @@ function nodePackageResolve (resolvedPath, parentPath, cjsResolve, realpath, env
 
 async function finalizeResolve (resolved, jspmProjectPath, cjsResolve, isMain, cache) {
   if (resolved.endsWith('.mjs'))
-    return { resolved, format: 'esm' };
+    return { resolved, format: 'module' };
   if (resolved.endsWith('.node'))
     return { resolved, format: 'addon' };
   if (cjsResolve && resolved.endsWith('.json'))
@@ -658,22 +658,22 @@ async function finalizeResolve (resolved, jspmProjectPath, cjsResolve, isMain, c
   if (!isMain && !resolved.endsWith('.js'))
     return { resolved, format: 'unknown' };
   if (cjsResolve)
-    return { resolved, format: 'cjs' };
+    return { resolved, format: 'commonjs' };
   const boundary = await getPackageBoundary.call(this, resolved, cache);
   let cjs = !jspmProjectPath;
   if (boundary) {
     const pcfg = await this.readPackageConfig(boundary, cache);
-    if (pcfg && pcfg.mode) {
-      if (pcfg.mode === 'cjs') cjs = true;
-      if (pcfg.mode === 'esm') cjs = false;
+    if (pcfg && pcfg.type) {
+      if (pcfg.type === 'commonjs') cjs = true;
+      if (pcfg.type === 'module') cjs = false;
     }
   }
-  return { resolved, format: cjs ? 'cjs' : 'esm' };
+  return { resolved, format: cjs ? 'commonjs' : 'module' };
 }
 
 function finalizeResolveSync (resolved, jspmProjectPath, cjsResolve, isMain, cache) {
   if (resolved.endsWith('.mjs'))
-    return { resolved, format: 'esm' };
+    return { resolved, format: 'module' };
   if (resolved.endsWith('.node'))
     return { resolved, format: 'addon' };
   if (cjsResolve && resolved.endsWith('.json'))
@@ -681,17 +681,17 @@ function finalizeResolveSync (resolved, jspmProjectPath, cjsResolve, isMain, cac
   if (!isMain && !resolved.endsWith('.js'))
     return { resolved, format: 'unknown' };
   if (cjsResolve)
-    return { resolved, format: 'cjs' };
+    return { resolved, format: 'commonjs' };
   const boundary = getPackageBoundarySync.call(this, resolved, cache);
   let cjs = !jspmProjectPath;
   if (boundary) {
     const pcfg = this.readPackageConfigSync(boundary, cache);
-    if (pcfg && pcfg.mode) {
-      if (pcfg.mode === 'cjs') cjs = true;
-      if (pcfg.mode === 'esm') cjs = false;
+    if (pcfg && pcfg.type) {
+      if (pcfg.type === 'commonjs') cjs = true;
+      if (pcfg.type === 'module') cjs = false;
     }
   }
-  return { resolved, format: cjs ? 'cjs' : 'esm' };
+  return { resolved, format: cjs ? 'commonjs' : 'module' };
 }
 
 function legacyFileResolve (path, parentPath, cjsResolve, cache) {
@@ -731,16 +731,16 @@ function nodeFinalizeResolve (resolved, parentPath, cjsResolve, realpath, isMain
   if (resolved.endsWith('.mjs')) {
     if (cjsResolve)
       throwInvalidModuleName(`Cannot load ".mjs" module ${resolved} from CommonJS module ${parentPath}.`);
-    return { resolved, format: 'esm' };
+    return { resolved, format: 'module' };
   }
   if (resolved.endsWith('.js'))
-    return { resolved, format: 'cjs' };
+    return { resolved, format: 'commonjs' };
   if (resolved.endsWith('.json'))
     return { resolved, format: 'json' };
   if (resolved.endsWith('.node'))
     return { resolved, format: 'addon' };
   if (isMain)
-    return { resolved, format: cjsResolve ? 'cjs' : 'esm' };
+    return { resolved, format: cjsResolve ? 'commonjs' : 'module' };
   return { resolved, format: 'unknown' };
 }
 
@@ -1154,7 +1154,7 @@ function processPjsonConfig (pjson) {
   const pcfg = {
     main: typeof pjson.main === 'string' ? stripLeadingDotsAndTrailingSlash(pjson.main) : undefined,
     map: typeof pjson.map === 'object' ? pjson.map : undefined,
-    mode: pjson.mode === 'esm' || pjson.mode === 'cjs' ? pjson.mode : undefined
+    type: pjson.type === 'module' || pjson.type === 'commonjs' ? pjson.type : undefined
   };
 
   let mainMap;

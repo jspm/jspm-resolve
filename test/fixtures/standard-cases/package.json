@@ -1,6 +1,6 @@
 {
   "name": "standard-case",
-  "mode": "cjs",
+  "type": "commonjs",
   "main": "./lib.js",
   "map": {
     "a": "./b",

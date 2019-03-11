@@ -1,5 +1,8 @@
 import module from 'module';
 import jspmResolve from './resolve.js';
+import process from 'process';
+
+const shortFormat = parseInt(process.versions.node.split('.')[0]) < 12;
 
 const filePrefix = 'file://' + (process.platform === 'win32' ? '/' : '');
 
@@ -23,6 +26,14 @@ export async function resolve (name, parentUrl) {
   }
 
   const url = format === 'builtin' ? resolved : filePrefix + encodeURI(resolved).replace(/#/g, encodeURIComponent);
+
+  if (shortFormat) {
+    if (format === 'module')
+      format = 'esm';
+    else if (format === 'commonjs')
+      format = 'cjs';
+  }
+
   return { url, format };
 }
 
