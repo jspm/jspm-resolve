@@ -245,7 +245,7 @@ async function resolve (name, parentPath, {
 
   // not a jspm project -> node_modules resolve
   if (!jspmProjectPath)
-    return nodeModulesResolve.call(utils, name, parentPath, cjsResolve, env, cache);
+    return nodeModulesResolve.call(utils, name, parentPath, cjsResolve, browserBuiltins, env, cache);
 
   validatePlain(name);
 
@@ -313,7 +313,7 @@ function resolveSync (name, parentPath, {
 
   // not a jspm project -> node_modules resolve
   if (!jspmProjectPath)
-    return nodeModulesResolve.call(utils, name, parentPath, cjsResolve, env, cache);
+    return nodeModulesResolve.call(utils, name, parentPath, cjsResolve, browserBuiltins, env, cache);
 
   validatePlain(name);
 
@@ -585,7 +585,7 @@ function builtinResolve (name, browserBuiltins) {
   }
 }
 
-function nodeModulesResolve (name, parentPath, cjsResolve, env, cache) {
+function nodeModulesResolve (name, parentPath, cjsResolve, browserBuiltins, env, cache) {
   let curParentPath = parentPath;
   let separatorIndex;
   let pkgName, pkgSubpath;
