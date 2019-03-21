@@ -451,8 +451,6 @@ function relativeResolveSync (name, parentPath, jspmProjectPath, cjsResolve, isM
 async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache) {
   let resolved;
   const jspmConfig = await this.readJspmConfig(jspmProjectPath, cache);
-  if (!jspmConfig)
-    return;
   const resolvedPkgName = await this.packageResolve(name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
   if (!resolvedPkgName)
     return;
@@ -488,8 +486,6 @@ async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProject
 function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache) {
   let resolved;
   const jspmConfig = this.readJspmConfigSync(jspmProjectPath, cache);
-  if (!jspmConfig)
-    return;
   const resolvedPkgName = this.packageResolveSync(name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
   if (!resolvedPkgName)
     return;
@@ -538,26 +534,6 @@ function getPackageConfigSync (resolved, jspmProjectPath, cache) {
   const pkgPath = pkg ? packageToPath(pkg.name, jspmProjectPath) : jspmProjectPath;
   const pkgConfig = pkgPath ? this.readPackageConfigSync(pkgPath, cache) : undefined;
   return { pkg, pkgPath, pkgConfig };
-}
-
-async function getPackageBoundary (resolved, cache) {
-  const rootSeparatorIndex = resolved.indexOf('/');
-  let separatorIndex;
-  while ((separatorIndex = resolved.lastIndexOf('/')) > rootSeparatorIndex) {
-    resolved = resolved.substr(0, separatorIndex);
-    if (await this.isFile(resolved + '/package.json', cache))
-      return resolved;
-  }
-}
-
-function getPackageBoundarySync (resolved, cache) {
-  const rootSeparatorIndex = resolved.indexOf('/');
-  let separatorIndex;
-  while ((separatorIndex = resolved.lastIndexOf('/')) > rootSeparatorIndex) {
-    resolved = resolved.substr(0, separatorIndex);
-    if (this.isFileSync(resolved + '/package.json', cache))
-      return resolved;
-  }
 }
 
 const builtins = {
@@ -659,7 +635,7 @@ async function finalizeResolve (resolved, jspmProjectPath, cjsResolve, isMain, c
     return { resolved, format: 'unknown' };
   if (cjsResolve)
     return { resolved, format: 'commonjs' };
-  const boundary = await getPackageBoundary.call(this, resolved, cache);
+  const boundary = await this.getPackageBoundary(resolved, cache);
   let cjs = !jspmProjectPath;
   if (boundary) {
     const pcfg = await this.readPackageConfig(boundary, cache);
@@ -682,7 +658,7 @@ function finalizeResolveSync (resolved, jspmProjectPath, cjsResolve, isMain, cac
     return { resolved, format: 'unknown' };
   if (cjsResolve)
     return { resolved, format: 'commonjs' };
-  const boundary = getPackageBoundarySync.call(this, resolved, cache);
+  const boundary = this.getPackageBoundarySync(resolved, cache);
   let cjs = !jspmProjectPath;
   if (boundary) {
     const pcfg = this.readPackageConfigSync(boundary, cache);
@@ -799,6 +775,26 @@ const resolveUtils = {
     }
     while (separatorIndex > rootSeparatorIndex);
   },
+
+  async getPackageBoundary (resolved, cache) {
+    const rootSeparatorIndex = resolved.indexOf('/');
+    let separatorIndex;
+    while ((separatorIndex = resolved.lastIndexOf('/')) > rootSeparatorIndex) {
+      resolved = resolved.substr(0, separatorIndex);
+      if (await this.isFile(resolved + '/package.json', cache))
+        return resolved;
+    }
+  },
+  
+  getPackageBoundarySync (resolved, cache) {
+    const rootSeparatorIndex = resolved.indexOf('/');
+    let separatorIndex;
+    while ((separatorIndex = resolved.lastIndexOf('/')) > rootSeparatorIndex) {
+      resolved = resolved.substr(0, separatorIndex);
+      if (this.isFileSync(resolved + '/package.json', cache))
+        return resolved;
+    }
+  },
   
   async readJspmConfig (jspmProjectPath, cache) {
     if (cache) {
@@ -812,8 +808,9 @@ const resolveUtils = {
       source = await this.readFile(jspmProjectPath + '/jspm.json');
     }
     catch (e) {
-      if (e.code === 'ENOENT')
-        return undefined;
+      if (e.code === 'ENOENT') {
+        throwInvalidConfig(`Unable to resolve in jspm project as jspm.json does not exist in ${jspmProjectPath}`);
+      }
       throw e;
     }
 
@@ -849,8 +846,9 @@ const resolveUtils = {
       source = this.readFileSync(jspmProjectPath + '/jspm.json');
     }
     catch (e) {
-      if (e.code === 'ENOENT')
-        return undefined;
+      if (e.code === 'ENOENT') {
+        throwInvalidConfig(`Unable to resolve in jspm project as jspm.json does not exist in ${jspmProjectPath}`);
+      }
       throw e;
     }
 
