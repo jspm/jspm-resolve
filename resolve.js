@@ -1152,7 +1152,11 @@ function processPjsonConfig (pjson) {
   const pcfg = {
     main: typeof pjson.main === 'string' ? stripLeadingDotsAndTrailingSlash(pjson.main) : undefined,
     map: typeof pjson.map === 'object' ? pjson.map : undefined,
-    type: pjson.type === 'module' || pjson.type === 'commonjs' ? pjson.type : undefined
+    type: pjson.type === 'module' || pjson.type === 'commonjs' ? pjson.type : undefined,
+    dependencies: pjson.dependencies,
+    devDependencies: pjson.devDependencies,
+    peerDependencies: pjson.peerDependencies,
+    optionalDependencies: pjson.optionalDependencies
   };
 
   let mainMap;
