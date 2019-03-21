@@ -192,7 +192,7 @@ Package names in canonical form are names of the form `registry:package@version`
 Valid package names satisfy the JS regular expression:
 
 ```js
-/^[a-z]+:(@[-_\.a-zA-Z\d]+\/)?[-_\.a-zA-Z\d]+@[^@<>:"/\|?*^\u0000-\u001F]+$/
+/^[a-z]+:(@[-a-zA-Z\d][-_\.a-zA-Z\d]*\/)?[-a-zA-Z\d][-_\.a-zA-Z\d]*@[^@<>:"/\|?*^\u0000-\u001F]+$/
 ```
 
 Package names must consist of either one or two path segments with a version - `registry:x@version` or `registry:@base/x@version`. The `@` prefix is required for two-segment package names in order to ensure the package scope remains statically determinable for any project path.
