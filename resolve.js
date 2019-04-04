@@ -251,6 +251,14 @@ async function resolve (name, parentPath, {
 
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = await getPackageConfig.call(utils, parentPath, jspmProjectPath, cache);
 
+  // package "name" resolution support
+  if (parentPkgConfig.name) {
+    if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
+      const subPath = name.substr(parentPkgConfig.name.length);
+      return jspmPackageResolve.call(utils, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+    }
+  }
+
   // parent package map configuration
   if (parentPkgConfig && parentPkgConfig.map) {
     const mapped = applyMap(name, parentPkgConfig.map, env);
@@ -318,6 +326,14 @@ function resolveSync (name, parentPath, {
   validatePlain(name);
 
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = getPackageConfigSync.call(utils, parentPath, jspmProjectPath, cache);
+
+  // package "name" resolution support
+  if (parentPkgConfig.name) {
+    if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[name.length] === '/')) {
+      const subPath = name.substr(parentPkgConfig.length);
+      return jspmPackageResolveSync.call(this, pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+    }
+  }
 
   // parent package map configuration
   if (parentPkgConfig && parentPkgConfig.map) {
@@ -449,7 +465,6 @@ function relativeResolveSync (name, parentPath, jspmProjectPath, cjsResolve, isM
 }
 
 async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache) {
-  let resolved;
   const jspmConfig = await this.readJspmConfig(jspmProjectPath, cache);
   const resolvedPkgName = await this.packageResolve(name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
   if (!resolvedPkgName)
@@ -458,12 +473,29 @@ async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProject
   if (!resolvedPkg)
     throwInvalidConfig(`${resolvedPkgName} is an invalid resolution in the jspm config file for ${jspmProjectPath}.`);
   
-  let subPath = resolvedPkg.path;
   const pkgPath = packageToPath(resolvedPkg.name, jspmProjectPath);
   const pkgConfig = await this.readPackageConfig(pkgPath, cache);
 
-  resolved = pkgPath + subPath;
+  return jspmPackageResolve.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, env, cache);
+}
+
+function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache) {
+  const jspmConfig = this.readJspmConfigSync(jspmProjectPath, cache);
+  const resolvedPkgName = this.packageResolveSync(name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
+  if (!resolvedPkgName)
+    return;
+  const resolvedPkg = parsePackageName(resolvedPkgName);
+  if (!resolvedPkg)
+    throwInvalidConfig(`${resolvedPkgName} is an invalid resolution in the jspm config file for ${jspmProjectPath}.`);
   
+  const pkgPath = packageToPath(resolvedPkg.name, jspmProjectPath);
+  const pkgConfig = this.readPackageConfigSync(pkgPath, cache);
+
+  return jspmPackageResolveSync.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, env, cache);
+}
+
+function jspmPackageResolve (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache) {
+  let resolved = pkgPath + subPath;
   if (pkgConfig !== undefined) {
     if (subPath.length === 0) {
       if (pkgConfig.main === undefined)
@@ -483,22 +515,8 @@ async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProject
   return finalizeResolve.call(this, resolved, jspmProjectPath, cjsResolve, isMain, cache);
 }
 
-function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache) {
-  let resolved;
-  const jspmConfig = this.readJspmConfigSync(jspmProjectPath, cache);
-  const resolvedPkgName = this.packageResolveSync(name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
-  if (!resolvedPkgName)
-    return;
-  const resolvedPkg = parsePackageName(resolvedPkgName);
-  if (!resolvedPkg)
-    throwInvalidConfig(`${resolvedPkgName} is an invalid resolution in the jspm config file for ${jspmProjectPath}.`);
-  
-  let subPath = resolvedPkg.path;
-  const pkgPath = packageToPath(resolvedPkg.name, jspmProjectPath);
-  const pkgConfig = this.readPackageConfigSync(pkgPath, cache);
-
-  resolved = pkgPath + subPath;
-  
+function jspmPackageResolveSync (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache) {
+  let resolved = pkgPath + subPath;
   if (pkgConfig !== undefined) {
     if (subPath.length === 0) {
       if (pkgConfig.main === undefined)
@@ -1149,7 +1167,17 @@ function applyMap (name, parentMap, env) {
 
 resolve.processPjsonConfig = processPjsonConfig;
 function processPjsonConfig (pjson) {
+  let name;
+  if (typeof pjson.name === 'string') {
+    try {
+      validatePlain(pjson.name);
+      name = pjson.name;
+    }
+    catch (e) {}
+  }
+
   const pcfg = {
+    name: name,
     main: typeof pjson.main === 'string' ? stripLeadingDotsAndTrailingSlash(pjson.main) : undefined,
     map: typeof pjson.map === 'object' ? pjson.map : undefined,
     type: pjson.type === 'module' || pjson.type === 'commonjs' ? pjson.type : undefined,

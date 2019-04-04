@@ -119,6 +119,20 @@ suite('Standard Cases', () => {
     assert.equal(resolved, pkgPath);
   });
 
+  test('Package name loading', async () => {
+    var { resolved } = await jspmResolve('standard-case', sfPath, { cache });
+    assert.equal(resolved, sfPath + 'lib.js');
+
+    var { resolved } = await jspmResolve('standard-case/lib.js', sfPath, { cache });
+    assert.equal(resolved, sfPath + 'lib.js');
+
+    var { resolved } = await jspmResolve('standard-case/lib.js', sfPath, { cache });
+    assert.equal(resolved, sfPath + 'lib.js');
+
+    var { resolved } = await jspmResolve('standard-case/rel', sfPath, { cache, cjsResolve: true });
+    assert.equal(resolved, sfPath + 'd');
+  });
+
   test('Custom extensions', async () => {
     var { resolved } = await jspmResolve('pkg2/custom.ext', sfPath, { cache });
     assert.equal(resolved, pkg2Path + 'custom.ext');

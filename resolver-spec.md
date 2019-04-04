@@ -55,6 +55,10 @@ By default jspm treats all package scopes as `"type": "module"` unless (a) they 
 
 Custom assets can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
 
+#### Own Name Loading
+
+Packages can load their own root using the `"name"` field of the package.json.
+
 ### Package Configuration
 
 #### Map Configuration
@@ -285,6 +289,7 @@ The process of reading the package.json configuration for a given package path i
 > 1. Let _type_ be set to _undefined_.
 > 1. If _pjson.type_ is equal to _"commonjs"_ or _"module"_ then,
 >    1. Set _type_ to _pjson.type_.
+> 1. Let _name_ be equal to the value of _pjson.name_ if a string and a valid package name, or _undefined_ otherwise.
 > 1. Let _main_ be equal to the value of _pjson.main_ if a string or _undefined_ otherwise.
 > 1. If _main_ is defined then,
 >    1. If _main_ starts with _"./"_ then,
@@ -314,7 +319,7 @@ The process of reading the package.json configuration for a given package path i
 >       1. If _target_ is equal to _false_ then,
 >          1. Set _target_ to _"@empty"_.
 >       1. Set _map[match] to the object _{ browser: pjson.browser[name] }_.
-> 1. Return the object with properties _{ path, main, map, type }_.
+> 1. Return the object with properties _{ path, name, main, map, type }_.
 
 > **GET_PACKAGE_CONFIG(resolved: String, jspmProjectPath: String)**
 > 1. If _jspmProjectPath_ is _undefined_ then,
@@ -454,6 +459,10 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _name_ contains any _"\"_ character then,
 >    1. Throw an _Invalid Module Name_ error.
 > 1. Let _parentPackage_ be the result of _GET_PACKAGE_CONFIG(parentPath, projectPath)_.
+> 1. If _packageConfig?.name_ is defined then,
+>    1. If _name_ is equal to _packageConfig.name_ or _name_ starts with _packageConfig.name_ followed by _"/"_ then,
+>       1. Let _subPath_ be the substring of _name_ from the length of _packageConfig.name_.
+>       1. Return _JSPM_PACKAGE_RESOLVE(packageConfig, subPath, cjsResolve, isMain)_.
 > 1. Let _mapped_ be the value of _APPLY_MAP(name, packageConfig?.map)_
 > 1. If _mapped_ is not _undefined_ then,
 >    1. If _mapped_ starts with _"./"_ then,
@@ -520,24 +529,26 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _packageName_ is _undefined_ then,
 >    1. Return _undefined_.
 > 1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_CANONICAL(packageName)_.
-> 1. Let _subPath_ be _resolvedPackage.path_.
 > 1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(resolvedPackage.name, projectPath)_.
-> 1. Let _resolved_ be _${packagePath}${subPath}"_.
 > 1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
-> 1. If _cjsResolve_ is equal to _true_ then,
->    1. Return _NODE_PACKAGE_RESOLVE(_${packagePath}${subPath}", false, false, packagePath, packageConfig, isMain)_.
+> 1. Return the result of _JSPM_PACKAGE_RESOLVE(packageConfig, resolvedPackage.path, cjsResolve, isMain)_.
+
+> **JSPM_PACKAGE_RESOLVE(packageConfig: Object, subPath: String, cjsResolve, isMain)**
+> 1. Let _resolved_ be the concatenation of _packageConfig.path_ and _subPath_.
 > 1. If _packageConfig_ is not _undefined_ then,
 >    1. If _subPath_ is the empty string then,
 >       1. If _packageConfig.main_ is _undefined_ then,
 >          1. Throw a _Module Not Found_ error.
 >       1. Set _subPath_ to _"/${packageConfig.main}"_.
->       1. Set _resolved_ be _${packagePath}${subPath}"_.
->    1. If _packageMap_ is not _undefined_ then,
->       1. Let _mapped_ be the value of  _APPLY_MAP(".${subPath}", packageMap)_.
+>       1. Set _resolved_ to _${packagePath}${subPath}"_.
+>    1. If _packageConfig.map_ is not _undefined_ then,
+>       1. Let _mapped_ be the value of  _APPLY_MAP(".${subPath}", packageConfig.map)_.
 >       1. If _mapped_ is not _undefined_ then,
 >          1. If _mapped_ is equal to _"@empty"_ then,
 >             1. Return _{ resolved: "@empty", format: "builtin" }_.
->          1. Set _resolved_ to the path resolution of _mapped_ relative to base _packagePath_.
+>          1. Set _resolved_ to the path resolution of _mapped_ relative to base _packageConfig.path_.
+> 1. If _cjsResolve_ is equal to _true_ then,
+>    1. Return _NODE_PACKAGE_RESOLVE(_${packagePath}${subPath}", false, false, packagePath, packageConfig, isMain)_.
 > 1. Return _FINALIZE_RESOLVE(resolved, cjsResolve, isMain)_.
 
 > **FINALIZE_RESOLVE(resolved: String, jspmProjectPath: String, cjsResolve: Boolean, isMain: Boolean)**
