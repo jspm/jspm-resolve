@@ -251,12 +251,10 @@ async function resolve (name, parentPath, {
 
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = await getPackageConfig.call(utils, parentPath, jspmProjectPath, cache);
 
-  // package "name" resolution support
-  if (parentPkgConfig.name) {
-    if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
-      const subPath = name.substr(parentPkgConfig.name.length);
-      return jspmPackageResolve.call(utils, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
-    }
+  // package relative "~" support
+  if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
+    const subPath = name.substr(1);
+    return jspmPackageResolve.call(utils, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
   }
 
   // parent package map configuration
@@ -328,11 +326,10 @@ function resolveSync (name, parentPath, {
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = getPackageConfigSync.call(utils, parentPath, jspmProjectPath, cache);
 
   // package "name" resolution support
-  if (parentPkgConfig.name) {
-    if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[name.length] === '/')) {
-      const subPath = name.substr(parentPkgConfig.length);
-      return jspmPackageResolveSync.call(this, pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
-    }
+  // package relative "~" support
+  if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
+    const subPath = name.substr(1);
+    return jspmPackageResolveSync.call(utils, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
   }
 
   // parent package map configuration

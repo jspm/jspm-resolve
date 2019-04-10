@@ -119,17 +119,17 @@ suite('Standard Cases', () => {
     assert.equal(resolved, pkgPath);
   });
 
-  test('Package name loading', async () => {
-    var { resolved } = await jspmResolve('standard-case', sfPath, { cache });
+  test('Package scope-relative loading', async () => {
+    var { resolved } = await jspmResolve('~', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = await jspmResolve('standard-case/lib.js', sfPath, { cache });
+    var { resolved } = await jspmResolve('~/lib.js', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = await jspmResolve('standard-case/lib.js', sfPath, { cache });
+    var { resolved } = await jspmResolve('~/lib.js', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = await jspmResolve('standard-case/rel', sfPath, { cache, cjsResolve: true });
+    var { resolved } = await jspmResolve('~/rel', sfPath, { cache, cjsResolve: true });
     assert.equal(resolved, sfPath + 'd');
   });
 
@@ -343,6 +343,21 @@ suite('Standard Cases', () => {
 
     var { resolved } = jspmResolve.sync('..', pkgPath + 'sub/path.js', { cache: cache });
     assert.equal(resolved, pkgPath);
+  });
+
+
+  test('Package scope-relative loading', async () => {
+    var { resolved } = jspmResolve.sync('~', sfPath, { cache });
+    assert.equal(resolved, sfPath + 'lib.js');
+
+    var { resolved } = jspmResolve.sync('~/lib.js', sfPath, { cache });
+    assert.equal(resolved, sfPath + 'lib.js');
+
+    var { resolved } = jspmResolve.sync('~/lib.js', sfPath, { cache });
+    assert.equal(resolved, sfPath + 'lib.js');
+
+    var { resolved } = jspmResolve.sync('~/rel', sfPath, { cache, cjsResolve: true });
+    assert.equal(resolved, sfPath + 'd');
   });
 
   test('Custom extensions', async () => {
