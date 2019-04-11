@@ -251,6 +251,13 @@ async function resolve (name, parentPath, {
 
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = await getPackageConfig.call(utils, parentPath, jspmProjectPath, cache);
 
+  // package "name" resolution support  
+  if (parentPkgConfig.name) {
+    if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
+      const subPath = name.substr(parentPkgConfig.name.length);
+      return jspmPackageResolve.call(utils, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+    }
+  }
   // package relative "~" support
   if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
     const subPath = name.substr(1);
@@ -326,6 +333,12 @@ function resolveSync (name, parentPath, {
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = getPackageConfigSync.call(utils, parentPath, jspmProjectPath, cache);
 
   // package "name" resolution support
+  if (parentPkgConfig.name) {
+    if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
+      const subPath = name.substr(parentPkgConfig.name.length);
+      return jspmPackageResolveSync.call(utils, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+    }
+  }
   // package relative "~" support
   if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
     const subPath = name.substr(1);
@@ -1164,7 +1177,16 @@ function applyMap (name, parentMap, env) {
 
 resolve.processPjsonConfig = processPjsonConfig;
 function processPjsonConfig (pjson) {
+  let name;
+  if (typeof pjson.name === 'string') {
+    try {
+      validatePlain(pjson.name);
+      name = pjson.name;
+    }
+    catch (e) {}
+  }
   const pcfg = {
+    name: name,
     main: typeof pjson.main === 'string' ? stripLeadingDotsAndTrailingSlash(pjson.main) : undefined,
     map: typeof pjson.map === 'object' ? pjson.map : undefined,
     type: pjson.type === 'module' || pjson.type === 'commonjs' ? pjson.type : undefined,
