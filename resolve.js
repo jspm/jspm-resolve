@@ -1053,7 +1053,7 @@ const resolveUtils = {
   readPackageConfigSync
 };
 
-const fsUtils = {
+const fsUtils = Object.freeze({
   isDirSync (path, cache) {
     const cached = cache && cache.isDirCache[path];
     if (cached !== undefined)
@@ -1135,11 +1135,12 @@ const fsUtils = {
   readFileSync (path) {
     return fs.readFileSync(path);
   }
-};
+});
 
 resolve.applyMap = applyMap;
 resolve.sync = resolveSync;
 resolve.utils = resolveUtils;
+resolve.fs = fsUtils;
 resolve.builtins = builtins;
 
 const winPathRegEx = /^[a-z]:\//i;
