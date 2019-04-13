@@ -55,10 +55,6 @@ By default jspm treats all package scopes as `"type": "module"` unless (a) they 
 
 Custom assets can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
 
-#### Package-relative loading
-
-Packages can load from their own paths using `~` syntax - `import '~'` or `import '~/path.js'`.
-
 ### Package Configuration
 
 #### Map Configuration
