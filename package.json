@@ -1,15 +1,14 @@
 {
   "name": "@jspm/resolve",
-  "version": "0.3.0",
-  "description": "jspm 2.0 NodeJS resolver",
+  "version": "1.0.0",
+  "description": "jspm 2.0 resolver",
   "main": "resolve.js",
-  "mode": "cjs",
   "scripts": {
     "test": "jspm test/test.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/jspm/resolve.git"
+    "url": "git://git@github.com/jspm/resolve.git"
   },
   "keywords": [
     "jspm",
