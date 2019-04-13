@@ -1,7 +1,5 @@
 # JSPM 2 Resolver
 
-This project contains the jspm 2 resolver.
-
 This implements the `jspm_packages/[registry]/[name]@[version]/` module resolution lookup while checking the rules defined in `package.json` and `json.json` for jspm.
 
 For the full detailed specification of jspm resolution, see the [jspm 2.0 resolver specification](https://github.com/jspm/jspm-resolve/blob/master/resolver-spec.md).
