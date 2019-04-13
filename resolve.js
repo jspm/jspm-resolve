@@ -241,7 +241,6 @@ async function resolve (name, parentPath, {
   cache,
   cjsResolve = false,
   fs = fsUtils,
-  // deprecated
   browserBuiltins = undefined // when env.browser is set, resolves builtins to this directory
 } = {}) {
   // necessary for bins to not have extensions
