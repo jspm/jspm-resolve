@@ -1237,21 +1237,6 @@ function processPjsonConfig (pjson) {
 
   let mainMap;
 
-  if (pjson.bin) {
-    let bin;
-    if (typeof pjson.bin !== 'object') {
-      bin = pjson.bin;
-    }
-    else {
-      if (typeof pjson.name === 'string' && pjson.bin[pjson.name] !== undefined)
-        bin = pjson.bin[pjson.name];
-      else
-        bin = Object.keys(pjson.bin)[0];
-    }
-    if (bin)
-      (mainMap = mainMap || {})['bin'] = stripLeadingDotsAndTrailingSlash(bin);
-  }
-
   if (typeof pjson['react-native'] === 'string')
     (mainMap = mainMap || {})['react-native'] = stripLeadingDotsAndTrailingSlash(pjson['react-native']);
 
