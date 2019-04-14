@@ -24,7 +24,6 @@ const filePrefix = 'file://' + (process.platform === 'win32' ? '/' : '');
 
 const cache = {};
 
-module._nodeModulePaths = () => [];
 module._resolveFilename = (request, parent) => jspmResolve.cjsResolve(request, { ...parent, cache });
 
 export async function resolve (name, parentUrl) {
