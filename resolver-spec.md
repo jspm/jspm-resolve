@@ -446,9 +446,9 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Assert _parentPath_ is a valid absolute file system path.
 > 1. If _name_ contains the substring _"%2F"_ or _"%5C"_ then,
 >    1. Throw an _Invalid Module Name_ error.
-> 1. Let _jspmProjectPath_ be the result of _GET_JSPM_PROJECT_PATH(parentPath)_.
 > 1. If _IS_PLAIN(name)_ is _false_ then,
->    1. Return the result of _RELATIVE_RESOLVE(name, parentPath, jspmProjectPath, cjsResolve, isMain)_.
+>    1. Return the result of _RELATIVE_RESOLVE(name, parentPath, cjsResolve, isMain)_.
+> 1. Let _jspmProjectPath_ be the result of _GET_JSPM_PROJECT_PATH(parentPath)_.
 > 1. If _jspmProjectPath_ is _undefined_ then,
 >    1. Note: This should be extended to support any future Node.js resolution specs.
 >    1. Return _NODE_MODULES_RESOLVE(name, parentPath, cjsResolve)_.
@@ -496,10 +496,13 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. If _name_ is not a valid file URL then,
 >       1. Throw an _Invalid Module Name_ error.
 >    1. Set _resolved_ to the absolute file system path of the file URL _name_.
+> 1. Let _jspmProjectPath_ be the result of _GET_JSPM_PROJECT_PATH(resolved)_.
 > 1. If _cjsResolve_ is equal to _true_ then,
->    1. Let _parentPackage_ be the result of _GET_PACKAGE_CONFIG(resolved, projectPath)_.
+>    1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
+>    1. If _scope_ is not _undefined_ then,
+>       1. Let _pjson_ be the result of _READ_PACKAGE_JSON("${scope}/package.json")_.
 >    1. Let _realpath_ be the boolean indicating if _jspmProjectPath_ is _undefined_ or _resolved_ is not contained within _jspmProjectPath_.
->    1. Return _NODE_PACKAGE_RESOLVE(resolved, false, realpath, parentPackage.path, parentPackage.config, isMain)_.
+>    1. Return _NODE_PACKAGE_RESOLVE(resolved, false, realpath, scope, pjson, isMain)_.
 > 1. Return _FINALIZE_RESOLVE(resolved, jspmProjectPath, isMain)_.
 
 > **JSPM_PROJECT_RESOLVE(name: String, parentPackage: Object, jspmProjectPath: String, cjsResolve: Boolean, isMain: Boolean)**

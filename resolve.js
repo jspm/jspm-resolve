@@ -260,12 +260,12 @@ async function resolve (name, parentPath, {
   else {
     env = defaultEnv;
   }
-  
-  const jspmProjectPath = await getJspmProjectPath.call(fs, parentPath, cache);
 
-  const relativeResolved = await relativeResolve.call(fs, name, parentPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+  const relativeResolved = await relativeResolve.call(fs, name, parentPath, cjsResolve, isMain, env, cache);
   if (relativeResolved)
     return relativeResolved;
+
+  const jspmProjectPath = await getJspmProjectPath.call(fs, parentPath, cache);
 
   // not a jspm project -> node_modules resolve
   if (!jspmProjectPath)
@@ -341,12 +341,12 @@ function resolveSync (name, parentPath, {
   else {
     env = defaultEnv;
   }
-  
-  const jspmProjectPath = getJspmProjectPathSync.call(fs, parentPath, cache);
 
-  const relativeResolved = relativeResolveSync.call(fs, name, parentPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+  const relativeResolved = relativeResolveSync.call(fs, name, parentPath, cjsResolve, isMain, env, cache);
   if (relativeResolved)
     return relativeResolved;
+
+  const jspmProjectPath = getJspmProjectPathSync.call(fs, parentPath, cache);
 
   // not a jspm project -> node_modules resolve
   if (!jspmProjectPath)
@@ -398,7 +398,7 @@ function resolveSync (name, parentPath, {
   throw throwModuleNotFound(name, parentPath);
 }
 
-async function relativeResolve (name, parentPath, jspmProjectPath, cjsResolve, isMain, env, cache) {
+async function relativeResolve (name, parentPath, cjsResolve, isMain, env, cache) {
   let resolved;
   if (name[0] === '/') {
     name = name.replace(winSepRegEx, '/');
@@ -437,18 +437,21 @@ async function relativeResolve (name, parentPath, jspmProjectPath, cjsResolve, i
   if (!resolved)
     return;
 
+  const jspmProjectPath = await getJspmProjectPath.call(this, resolved, cache);
+
   if (cjsResolve) {
-    const { pkgPath, pkgConfig } = await getPackageConfig.call(this, resolved, jspmProjectPath, cache);
     if (resolved[resolved.length - 1] === '/')
       resolved = resolved.substr(0, resolved.length - 1);
+    const boundary = await getPackageBoundary.call(this, resolved + '/', cache);
+    const pcfg = await readPackageConfig.call(this, boundary, cache);
     const realpath = !jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved[jspmProjectPath.length] !== '/';
-    return nodePackageResolve.call(this, resolved, parentPath, false, realpath, env, pkgPath, pkgConfig, isMain, cache);
+    return nodePackageResolve.call(this, resolved, parentPath, false, realpath, env, boundary, pcfg, isMain, cache);
   }
 
   return finalizeResolve.call(this, resolved, jspmProjectPath, cjsResolve, isMain, cache);
 }
 
-function relativeResolveSync (name, parentPath, jspmProjectPath, cjsResolve, isMain, env, cache) {
+function relativeResolveSync (name, parentPath, cjsResolve, isMain, env, cache) {
   let resolved;
   if (name[0] === '/') {
     name = name.replace(winSepRegEx, '/');
@@ -487,12 +490,15 @@ function relativeResolveSync (name, parentPath, jspmProjectPath, cjsResolve, isM
   if (!resolved)
     return;
 
+  const jspmProjectPath = getJspmProjectPathSync.call(this, resolved, cache);
+
   if (cjsResolve) {
-    const { pkgPath, pkgConfig } = getPackageConfigSync.call(this, resolved, jspmProjectPath, cache);
     if (resolved[resolved.length - 1] === '/')
       resolved = resolved.substr(0, resolved.length - 1);
+    const boundary = getPackageBoundarySync.call(this, resolved + '/', cache);
+    const pcfg = readPackageConfigSync.call(this, boundary, cache);
     const realpath = !jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved[jspmProjectPath.length] !== '/';
-    return nodePackageResolve.call(this, resolved, parentPath, false, realpath, env, pkgPath, pkgConfig, isMain, cache);
+    return nodePackageResolve.call(this, resolved, parentPath, false, realpath, env, boundary, pcfg, isMain, cache);
   }
 
   return finalizeResolveSync.call(this, resolved, jspmProjectPath, cjsResolve, isMain, cache);
