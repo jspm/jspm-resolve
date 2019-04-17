@@ -276,16 +276,16 @@ async function resolve (name, parentPath, {
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = await getPackageConfig.call(fs, parentPath, jspmProjectPath, cache);
 
   // package "name" resolution support  
-  if (parentPkgConfig.name) {
+  if (parentPkgConfig && parentPkgConfig.name) {
     if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
       const subPath = name.substr(parentPkgConfig.name.length);
-      return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+      return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
     }
   }
   // package relative "~" support
   if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
     const subPath = name.substr(1);
-    return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+    return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
   }
 
   // parent package map configuration
@@ -305,7 +305,7 @@ async function resolve (name, parentPath, {
   }
 
   // jspm lock file resolution
-  const jspmProjectResolved = await jspmProjectResolve.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache);
+  const jspmProjectResolved = await jspmProjectResolve.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
   if (jspmProjectResolved)
     return jspmProjectResolved;
 
@@ -357,16 +357,16 @@ function resolveSync (name, parentPath, {
   const { pkg: parentPkg, pkgPath: parentPkgPath, pkgConfig: parentPkgConfig } = getPackageConfigSync.call(fs, parentPath, jspmProjectPath, cache);
 
   // package "name" resolution support
-  if (parentPkgConfig.name) {
+  if (parentPkgConfig && parentPkgConfig.name) {
     if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
       const subPath = name.substr(parentPkgConfig.name.length);
-      return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+      return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
     }
   }
   // package relative "~" support
   if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
     const subPath = name.substr(1);
-    return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache);
+    return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
   }
 
   // parent package map configuration
@@ -386,7 +386,7 @@ function resolveSync (name, parentPath, {
   }
 
   // jspm lock file resolution
-  const jspmProjectResolved = jspmProjectResolveSync.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache);
+  const jspmProjectResolved = jspmProjectResolveSync.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
   if (jspmProjectResolved)
     return jspmProjectResolved;
 
@@ -498,7 +498,7 @@ function relativeResolveSync (name, parentPath, jspmProjectPath, cjsResolve, isM
   return finalizeResolveSync.call(this, resolved, jspmProjectPath, cjsResolve, isMain, cache);
 }
 
-async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache) {
+async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
   const jspmConfig = await readJspmConfig.call(this, jspmProjectPath, cache);
   const resolvedPkgName = await packageResolve.call(this, name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
   if (!resolvedPkgName)
@@ -510,10 +510,10 @@ async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProject
   const pkgPath = packageToPath(resolvedPkg.name, jspmProjectPath);
   const pkgConfig = await readPackageConfig.call(this, pkgPath, cache);
 
-  return jspmPackageResolve.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, env, cache);
+  return jspmPackageResolve.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
 }
 
-function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, env, cache) {
+function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
   const jspmConfig = readJspmConfigSync.call(this, jspmProjectPath, cache);
   const resolvedPkgName = packageResolveSync.call(this, name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
   if (!resolvedPkgName)
@@ -525,10 +525,10 @@ function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPa
   const pkgPath = packageToPath(resolvedPkg.name, jspmProjectPath);
   const pkgConfig = readPackageConfigSync.call(this, pkgPath, cache);
 
-  return jspmPackageResolveSync.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, env, cache);
+  return jspmPackageResolveSync.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
 }
 
-function jspmPackageResolve (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache) {
+function jspmPackageResolve (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
   let resolved = pkgPath + subPath;
   if (pkgConfig !== undefined) {
     if (subPath.length === 0) {
@@ -549,7 +549,7 @@ function jspmPackageResolve (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsRe
   return finalizeResolve.call(this, resolved, jspmProjectPath, cjsResolve, isMain, cache);
 }
 
-function jspmPackageResolveSync (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, env, cache) {
+function jspmPackageResolveSync (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
   let resolved = pkgPath + subPath;
   if (pkgConfig !== undefined) {
     if (subPath.length === 0) {
