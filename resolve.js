@@ -314,6 +314,10 @@ async function resolve (name, parentPath, {
   if (builtinResolved)
     return builtinResolved;
 
+  // node_modules fallback ONLY when not in a dependency package
+  if (!parentPkgConfig || parentPkgPath === jspmProjectPath)
+    return nodeModulesResolve.call(fs, name, parentPath, cjsResolve, browserBuiltins, env, cache);
+
   throw throwModuleNotFound(name, parentPath);
 }
 
@@ -394,6 +398,10 @@ function resolveSync (name, parentPath, {
   const builtinResolved = builtinResolve(name, env.browser ? browserBuiltins : undefined);
   if (builtinResolved)
     return builtinResolved;
+
+  // node_modules fallback ONLY when not in a dependency package
+  if (!parentPkgConfig || parentPkgPath === jspmProjectPath)
+    return nodeModulesResolve.call(fs, name, parentPath, cjsResolve, browserBuiltins, env, cache);
 
   throw throwModuleNotFound(name, parentPath);
 }

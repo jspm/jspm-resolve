@@ -455,9 +455,9 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _name_ contains any _"\"_ character then,
 >    1. Throw an _Invalid Module Name_ error.
 > 1. Let _parentPackage_ be the result of _GET_PACKAGE_CONFIG(parentPath, projectPath)_.
-> 1. If _packageConfig?.name_ is defined then,
->    1. If _name_ is equal to _packageConfig.name_ or _name_ starts with _packageConfig.name_ followed by _"/"_ then,
->       1. Let _subPath_ be the substring of _name_ from the length of _packageConfig.name_.
+> 1. If _parentPackage?.config?.name_ is defined then,
+>    1. If _name_ is equal to _parentPackage?.config?.name_ or _name_ starts with _parentPackage?.config?.name_ followed by _"/"_ then,
+>       1. Let _subPath_ be the substring of _name_ from the length of _parentPackage?.config?.name_.
 >       1. Return _JSPM_PACKAGE_RESOLVE(packageConfig, subPath, cjsResolve, isMain)_.
 > 1. Let _mapped_ be the value of _APPLY_MAP(name, packageConfig?.map)_
 > 1. If _mapped_ is not _undefined_ then,
@@ -476,8 +476,11 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Let _resolved_ to the result of _JSPM_PROJECT_RESOLVE(name, parentPackage, jspmProjectPath, cjsResolve, isMain)_.
 >    1. If _resolved_ is not equal to _undefined_ then,
 >       1. Return _resolved_.
+>    1. If _parentPackage?.path_ is equal to _jspmProjectPath_ then,
+>       1. Return _NODE_MODULES_RESOLVE(name, parentPath, cjsResolve)_.
 > 1. If _name_ is a builtin module or _"@empty"_ then,
 >    1.  Return the object _{ resolved: name, format: "builtin" }_.
+> 1. If _parentPackage?
 > 1. Throw a _Module Not Found_ error.
 
 > **RELATIVE_RESOLVE(name: String, parentPath: String, jspmProjectPath: String, cjsResolve: Boolean, isMain)**
