@@ -1248,6 +1248,11 @@ function processPjsonConfig (pjson) {
     peerDependencies: pjson.peerDependencies,
     optionalDependencies: pjson.optionalDependencies
   };
+  
+  // Override with jspm section if it exists.
+  if (typeof pjson.jspm === 'object') {
+    Object.assign(pcfg, pjson.jspm);
+  }
 
   let mainMap;
 
