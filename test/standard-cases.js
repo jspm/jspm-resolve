@@ -175,7 +175,7 @@ suite('Standard Cases', () => {
 
   test('Node Resolution fallback', async () => {
     try {
-      var { resolved } = await jspmResolve('mocha', sfPath, { cache });
+      var { resolved } = await jspmResolve('mochaa', sfPath, { cache });
       assert(false);
     }
     catch (e) {
@@ -402,7 +402,7 @@ suite('Standard Cases', () => {
 
   test('Node Resolution fallback', async () => {
     try {
-      var { resolved } = jspmResolve.sync('mocha', sfPath, { cache });
+      var { resolved } = jspmResolve.sync('mochaa', sfPath, { cache });
       assert(false);
     }
     catch (e) {
