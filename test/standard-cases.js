@@ -409,11 +409,20 @@ suite('Standard Cases', () => {
       assert.equal(e.code, 'MODULE_NOT_FOUND');
     }
 
-    var { resolved } = jspmResolve.sync('y/index', nmPath, { cache });
+    var { resolved, format } = jspmResolve.sync('y/index', nmPath, { cache });
     assert.equal(resolved, `${nmPath}node_modules/y/index.js`);
+    assert.equal(format, 'commonjs');
 
     var { resolved } = jspmResolve.sync('y/', nmPath, { cache });
     assert.equal(resolved, `${nmPath}node_modules/y/`);
+
+    var { resolved, format } = jspmResolve.sync('z/index', nmPath, { cache });
+    assert.equal(resolved, `${nmPath}node_modules/z/index`);
+    assert.equal(format, 'unknown');
+
+    var { resolved, format } = jspmResolve.sync('z/index.js', nmPath, { cache });
+    assert.equal(resolved, `${nmPath}node_modules/z/index.js`);
+    assert.equal(format, 'module');
 
     var { resolved, format } = jspmResolve.sync('fs', sfPath, { cache });
     assert.equal(resolved, 'fs');
