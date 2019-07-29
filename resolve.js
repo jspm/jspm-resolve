@@ -279,13 +279,13 @@ async function resolve (name, parentPath, {
   if (parentPkgConfig && parentPkgConfig.name) {
     if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
       const subPath = name.substr(parentPkgConfig.name.length);
-      return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+      return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath !== undefined, isMain, browserBuiltins, env, cache);
     }
   }
   // package relative "~" support
   if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
     const subPath = name.substr(1);
-    return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+    return jspmPackageResolve.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath !== undefined, isMain, browserBuiltins, env, cache);
   }
 
   // parent package map configuration
@@ -296,16 +296,16 @@ async function resolve (name, parentPath, {
         const resolved = parentPkgPath + mapped.substr(1);
         if (cjsResolve) {
           const realpath = !jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved[jspmProjectPath.length] !== '/';
-          return nodeFinalizeResolve.call(fs, resolved, parentPath, false, realpath, isMain, cache);
+          return nodeFinalizeResolve.call(fs, resolved, parentPath, realpath, cache);
         }
-        return finalizeResolve.call(fs, resolved, jspmProjectPath !== undefined, cjsResolve, isMain, cache);
+        return finalizeResolve.call(fs, resolved, jspmProjectPath !== undefined, isMain, cache);
       }
       validatePlain(name = mapped);
     }
   }
 
   // jspm lock file resolution
-  const jspmProjectResolved = await jspmProjectResolve.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+  const jspmProjectResolved = await jspmProjectResolve.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, isMain, browserBuiltins, env, cache);
   if (jspmProjectResolved)
     return jspmProjectResolved;
 
@@ -364,13 +364,13 @@ function resolveSync (name, parentPath, {
   if (parentPkgConfig && parentPkgConfig.name) {
     if (name.startsWith(parentPkgConfig.name) && (name.length === parentPkgConfig.name.length || name[parentPkgConfig.name.length] === '/')) {
       const subPath = name.substr(parentPkgConfig.name.length);
-      return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+      return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, isMain, browserBuiltins, env, cache);
     }
   }
   // package relative "~" support
   if (name.startsWith('~') && (name.length === 1 || name[1] === '/')) {
     const subPath = name.substr(1);
-    return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+    return jspmPackageResolveSync.call(fs, parentPkgConfig, parentPkgPath, subPath, jspmProjectPath, isMain, browserBuiltins, env, cache);
   }
 
   // parent package map configuration
@@ -381,16 +381,16 @@ function resolveSync (name, parentPath, {
         const resolved = parentPkgPath + mapped.substr(1);
         if (cjsResolve) {
           const realpath = !jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved[jspmProjectPath.length] !== '/';
-          return nodeFinalizeResolve.call(fs, resolved, parentPath, false, realpath, isMain, cache);
+          return nodeFinalizeResolve.call(fs, resolved, parentPath, realpath, cache);
         }
-        return finalizeResolveSync.call(fs, resolved, jspmProjectPath !== undefined, cjsResolve, isMain, cache);
+        return finalizeResolveSync.call(fs, resolved, jspmProjectPath !== undefined, isMain, cache);
       }
       validatePlain(name = mapped);
     }
   }
 
   // jspm lock file resolution
-  const jspmProjectResolved = jspmProjectResolveSync.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+  const jspmProjectResolved = jspmProjectResolveSync.call(fs, name, parentPkg, parentPkgConfig, jspmProjectPath, isMain, browserBuiltins, env, cache);
   if (jspmProjectResolved)
     return jspmProjectResolved;
 
@@ -453,10 +453,10 @@ async function relativeResolve (name, parentPath, cjsResolve, isMain, env, cache
     const boundary = await getPackageBoundary.call(this, resolved + '/', cache);
     const pcfg = await readPackageConfig.call(this, boundary, cache);
     const realpath = !jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved[jspmProjectPath.length] !== '/';
-    return nodePackageResolve.call(this, resolved, parentPath, false, realpath, env, boundary, pcfg, isMain, cache);
+    return nodePackageResolve.call(this, resolved, parentPath, true, realpath, env, boundary, pcfg, isMain, cache);
   }
 
-  return finalizeResolve.call(this, resolved, jspmProjectPath !== undefined, cjsResolve, isMain, cache);
+  return finalizeResolve.call(this, resolved, jspmProjectPath !== undefined, isMain, cache);
 }
 
 function relativeResolveSync (name, parentPath, cjsResolve, isMain, env, cache) {
@@ -506,13 +506,13 @@ function relativeResolveSync (name, parentPath, cjsResolve, isMain, env, cache) 
     const boundary = getPackageBoundarySync.call(this, resolved + '/', cache);
     const pcfg = readPackageConfigSync.call(this, boundary, cache);
     const realpath = !jspmProjectPath || !resolved.startsWith(jspmProjectPath) || resolved[jspmProjectPath.length] !== '/';
-    return nodePackageResolve.call(this, resolved, parentPath, false, realpath, env, boundary, pcfg, isMain, cache);
+    return nodePackageResolve.call(this, resolved, parentPath, true, realpath, env, boundary, pcfg, isMain, cache);
   }
 
-  return finalizeResolveSync.call(this, resolved, jspmProjectPath !== undefined, cjsResolve, isMain, cache);
+  return finalizeResolveSync.call(this, resolved, jspmProjectPath !== undefined, isMain, cache);
 }
 
-async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
+async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProjectPath, isMain, browserBuiltins, env, cache) {
   const jspmConfig = await readJspmConfig.call(this, jspmProjectPath, cache);
   const resolvedPkgName = await packageResolve.call(this, name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
   if (!resolvedPkgName)
@@ -524,10 +524,10 @@ async function jspmProjectResolve (name, parentPkg, parentPkgConfig, jspmProject
   const pkgPath = packageToPath(resolvedPkg.name, jspmProjectPath);
   const pkgConfig = await readPackageConfig.call(this, pkgPath, cache);
 
-  return jspmPackageResolve.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+  return jspmPackageResolve.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath !== undefined, isMain, browserBuiltins, env, cache);
 }
 
-function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
+function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPath, isMain, browserBuiltins, env, cache) {
   const jspmConfig = readJspmConfigSync.call(this, jspmProjectPath, cache);
   const resolvedPkgName = packageResolveSync.call(this, name, parentPkg && parentPkg.name, parentPkgConfig, jspmConfig);
   if (!resolvedPkgName)
@@ -539,10 +539,10 @@ function jspmProjectResolveSync (name, parentPkg, parentPkgConfig, jspmProjectPa
   const pkgPath = packageToPath(resolvedPkg.name, jspmProjectPath);
   const pkgConfig = readPackageConfigSync.call(this, pkgPath, cache);
 
-  return jspmPackageResolveSync.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache);
+  return jspmPackageResolveSync.call(this, pkgConfig, pkgPath, resolvedPkg.path, jspmProjectPath !== undefined, isMain, browserBuiltins, env, cache);
 }
 
-function jspmPackageResolve (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
+function jspmPackageResolve (pkgConfig, pkgPath, subPath, jspmProject, isMain, browserBuiltins, env, cache) {
   let resolved = pkgPath + subPath;
   if (pkgConfig !== undefined) {
     if (subPath.length === 0) {
@@ -560,10 +560,10 @@ function jspmPackageResolve (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsRe
       }
     }
   }
-  return finalizeResolve.call(this, resolved, jspmProjectPath !== undefined, cjsResolve, isMain, cache);
+  return finalizeResolve.call(this, resolved, jspmProject, isMain, cache);
 }
 
-function jspmPackageResolveSync (pkgConfig, pkgPath, subPath, jspmProjectPath, cjsResolve, isMain, browserBuiltins, env, cache) {
+function jspmPackageResolveSync (pkgConfig, pkgPath, subPath, jspmProject, isMain, browserBuiltins, env, cache) {
   let resolved = pkgPath + subPath;
   if (pkgConfig !== undefined) {
     if (subPath.length === 0) {
@@ -581,7 +581,7 @@ function jspmPackageResolveSync (pkgConfig, pkgPath, subPath, jspmProjectPath, c
       }
     }
   }
-  return finalizeResolveSync.call(this, resolved, jspmProjectPath !== undefined, cjsResolve, isMain, cache);
+  return finalizeResolveSync.call(this, resolved, jspmProject, isMain, cache);
 }
 
 async function getPackageConfig (resolved, jspmProjectPath, cache) {
@@ -656,9 +656,8 @@ function nodeModulesResolve (name, parentPath, cjsResolve, browserBuiltins, env,
 }
 
 function nodePackageResolve (resolvedPath, parentPath, cjsResolve, realpath, env, packagePath, pcfg, isMain, cache) {
-  const typeModule = pcfg && pcfg.type === 'module';
   if (resolvedPath === packagePath) {
-    if (typeModule) {
+    if (!cjsResolve && pcfg && pcfg.type === 'module') {
       if (pcfg.main === undefined)
         throwModuleNotFound(resolvedPath, parentPath);
       else
@@ -666,10 +665,10 @@ function nodePackageResolve (resolvedPath, parentPath, cjsResolve, realpath, env
     }
     else {
       if (pcfg.main === undefined)
-        resolvedPath = legacyDirResolve.call(this, packagePath, parentPath, cjsResolve, cache);
+        resolvedPath = legacyDirResolve.call(this, packagePath, parentPath, cache);
       else
         try {
-          resolvedPath = legacyFileResolve.call(this, resolvedPath = packagePath + '/' + pcfg.main, parentPath, cjsResolve, cache);
+          resolvedPath = legacyFileResolve.call(this, resolvedPath = packagePath + '/' + pcfg.main, parentPath, cache);
         }
         catch (e) {
           if (e.code !== 'MODULE_NOT_FOUND')
@@ -677,9 +676,9 @@ function nodePackageResolve (resolvedPath, parentPath, cjsResolve, realpath, env
         }
     }
   }
-  else if (!typeModule) {
+  else if (cjsResolve) {
     try {
-      resolvedPath = legacyFileResolve.call(this, resolvedPath, parentPath, cjsResolve, cache);
+      resolvedPath = legacyFileResolve.call(this, resolvedPath, parentPath, cache);
     }
     catch (e) {
       if (e.code !== 'MODULE_NOT_FOUND')
@@ -696,23 +695,21 @@ function nodePackageResolve (resolvedPath, parentPath, cjsResolve, realpath, env
       resolvedPath = packagePath + '/' + mapped;
     }
   }
-  if (typeModule)
-    return finalizeResolveSync.call(this, resolvedPath, false, cjsResolve, isMain, cache);
+  if (!cjsResolve)
+    return finalizeResolveSync.call(this, resolvedPath, false, isMain, cache);
   else
-    return nodeFinalizeResolve.call(this, resolvedPath, parentPath, cjsResolve, realpath, isMain, cache);
+    return nodeFinalizeResolve.call(this, resolvedPath, parentPath, realpath, cache);
 }
 
-async function finalizeResolve (resolved, jspmProject, cjsResolve, isMain, cache) {
+async function finalizeResolve (resolved, jspmProject, isMain, cache) {
   if (resolved.endsWith('.mjs'))
     return { resolved, format: 'module' };
   if (resolved.endsWith('.node'))
     return { resolved, format: 'addon' };
-  if (cjsResolve && resolved.endsWith('.json'))
+  if (resolved.endsWith('.json'))
     return { resolved, format: 'json' };
   if (!isMain && !resolved.endsWith('.js'))
     return { resolved, format: 'unknown' };
-  if (cjsResolve)
-    return { resolved, format: 'commonjs' };
   const boundary = await getPackageBoundary.call(this, resolved, cache);
   let cjs = !jspmProject;
   if (boundary) {
@@ -725,17 +722,15 @@ async function finalizeResolve (resolved, jspmProject, cjsResolve, isMain, cache
   return { resolved, format: cjs ? 'commonjs' : 'module' };
 }
 
-function finalizeResolveSync (resolved, jspmProject, cjsResolve, isMain, cache) {
+function finalizeResolveSync (resolved, jspmProject, isMain, cache) {
   if (resolved.endsWith('.mjs'))
     return { resolved, format: 'module' };
   if (resolved.endsWith('.node'))
     return { resolved, format: 'addon' };
-  if (cjsResolve && resolved.endsWith('.json'))
+  if (resolved.endsWith('.json'))
     return { resolved, format: 'json' };
   if (!isMain && !resolved.endsWith('.js'))
     return { resolved, format: 'unknown' };
-  if (cjsResolve)
-    return { resolved, format: 'commonjs' };
   const boundary = getPackageBoundarySync.call(this, resolved, cache);
   let cjs = !jspmProject;
   if (boundary) {
@@ -748,26 +743,22 @@ function finalizeResolveSync (resolved, jspmProject, cjsResolve, isMain, cache) 
   return { resolved, format: cjs ? 'commonjs' : 'module' };
 }
 
-function legacyFileResolve (path, parentPath, cjsResolve, cache) {
+function legacyFileResolve (path, parentPath, cache) {
   if (path[path.length - 1] === '/')
     return path;
   if (this.isFileSync(path, cache))
     return path;
-  if (!cjsResolve && this.isFileSync(path + '.mjs', cache))
-    return path + '.mjs';
   if (this.isFileSync(path + '.js', cache))
     return path + '.js';
   if (this.isFileSync(path + '.json', cache))
     return path + '.json';
   if (this.isFileSync(path + '.node', cache))
     return path + '.node';
-  return legacyDirResolve.call(this, path, parentPath, cjsResolve, cache);
+  return legacyDirResolve.call(this, path, parentPath, cache);
 }
 
-function legacyDirResolve (path, parentPath, cjsResolve, cache) {
+function legacyDirResolve (path, parentPath, cache) {
   if (this.isDirSync(path, cache)) {
-    if (!cjsResolve && this.isFileSync(path + '/index.mjs', cache))
-      return path + '/index.mjs';
     if (this.isFileSync(path + '/index.js', cache))
       return path + '/index.js';
     if (this.isFileSync(path + '/index.json', cache))
@@ -778,12 +769,11 @@ function legacyDirResolve (path, parentPath, cjsResolve, cache) {
   throwModuleNotFound(path, parentPath);
 }
 
-function nodeFinalizeResolve (resolved, parentPath, cjsResolve, realpath, isMain, cache) {
-  resolved = legacyFileResolve.call(this, resolved, parentPath, cjsResolve, cache);
+function nodeFinalizeResolve (resolved, parentPath, realpath, cache) {
+  resolved = legacyFileResolve.call(this, resolved, parentPath, cache);
   if (realpath)
     resolved = this.realpathSync(resolved);
   if (resolved.endsWith('.mjs')) {
-    if (cjsResolve)
       throwInvalidModuleName(`Cannot load ".mjs" module ${resolved} from CommonJS module ${parentPath}.`);
     return { resolved, format: 'module' };
   }
@@ -793,9 +783,7 @@ function nodeFinalizeResolve (resolved, parentPath, cjsResolve, realpath, isMain
     return { resolved, format: 'json' };
   if (resolved.endsWith('.node'))
     return { resolved, format: 'addon' };
-  if (isMain)
-    return { resolved, format: cjsResolve ? 'commonjs' : 'module' };
-  return { resolved, format: 'unknown' };
+  return { resolved, format: 'commonjs' };
 }
 
 async function getJspmProjectPath (modulePath, cache) {
