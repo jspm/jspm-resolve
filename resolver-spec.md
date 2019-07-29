@@ -549,7 +549,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 >          1. Set _resolved_ to the path resolution of _mapped_ relative to base _packageConfig.path_.
 > 1. If _cjsResolve_ is equal to _true_ then,
 >    1. Return _NODE_PACKAGE_RESOLVE(_${packagePath}${subPath}", false, false, packagePath, packageConfig, isMain)_.
-> 1. Return _FINALIZE_RESOLVE(resolved, true, isMain)_.
+> 1. Otherwise,
+>    1. Return _FINALIZE_RESOLVE(resolved, true, isMain)_.
 
 > **FINALIZE_RESOLVE(resolved: String, jspmProject: Boolean, isMain: Boolean)**
 > 1. If _resolved_ ends in _".mjs"_ then,
