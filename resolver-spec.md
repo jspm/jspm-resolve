@@ -57,7 +57,63 @@ Custom assets can also be resolved through the jspm resolver, which will return 
 
 ### Package Configuration
 
-#### Map Configuration
+#### Package Entry Points
+
+The default entry point for a package is the `"main"`.
+
+Custom entry points can be defined based on _environment conditions_.
+
+Condition names can take values `"browser" | "node" | "dev" | "production" | "react-native" | "electron" | "main"`, with matching done in priority order.
+
+Custom _environment conditions_ can also be defined and passed to the resolver.
+
+Only if the field is enabled for the environment, and the corresponding value is a string, is it correctly matched, otherwise the next priority environment name is checked.
+
+#### Package Exports
+
+Package `"exports"` are supported as in Node.js, with the same resolution and validation rules, with the following structure:
+
+```js
+{
+  "exports": {
+    [RelName]: ExportsTarget | ExportsTarget[]
+  }
+}
+```
+
+where:
+
+* `RelName` is a specifier starting with `"./"`.
+* `ExportsTarget` is a `RelName` or `ConditionalExportsTarget`.
+* `ConditionalExportsTarget` is an object mapping condition value strings to map values (`{ [ConditionName: string]: ExportsTarget }`).
+
+Invalid types are ignored in fallbacks or mappings.
+
+In addition to supporting string targets, object targets are also supported in exports fallbacks:
+
+```json
+{
+  "exports": {
+    "./asdf": [{
+      "browser": {
+        "dev": "./asdf-browser-dev.js",
+        "production": "./asdf-browser-production.js"
+      },
+      "node": "./asdf-node.js"
+    }, "./asdf.js"]
+  }
+}
+```
+
+Targets within the conditional object are themselves valid object or string targets. Nested fallback arrays are not currently supported.
+
+If no object match is found, the matching moves on to the next fallback path.
+
+The names are checked on the object based on the condition priority order, exactly as for the entry points.
+
+Trailing slashes can be used to map folders, but require the target to also use a trailing slash.
+
+#### Package Map
 
 The `package.json` file `"map"` property can be used to configure mappings for both installed dependencies and the local project, with the followinng structure:
 
@@ -65,17 +121,20 @@ The `package.json` file `"map"` property can be used to configure mappings for b
 ```js
 {
   "map": {
-    [name: RelOrPlain]: RelOrPlain | ConditionalMap
+    [name: PlainName]: MapTarget | MapTarget[]
   }
 }
 ```
 
 where:
 
-* `RelOrPlain` is as above, a `/`-separated name that either starts with `./` or is a plain name.
-* `ConditionalMap` is an object mapping condition value strings to map values (`{ [ConditionName: string]: RelOrPlain | ConditionalMap }`).
+* `RelOrPlain` is a `/`-separated name that either starts with `./` or is a plain name.
+* `MapTarget` is `RelOrPlain` or `ConditionalMapTarget`.
+* `ConditionalMapTarget` is an object mapping condition value strings to map values (`{ [ConditionName: string]: MapTarget }`).
 
-The resolve object is a map configuration that replaces the best matched starting prefix of the name.
+The mapping rules are identical to `"exports"` except that the mapping is applied for imports made within the package boundary of the package itself.
+
+When mapping into a plain name, the plain name must at least be a valid package name (as defined here).
 
 For example:
 
@@ -83,61 +142,50 @@ For example:
 {
   "main": "dist/index.js",
   "map": {
-    "./submodule": "./dist/submodule.js",
-    "./index.js": {
-      "browser": "./dist/index-browser.js"
+    "subpath/": "./dist/subpath/",
+    "polyfill": {
+      "browser": "dep/polyfill-browser.js",
+      "node": "dep/polyfill-node.js"
     }
   }
 }
 ```
 
-would support `import 'pkg/submodule'` mapping to `pkg/src/submodule.js` as well as having the `index.js` being conditionally mapped to `pkg/dist/index-browser.js` under the browser resolve condition only.
+If the map target is defined but is not valid or does not match any conditions, then a _Module Not Found_ error is thrown for a missing map. The
+lookup does not fallback to a package lookup.
 
-Condition names can take values `"browser" | "node" | "dev" | "production" | "react-native" | "electron" | "default"`, with the first matching condition map recursively taken to be the resultant map. `"default"` is always set to true.
+#### Browser Field Compatibility
 
-In addition the following constraint is placed:
-
-> Package-relative resolutions (starting with `./`) can only resolve to other package-relative resolutions. This is to ensure a well-defined staged resolution process without circularity edge cases. The assumption here is that `"./x": "y"` is treated as
-`"./x": "./y"`, while `"x": "y"` truly is an external mapping, just like the existing `browser` field spec.
-
-If using the `"react-native"`, `"electron"`, `"browser"` or `"main"` package.json properties, these will be internally desugared into map in this listed order of precedence.
-
-For example:
+The package.json `"browser"` field used as an object is supported internally as being desugared to map and exports:
 
 ```json
 {
-  "main": "x",
-  "browser": "y"
+  "main": "./x",
+  "browser": {
+    "./x.js": "./x-browser.js",
+    "x": "y"
+  }
 }
 ```
 
-is interpreted as:
+is treated as:
 
 ```json
 {
-  "main": "x",
+  "main": "./x",
+  "browser": "./x-browser.js",
+  "exports": {
+    "./x.js": {
+      "browser": "./x-browser.js"
+    }
+  },
   "map": {
-    "./x": {
-      "browser": "./y"
+    "x": {
+      "browser": "y"
     }
   }
 }
 ```
-
-The `"./"` map can be used to map the entire root, for example:
-
-```json
-{
-  "map": {
-    "./": {
-      "dev": "./src",
-      "production": "./dist"
-    }
-  }
-}
-```
-
-would support `import 'pkg/x'` resolving to `pkg/src/x` under the development condition and `pkg/dist/x` under the production condition.
 
 ### jspm Config File
 
