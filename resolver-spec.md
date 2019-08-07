@@ -187,6 +187,13 @@ is treated as:
 }
 ```
 
+#### jspm field
+
+The `"jspm"` field in the package.json file can be used to define configuration that is unique to jspm.
+
+This configuration is treated as an override of the base-level package.json configuration. Extension only overrides the direct value properties, and does
+not iterate arrays or objects further.
+
 ### jspm Config File
 
 jspm resolution information is provided through a `jspm.json` file which must be in the same folder as the package.json file forming the package scope.
@@ -254,6 +261,35 @@ So that for example, `jspm install x@a/b` is sanitized as an input into the cano
 A package called `registry:package@version` in jspm is stored in `/path/to/jspm_packages/registry/package@version/`.
 
 To convert a package between these forms, the following methods are defined:
+
+> **URI_DECODE**(path: String)**
+> 1. Replace in _path_ any percent-encoded values with their URI-decodings throwing a _Invalid Module Name_ error for any _"%2E"_, _"%2F"_ or _"%5C"_ encodings.
+> 1. Replace in _path_ any _"\\"_ with _"/"_.
+> 1. Return _path_.
+
+> **PARSE_PACKAGE(specifier: String)**
+> 1. Let _packageName_ be *undefined*.
+> 1. Let _packageSubpath_ be *undefined*.
+> 1. If _specifier_ is an empty string then,
+>    1. Throw an _Invalid Specifier_ error.
+> 1. If _specifier_ does not start with _"@"_ then,
+>    1. Set _packageName_ to the substring of _specifier_ until the
+>       first _"/"_ separator or the end of the string.
+> 1. Otherwise,
+>    1. If _specifier_ does not contain a _"/"_ separator then,
+>       1. Throw an _Invalid Specifier_ error.
+>    1. Set _packageName_ to the substring of _specifier_
+>       until the second _"/"_ separator or the end of the string.
+> 1. If _packageName_ starts with _"."_ or contains _"\\"_ or _"%"_ then,
+>    1. Throw an _Invalid Specifier_ error.
+> 1. Let _packageSubpath_ be _undefined_.
+> 1. If the length of _specifier_ is greater than the length of
+>    _packageName_ then,
+>    1. Set _packageSubpath_ to _"."_ concatenated with the substring of
+>       _specifier_ from the position at the length of _packageName_.
+> 1. If _packageSubpath_ contains any _"."_ or _".."_ segments,
+>    1. Throw an _Invalid Specifier_ error.
+> 1. Return the object with values _{ packageName, packageSubpath }_.
 
 > **PARSE_PACKAGE_CANONICAL(canonical: String): { name: String, path: String }**
 > 1. Let _name_ be the unique substring of _name_ starting from the first index, that satisfies the package name regular expression.
@@ -330,125 +366,157 @@ The process of reading the package.json configuration for a given package path i
 >    1. Return _undefined_.
 > 1. Let _source_ be the contents of the file _"${packagePath}/package.json"_
 > 1. Let _pjson_ be set to the cached output of the JSON parser applied to _source_, throwing a _Configuration Error_ on invalid JSON.
+> 1. If _pjson.jspm_ is an Object, then,
+>    1. Let _overrides_ be the keys of _pjson.jspm_.
+>    1. For each _override_ of _overrides_, do
+>       1. Set _pjson[override]_ to _pjson.jspm[override]_.
 > 1. Let _type_ be set to _undefined_.
 > 1. If _pjson.type_ is equal to _"commonjs"_ or _"module"_ then,
 >    1. Set _type_ to _pjson.type_.
-> 1. Let _name_ be equal to the value of _pjson.name_ if a string and a valid package name, or _undefined_ otherwise.
-> 1. Let _main_ be equal to the value of _pjson.main_ if a string or _undefined_ otherwise.
-> 1. If _main_ is defined then,
->    1. If _main_ starts with _"./"_ then,
->       1. Set _main_ to the substring of _main_ after _"./"_.
-> 1. Let _mainMap_ be _undefined_.
-> 1. Let _map_ be set to the value of _pjson.map_ if an object or _undefined_ otherwise.
-> 1. If _pjson.react-native_ is a _string_ then,
->    1. Set _mainMap_ to an object if _undefined_.
->    1. Set _mainMap["react-native"]_ to _pjson.react-native_.
-> 1. If _pjson.electron_ is a _string_ then,
->    1. Set _mainMap_ to an object if _undefined_.
->    1. Set _mainMap["electron"]_ to _pjson.react-native_.
-> 1. If _pjson.browser_ is a _string_ then,
->    1. Set _mainMap_ to an object if _undefined_.
->    1. Set _mainMap["browser"]_ to _pjson.browser_.
-> 1. If _mainMap_ is not _undefined_ then,
->    1. Set _map_ to an object if _undefined_.
->    1. If _main_ is _undefined_ then,
->       1. Set _main_ to _"index.js"_.
->    1. If _map["./${main}"]_ is _undefined_ then,
->       1. Set _map["./${main}"]_ to _mainMap_.
-> 1. If _pjson.browser_ is an _object_ then,
->    1. For each key _name_ in _pjson.browser_,
->       1. If _map[name]_ is defined then,
->          1. Continue the loop.
->       1. Let _target_ be the value of _pjson.browser[name]_.
+> 1. Let _entries_ be an empty _Object_.
+> 1. Let _conditions_ be the list of string environment conditions in priority order.
+> 1. For each _condition_ of _conditions_, do
+>    1. If _pjson[condition]_ is a String then,
+>       1. Let _target_ be _pjson[condition]_.
+>       1. If _target_ starts with _"./"_ then,
+>          1. Set _target_ to the substring of _target_ after _"./"_.
+>       1. Set _entries[condition]_ to _target_.
+> 1. Let _exports_ be _undefined_.
+> 1. If _pjson.exports_ is not _null_ or _undefined_ then,
+>    1. Set _exports_ to an empty _Object_.
+> 1. If _pjson.exports_ is an _Object_ then,
+>    1. Set _exports_ to _pjson.exports_.
+> 1. Let _map_ be set to the value of _pjson.map_ if an Object or _undefined_ otherwise.
+> 1. If _pjson.browser_ is an _Object_ then,
+>    1. For each key _name_ in _pjson.browser_ do,
+>       1. Let _target_ be _pjson.browser[name]_.
 >       1. If _target_ is equal to _false_ then,
 >          1. Set _target_ to _"@empty"_.
->       1. Set _map[match] to the object _{ browser: pjson.browser[name] }_.
-> 1. Return the object with properties _{ path, name, main, map, type }_.
-
-> **GET_PACKAGE_CONFIG(resolved: String, jspmProjectPath: String)**
-> 1. If _jspmProjectPath_ is _undefined_ then,
->    1. Return _undefined_.
-> 1. If _resolved_ is not a subpath of _jspmProjectPath_ then,
->    1. Return _undefined_.
-> 1. Assert the file at _"jspm.json" exists in _jspmProjectPath_.
-> 1. Let _package_ be the result of _PARSE_PACKAGE_PATH(resolved, projectPath)_.
-> 1. Let _path_ and _config_ be _undefined_.
-> 1. If _package_ is _undefined_ then,
->    1. Set _path_ to _jspmProjectPath_.
->    1. Set _config_ to the result of _READ_PACKAGE_JSON(packagePath)_.
-> 1. Otherwise,
->    1. Set _path_ to the result of _PACKAGE_TO_PATH(package.name, projectPath)_.
->    1. Set _config_ to the result of _READ_PACKAGE_JSON(packagePath)_.
-> 1. Return the object with values _{ package, path, config }_.
+>       1. If _name_ starts with _"./"_ then,
+>          1. If _target_ starts with _"./"_ then,
+>             1. Set _target_ to the substring of _target_ after _"./"_.
+>          1. If _pjson.main_ starts with _name_ then,
+>             1. Let _extra_ be the substring of _name_ starting at the length of _pjson.main_.
+>             1. If _extra_ is equal to _""_, _".js"_, _".json"_, _".node"_, _"/index.js"_, _"/index.json"_, _"/index.node"_ then,
+>                1. Set _entries.browser_ to _target_.
+>          1. If _exports[name] is _undefined_ then,
+>             1. Set _exports[name]_ to the object _{ browser: target, main: name }_.
+>       1. Otherwise, if _map[name]_ is not defined then,
+>          1. Set _map[name] to the object _{ browser: target, main: name }_.
+> 1. Return the object with properties _{ type, entries, exports, map }_.
 
 > **GET_PACKAGE_SCOPE(modulePath: String)**
 > 1. Let _scope_ be _modulePath_.
 > 1. While _scope_ is not the file system root,
+>    1. If the last path segment of _scope_ is _"node_modules"_ or _"jspm_packages"_, return _undefined_.
 >    1. If the file at _"${scope}/package.json_ exists then,
 >       1. Return _scope_.
 >    1. Set _scope_ to the parent path of _scope_.
 > 1. Return _undefined_.
 
-Existing "map" entries always take precedence over main aliases and the browser map.
+### Entries, Exports and Map Resolution
 
-The handling of an "index.js" alias for the main ensures that conditional mains are properly supported
-even if there is no default main, although this is a rare edge case.
+> **RESOLVE_PACKAGE(packagePath: String, subpath: String, pcfg: Object)**
+> 1. Assert: _packagePath_ ends with _"/"_.
+> 1. If _subpath_ is the empty String then,
+>    1. Let _match_ be the first matching environment condition in _pcfg.entries_ in condition priority order.
+>    1. If _match_ is _undefined_ then,
+>       1. Throw a _Module Not Found_ error.
+>    1. Let _target_ be _pcfg.entries[match]_.
+>    1. Assert: _target_ is a String.
+>    1. Set _target_ to _URI_DECODE(target)_.
+>    1. Let _resolved_ be the resolution of _packagePath + "/" + target_.
+>    1. If the file at _resolved_ exists, return _resolved_.
+>    1. If _pcfg.type_ is equal to _"module"_, throw a _Module Not Found_ error.
+>    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath, pcfg.main)_.
+>    1. If _resolved_ is not _undefined_, return _resolved_.
+>    1. Throw a _Module Not Found_ error.
+> 1. If _pcfg.exports_ is _undefined_ or _null_ then,
+>    1. Set _subpath_ to _DECODE_PATH(subpath)_.
+>    1. Return the resolution of _subpath_ in _packagePath_.
+> 1. If _pcfg.exports_ is not an _Object_ then,
+>    1. Throw a _Module Not Found_ error.
+> 1. Set _subpath_ to _"./"_ concatenated with _subpath_.
+> 1. If _subpath_ is a key of _pcfg.exports_ then,
+>    1. Return the result of _RESOLVE_EXPORTS_TARGET(packagePath, pcfg.exports[subpath], "")_.
+> 1. For each entry _export_ of the keys of _pcfg.exports_ sorted by length descending,
+>    1. If _export_ does not end in _"/"_, continue the loop.
+>    1. If _subpath_ begins with _export_ then,
+>       1. Let _target_ be _pcfg.exports[export]_.
+>       1. Let _exportSubpath_ be the substring of _subpath_ starting at the length of _export_.
+>       1. Return _RESOLVE_EXPORTS_TARGET(packagePath, target, exportSubpath)_.
+> 1. Throw a _Module Not Found_ error.
 
-### Matching and Applying Map Resolution
+> **PACKAGE_EXPORTS_TARGET_RESOLVE(packagePath; String, target: Any, subpath: String)**
+> 1. If _target_ is a String then,
+>    1. If _target_ does not start with _"./"_, throw a _Module Not Found_ error.
+>    1. If _subpath_ has non-zero length and _target_ does not end with _"/"_, throw a _Module Not Found_ error.
+>    1. If _target_ or _subpath_ contain any _"node_modules"_ or _"jspm_packages"_ segments including through percent-encoding, throw a _Module Not Found_ error.
+>    1. Set _target_ to _URI_DECODE(target)_.
+>    1. Set _subpath_ to _URI_DECODE(subpath)_.
+>    1. Let _resolvedTarget_ be the resolution of _packagePath_ and _target_.
+>    1. If _resolvedTarget_ is contained in _packagePath_ then,
+>       1. Let _resolved_ be the resolution of _subpath_ and _resolvedTarget_.
+>       1. If _resolved_ is contained in _packagePath_, return _resolved_.
+> 1. Otherwise, if _target_ is an Object then,
+>    1. For each environment condition _condition_ in priority order,
+>       1. Let _targetValue_ be _target[condition]_.
+>       1. If _targetValue_ is a String,
+>          1. Return the result of **PACKAGE_EXPORTS_TARGET_RESOLVE(packagePath, targetValue, subpath)_, propagating any error.
+>       1. Otherwise if _targetValue is an Object,
+>          1. Return the result of **PACKAGE_EXPORTS_TARGET_RESOLVE(packagePath, targetValue, subpath)_, continuing the loop on a _Module Not Found_ error.
+>       1. Otherwise, continue the loop.
+> 1. Otherwise, if _target_ is an Array then,
+>    1. For each item _targetValue_ of _target_,
+>       1. If _targetValue_ is not a String or Object, continue the loop.
+>       1. Return the result of _PACKAGE_EXPORTS_TARGET_RESOLVE(packagePath, targetValue, subpath)_, continuing the loop on a _Module Not Found_ error.
+> 1. Throw a _Module Not Found_ error.
 
-jspm configurations use resolve maps to match a plain name and direct it to a new module name.
-Matching a map is based on finding the longest map target that matches the start of the plain name.
-
-Map configurations in the jspm configurations also support conditional objects which represent map branches based
-on environment conditionals.
-
-Match scopes are taken to be the `/` separator or the end of the name. In this way the map `{ 'x/y': 'z' }` can match both `x/y` and `x/y/path`.
-
-Maps can also enforce a trailing separator to match directories separately to exact paths, for example with `{ 'x': './y/main.js', 'x/': './y/' }`.
-
-The root directory map of `{ './': './root/' }` is permitted, while a single `.` match is not supported as this is handled via the main configuration.
-
-Applying the map is then the process of adding back the subpath after the match (`x/y/path` mapping into `z/path` for the `{ 'x/y': 'z' }` map), including support for condition branches:
-
-> **APPLY_MAP(name: String, resolveMap: Object)**
-> 1. If _resolveMap_ is _undefined_ then,
+> **RESOLVE_MAP(name: String, packagePath: String, pcfg: Object)**
+> 1. If _pcfg.map_ is _undefined_ then,
 >    1. Return _undefined_.
-> 1. Let _parentNames_ be the set of parent paths of _name_ (_"/"_ separated), including _name_ itself, in descending order of length alternating between including the trailing _"/"_ and not (each item repeated with and without the last separator).
-> 1. Let _match_ be set to _undefined_.
->    1. For each _parentName_ of _parentNames_,
->       1. If _parentName_ is equal to _"."_ then,
->          1. Break the loop.
->       1. If _resolveMap_ has an entry for _parentName_ then,
->          1. Set _match_ to _parentName_.
->          1. Break the loop.
-> 1. If _match_ is _undefined_ then,
->    1. Return _undefined_.
-> 1. Let _mapped_ be the value of _MAP_CONDITIONS(resolveMap[match])_.
-> 1. If _mapped_ is equal to _"@empty"_ then,
->    1. If _match_ is not equal to _name_ or _name_ ends with a _"/"_ separator then,
->       1. Throw an _Invalid Module Name_ error.
-> 1. If _match_ starts with _"./"_ and _mapped_ does not start with _"./"_ then,
->    1. Set _mapped_ to _"./${mapped}"_.
-> 1. If _mapped_ ends with a _"/"_ separator then,
->    1. If _match_ does not end with a _"/"_ separator then,
->       1. Throw an _Invalid Configuration_ error.
-> 1. Otherwise,
->    1. If _match_ ends with a _"/"_ separator then,
->       1. Add a trailing _"/"_ to _mapped_.
-> 1. If _mapped_ contains any _".."_ or _"."_ segments, any _"\"_ character, any _"%2F" or _"%5C"_ substring, or parses as a URL then,
->    1. Throw an _Invalid Configuration_ error.
-> 1. Assert _PARSE_PACKAGE_CANONICAL(mapped)_ is _false_.
-> 1. Return _mapped_ concatenated with the substring of _name_ from the index at the length of _match_ to the end of the string.
+> 1. If _name_ is a key of _pcfg.map_ then,
+>    1. Return the result of _MAP_TARGET_RESOLVE(packagePath, pcfg.map[name], "")_.
+> 1. For each entry _map_ of the keys of _pcfg.map_ sorted by length descending,
+>    1. If _map_ does not end in _"/"_ and the character of _map_ at the index of the length of _name_ is not _"/"_, continue the loop.
+>    1. If _name_ begins with _map_ then,
+>       1. Let _target_ be _pcfg.map[map]_.
+>       1. Let _mapSubpath_ be the substring of _name_ starting at the length of _map_.
+>       1. Let _resolved_ be _MAP_TARGET_RESOLVE(packagePath, target, mapSubpath)_, returning _undefined_ on abrupt completion.
+> 1. Return _undefined_.
 
-> **MAP_CONDITIONS(mapped: String | Object)**
-> 1. While _mapped_ is an _Object_,
->    1. For each property _condition_ of _mapped_,
->       1. If _condition_ is the name of an environment conditional that is _true_.
->          1. Set _mapped_ to the value of _mapped[condition]_.
->          1. Continue the next outer loop iteration.
->    1. Return _undefined_.
-> 1. If _mapped_ is not a _string_, throw an _Invalid Configuration_ error.
-> 1. Return _mapped_.
+> **MAP_TARGET_RESOLVE(packagePath: string, target: Any, subpath: String)**
+> 1. Note: If _subpath_ starts with _"/"_ that indicates a possible direct package subpath resolution.
+>    which will invalidate any matched target that is not a direct package name without a subpath.
+> 1. If _target_ is a String then,
+>    1. If _target_ is a valid package name then,
+>       1. Let _packageSubpath_ be the destructured property of _PARSE_PACKAGE(target)_.
+>       1. If _subpath_ starts with _"/"_ then,
+>          1. If _packageSubpath_ has non-zero length, throw a _Module Not Found_ error.
+>          1. Return the concatenation of _target_, _"/"_ and _subpath_.
+>       1. If _subpath_ has non-zero length and _target_ does not end in _"/"_, throw a _Module Not Found_ error.
+>       1. Return the concatenation of _target_ and _subpath_.
+>    1. Otherwise,
+>       1. If _subpath_ starts with _"/"_, throw a _Module Not Found_ error.
+>       1. If _target_ does not start with _"./"_, throw a _Module Not Found_ error.
+>       1. If _subpath_ has non-zero length and _target_ does not end with _"/"_, throw a _Module Not Found_ error.
+>       1. Set _target_ to _URI_DECODE(target)_.
+>       1. Set _subpath_ to _URI_DECODE(subpath)_.
+>       1. If _target_ or _subpath_ contain any _"node_modules"_ or _"jspm_packages"_ segments, throw a _Module Not Found_ error.
+>       1. Let _resolvedTarget_ be the resolution of _packagePath_ and _target_.
+>       1. If _resolvedTarget_ is contained in _packagePath_ then,
+>          1. Let _resolved_ be the resolution of _subpath_ and _resolvedTarget_.
+>          1. If _resolved_ is contained in _packagePath_, return _"./"_ concatenated with the substring of _resolved_ from the length of _packagePath_.
+> 1. Otherwise, if _target_ is an Object then,
+>    1. For each environment condition _condition_ in priority order,
+>       1. Let _targetValue_ be _target[condition]_.
+>       1. If _targetValue_ is not a String or Object, continue the loop.
+>       1. Return the result of **MAP_TARGET_RESOLVE(packagePath, targetValue, subpath)_, continuing the loop on a _Module Not Found_ error.
+> 1. Otherwise, if _target_ is an Array then,
+>    1. For each item _targetValue_ of _target_,
+>       1. If _targetValue_ is not a String or Object, continue the loop.
+>       1. Return the result of _MAP_TARGET_RESOLVE(packagePath, targetValue, subpath)_, continuing the loop on a _Module Not Found_ error.
+> 1. Throw a _Module Not Found_ error.
 
 ### Module Resolution Algorithm
 
@@ -460,29 +528,27 @@ Plain name resolution first checks plain package maps, then the jspm dependency 
 
 Relative resolution is applied after jspm plain configuration, based on detecting if the parent path is the base project or a package path, and then resolving the relative parent path using the package relative map configuration.
 
-When handling conditional resolution, the environment conditional state is required to be known, an object of the form:
+When handling conditional resolution, the environment conditional state is required to be known, an array of matched conditions in the following order:
 
 ```js
-{
-  browser: boolean,
-  node: boolean,
-  production: boolean,
-  dev: boolean,
-  react-native: boolean,
-  electron: boolean,
-  default: true
-}
+[
+  "browser",
+  "node",
+  "production",
+  "dev",
+  "react-native",
+  "electron",
+  "main"
+]
 ```
 
-Where `production` and `dev` must be mutually exclusive, while `browser` and `node` can both be true for environments like Electron.
+Where the first match in order will be picked from conditional branches in resolution configuration.
 
 All NodeJS builtins are accepted as plain name resolutions, corresponding to `{ resolved: builtinName, format: "builtin" }` from the resolver.
 
 `@empty` is a jspm-specific builtin providing an empty module object with an empty object as its default export.
 
 The resolver will either return a resolved path string, or throw a _Module Not Found_, _Invalid Module Name_ or _Invalid Configuration_ error.
-
-Package name requests and plain name requests are both considered unescaped - that is URL decoding will not be applied. URL decoding is only applied to URL-like requests.
 
 Absolute paths, URLs, URL-encoding, and relative segments are not supported in the parent path.
 
@@ -492,48 +558,31 @@ The resolution algorithm breaks down into the following high-level process to ge
 
 > **JSPM_RESOLVE(name: String, parentPath: String, cjsResolve: Boolean, isMain: Boolean)**
 > 1. Assert _parentPath_ is a valid absolute file system path.
-> 1. If _name_ contains the substring _"%2F"_ or _"%5C"_ then,
->    1. Throw an _Invalid Module Name_ error.
 > 1. Let _jspmProjectPath_ be the result of _GET_JSPM_PROJECT_PATH(parentPath)_.
 > 1. If _IS_PLAIN(name)_ is _false_ then,
 >    1. Return the result of _RELATIVE_RESOLVE(name, parentPath, jspmProjectPath, cjsResolve, isMain)_.
 > 1. If _jspmProjectPath_ is _undefined_ then,
->    1. Note: This should be extended to support any future Node.js resolution specs.
 >    1. Return _NODE_MODULES_RESOLVE(name, parentPath, cjsResolve)_.
-> 1. If _name_ contains any _"\"_ character then,
->    1. Throw an _Invalid Module Name_ error.
-> 1. Let _parentPackage_ be the result of _GET_PACKAGE_CONFIG(parentPath, projectPath)_.
-> 1. If _parentPackage?.config?.name_ is defined then,
->    1. If _name_ is equal to _parentPackage?.config?.name_ or _name_ starts with _parentPackage?.config?.name_ followed by _"/"_ then,
->       1. Let _subPath_ be the substring of _name_ from the length of _parentPackage?.config?.name_.
->       1. Return _JSPM_PACKAGE_RESOLVE(packageConfig, subPath, cjsResolve, isMain)_.
-> 1. Let _mapped_ be the value of _APPLY_MAP(name, packageConfig?.map)_
+> 1. Let _parentScope_ be the result of _GET_PACKAGE_SCOPE(parentPath)_.
+> 1. Let _parentConfig_ be the result of _READ_PACKAGE_JSON(parentScope)_, if _parentScope is not _undefined_.
+> 1. Let _mapped_ be the value of _RESOLVE_MAP(name, parentConfig?.map)_
 > 1. If _mapped_ is not _undefined_ then,
 >    1. If _mapped_ starts with _"./"_ then,
->       1. Let _resolved_ be the path resolution of _mapped_ relative to base _parentPackage.path_.
+>       1. Let _resolved_ be the path resolution of _mapped_ relative to base _parentScope_.
 >       1. If _cjsResolve_ is equal to _true_ then,
 >          1. Let _realpath_ be the boolean indicating if _jspmProjectPath_ is _undefined_ or _resolved_ is not contained within _jspmProjectPath_.
->          1. Return _NODE_FINALIZE_RESOLVE(resolved, realpath, isMain)_.
+>          1. Return _CJS_FINALIZE_RESOLVE(resolved, realpath, isMain)_.
 >       1. Return _FINALIZE_RESOLVE(resolved, true, isMain)_.
 >    1. Otherwise, set _name_ to _mapped_.
->    1. If _IS_PLAIN(name)_ is _false_ then,
->       1. Throw an _Invalid Configuration_ error.
->    1. If _name_ contins any _"\"_ character then,
->       1. Throw an _Invalid Configuration_ error.
-> 1. Let _resolved_ to the result of _JSPM_PROJECT_RESOLVE(name, parentPackage, jspmProjectPath, cjsResolve, isMain)_.
-> 1. If _resolved_ is not equal to _undefined_ then,
->    1. Return _resolved_.
-> 1. If _parentPackage?.path_ is equal to _jspmProjectPath_ then,
->    1. Return _NODE_MODULES_RESOLVE(name, parentPath, cjsResolve)_.
+> 1. Let _resolved_ to the result of _JSPM_PROJECT_RESOLVE(name, parentScope, parentConfig, jspmProjectPath, cjsResolve, isMain)_.
+> 1. If _resolved_ is not equal to _undefined_, return _resolved_.
 > 1. If _name_ is a builtin module or _"@empty"_ then,
 >    1.  Return the object _{ resolved: name, format: "builtin" }_.
-> 1. If _parentPackage?
 > 1. Throw a _Module Not Found_ error.
 
 > **RELATIVE_RESOLVE(name: String, parentPath: String, jspmProjectPath: String, cjsResolve: Boolean, isMain)**
 > 1. Let _resolved_ be _undefined_.
-> 1. Replace in _name_ any _"\"_ character with _"/"_.
-> 1. Replace in _name_ all percent-encoded values with their URI-decodings.
+> 1. Set _name_ to _URI_DECODE(name)_.
 > 1. If _name_ starts with _"//"_ and _name_ does not start with _"///"_ then,
 >    1. Throw an _Invalid Module Name_ error.
 > 1. Otherwise if _name_ starts with _"/"_ or _name_ starts with _"/"_ then,
@@ -554,53 +603,33 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Return _NODE_PACKAGE_RESOLVE(resolved, false, jspmProject, scope, pjson, isMain)_.
 > 1. Return _FINALIZE_RESOLVE(resolved, jspmProject, isMain)_.
 
-> **JSPM_PROJECT_RESOLVE(name: String, parentPackage: Object, jspmProjectPath: String, cjsResolve: Boolean, isMain: Boolean)**
+> **JSPM_PROJECT_RESOLVE(name: String, parentScope: String, parentConfig: String, jspmProjectPath: String, cjsResolve: Boolean, isMain: Boolean)**
 > 1. Let _jspmConfig_ be the result of _READ_JSPM_CONFIG(jspmProjectPath)_.
 > 1. If _jspmConfig_ is _undefined_ then,
 >    1. Return _undefined_.
-> 1. Let _packageName_ be _undefined_.
+> 1. Let _parentPackage_ be _PARSE_PACKAGE_PATH(parentScope)_ if _parentScope_ is not _undefined_.
+> 1. Let _packageName_ and _packageSubpath_ be the destructured properties of _PARSE_PACKAGE(name)_, throwing on abrupt completion.
+> 1. Let _packageResolution_ be _undefined_.
 > 1. If _parentPackage.package_ is not _undefined_ then,
->    1. Let _parentPackageResolveMap_ be set to _jspmConfig.dependencies[parentPackage.name]?.resolve_.
->    1. If _parentPackageResolveMap_ is not _undefined_ then,
->       1. Let _mapped_ be the value of _APPLY_MAP(name, parentPackageResolveMap)_
->       1. If _mapped_ is not _undefined_ then,
->          1. If _mapped_ is not a valid exact package name,
->             1. Throw an _Invalid Configuration_ error.
->          1. Set _packageName_ to _mapped_.
-> 1. If _packageName_ is _undefined_ then,
->    1. If _parentPackage.package_ is _undefined_ or _name_ is a match of _parentPackage.config.peerDependencies_ then,
->    1. Let _mapped_ be the value of _APPLY_MAP(name, jspmConfig.resolve)_.
->    1. If _mapped_ is not _undefined_ then,
->       1. If _mapped_ is not a valid exact package name,
->          1. Throw an _Invalid Configuration_ error.
->       1. Set _packageName_ to _mapped_.
-> 1. If _packageName_ is _undefined_ then,
->    1. Return _undefined_.
-> 1. Let _resolvedPackage_ be the result of _PARSE_PACKAGE_CANONICAL(packageName)_.
-> 1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(resolvedPackage.name, projectPath)_.
+>    1. Set _packageResolution_ to _jspmConfig.dependencies[parentPackage.name]?.resolve[packageName]_.
+> 1. If _packageResolution_ is _undefined_ then,
+>    1. If _parentPackage.package_ is _undefined_ or _name_ is a match of _parentConfig.peerDependencies_ then,
+>         1. Set _packageResolution_ to _jspmConfig.resolve[packageName]_.
+> 1. If _packageResolution_ is _undefined_, return _undefined_.
+> 1. If _packageResolution_ is not a valid exact package name, throw an _Invalid Configuration_ error.
+> 1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(packageResolution, jspmProjectPath)_.
 > 1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
-> 1. Return the result of _JSPM_PACKAGE_RESOLVE(packageConfig, resolvedPackage.path, cjsResolve, isMain)_.
-
-> **JSPM_PACKAGE_RESOLVE(packageConfig: Object, subPath: String, cjsResolve, isMain)**
-> 1. Let _resolved_ be the concatenation of _packageConfig.path_ and _subPath_.
-> 1. If _packageConfig_ is not _undefined_ then,
->    1. If _subPath_ is the empty string then,
->       1. If _packageConfig.main_ is _undefined_ then,
->          1. Throw a _Module Not Found_ error.
->       1. Set _subPath_ to _"/${packageConfig.main}"_.
->       1. Set _resolved_ to _${packagePath}${subPath}"_.
->    1. If _packageConfig.map_ is not _undefined_ then,
->       1. Let _mapped_ be the value of  _APPLY_MAP(".${subPath}", packageConfig.map)_.
->       1. If _mapped_ is not _undefined_ then,
->          1. If _mapped_ is equal to _"@empty"_ then,
->             1. Return _{ resolved: "@empty", format: "builtin" }_.
->          1. Set _resolved_ to the path resolution of _mapped_ relative to base _packageConfig.path_.
-> 1. If _cjsResolve_ is equal to _true_ then,
->    1. Return _NODE_PACKAGE_RESOLVE(_${packagePath}${subPath}", false, false, packagePath, packageConfig, isMain)_.
+> 1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig)_.
+> 1. If _cjsResolve_ is *true* then,
+>    1. Return the result of _CJS_FINALIZE_RESOLVE(resolved, packagePath, isMain)_.
 > 1. Otherwise,
->    1. Return _FINALIZE_RESOLVE(resolved, true, isMain)_.
+>    1. Let _jspmProject_ be the boolean indicating if _jspmProjectPath_ is not _undefined_.
+>    1. Return the result of _FINALIZE_RESOLVE(resolved, jspmProject, isMain)_.
 
 > **FINALIZE_RESOLVE(resolved: String, jspmProject: Boolean, isMain: Boolean)**
+> 1. If _resolved_ ends with the character _"/"_ then,
+>    1. Return _{ resolved, format: "unknown" }_.
+> 1. If the file at _resolved_ does not exist throw a _Module Not Found_ error.
 > 1. If _resolved_ ends in _".mjs"_ then,
 >    1. Return _{ resolved, format: "module" }_.
 > 1. If _resolved_ ends in _".node"_ then,
@@ -612,81 +641,20 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
 > 1. If _scope_ is not _undefined_ then,
 >    1. Let _pjson_ be the result of _READ_PACKAGE_JSON("${scope}/package.json")_.
-> 1. Let _cjs_ be _true_ if _jspmProject_ is true.
+> 1. Let _cjs_ be _true_ if _jspmProject_ is false.
 > 1. If _pjson?.type_ is equal to _"commonjs"_ then,
 >    1. Set _cjs_ to _true_.
 > 1. If _pjson?.type_ is equal to _"module"_ then,
 >    1. Set _cjs_ to _false_.
 > 1. Return _{ resolved, format: cjs ? "commonjs": "module" }_.
 
-> **NODE_MODULES_RESOLVE(name: String, parentPath: String, cjsResolve: Boolean, isMain): String**
-> 1. For each parent folder _modulesPath_ of _parentPath_ in descending order of length,
->    1. Let _resolved_ be set to _"${modulesPath}/node_modules/${name}"_.
->    1. For each parent path _packagePath_ of _resolved_, including _resolved_ in descending order,
->       1. If _packagePath_ ends in a _"node_modules"_ segment then,
->          1. Break the inner loop.
->       1. If the folder at _packagePath_ exists then,
->          1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON("${packagePath}/package.json")_.
->          1. Return _NODE_PACKAGE_RESOLVE(resolved, cjsResolve, true, packagePath, packageConfig, isMain)_.
-> 1. Throw a _Module Not Found_ error.
-
-> **NODE_PACKAGE_RESOLVE(resolved: String, cjsResolve: Boolean, realpath: String, packagePath: String, packageConfig: Object, isMain: Boolean)**
-> 1. If _resolved_ is equal to _packagePath_ then,
->    1. If _cjsResolve_ is _false_ and _packageConfig?.type_ is equal to _"module"_ then,
->       1. If _packageConfig?.main_ is _undefined_ then,
->          1. Throw a _Module Not Found_ error.
->       1. If _packageConfig?.main_ is not _undefined_ then,
->          1. Set _resolved_ to "${packagePath}/${packageConfig.main}".
->    1. Otherwise,
->       1. If _packageConfig?.main_ is not _undefined_ then,
->          1. Set _resolved_ to _LEGACY_FILE_RESOLVE("${packagePath}/${packageConfig.main}")_, where on _Module Not Found_ error,
->             1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath)_.
->       1. Otherwise,
->          1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath)_.
-> 1. Otherwise if _cjsResolve_ is _true_ then,
->    1. Set _resolved_ to _LEGACY_FILE_RESOLVE(packagePath)_.
-> 1. If _packageConfig?.map_ is not _undefined_ and _resolved_ is contained in _packagePath_ then,
->    1. Set _resolved_ to _LEGACY_FILE_RESOLVE(resolved)_, continuing and leaving it unchanged on a _Module Not Found_ error.
->    1. Let _relPath_ be the string _"."_ concatenated with the substring of _resolved_ of length _packagePath_.
->    1. Let _mapped_ be the value of  _APPLY_MAP(relPath, packageConfig.map)_.
->    1. If _mapped_ is not _undefined_ then,
->       1. If _mapped_ is equal to _"@empty"_ then,
->          1. Return _{ resolved: "@empty", format: "builtin" }_.
->       1. Set _resolved_ to the path resolution of _mapped_ relative to base _packagePath_.
-> 1. If _cjsResolve_ is _true_ then,
->    1. Return the result of _NODE_FINALIZE_RESOLVE(resolved, realpath, isMain)_.
-> 1. Otherwise,
->    1. Return _FINALIZE_RESOLVE(resolved, false, isMain)_.
-
-
-> **LEGACY_DIR_RESOLVE(dir: String)**
-> 1. If the file at _"${path}/index.js"_ exists,
->    1. Return _"${path}/index.js"_.
-> 1. Otherwise if the file at _"${path}/index.json"_ exists,
->    1. Return _"${path}/index.json"_.
-> 1. Otherwise if the file at _"${path}/index.node"_ exists,
->    1. Return _"${path}/index.node"_.
-> 1. Throw a _Module Not Found_ error.
-
-> **LEGACY_FILE_RESOLVE(path: String)**
-> 1. Assert _path_ is a valid file path.
-> 1. Let _resolved_ be equal to _undefined_.
-> 1. If _path_ ends with the character _"/"_ then,
->    1. Set _resolved_ to _path_.
-> 1. Otherwise if the file at _path_ exists,
->    1. Set _resolved_ to _path_.
-> 1. Otherwise if the file at _"${path}.js"_ exists,
->    1. Set _resolved_ to _"${path}.js"_.
-> 1. Otherwise if the file at _"${path}.json"_ exists,
->    1. Set _resolved_ to _"${path}.json"_.
-> 1. Otherwise if the file at _"${path}.node"_ exists,
->    1. Set _resolved_ to _"${path}.node"_.
-> 1. Otherwise,
->    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path)_.
-> 1. Return _resolved_.
-
-> **NODE_FINALIZE_RESOLVE(resolved: String, realpath: Boolean, isMain: Boolean)**
-> 1. Set _resolved_ to _LEGACY_FILE_RESOLVE(resolved, cjsResolve)_.
+> **CJS_FINALIZE_RESOLVE(resolved: String, packagePath: Boolean, isMain: Boolean)**
+> 1. Set _resolved_ to _LEGACY_FILE_RESOLVE(resolved)_.
+> 1. If _resolved_ is _undefined_ then,
+>    1. Let _pcfg_ be the result of _READ_PACKAGE_JSON(resolved)_.
+>    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(resolved, pcfg?.main)_.
+> 1. If _resolved_ is _undefined_ then,
+>    1. Throw a _Module Not Found_ error.
 > 1. Let _format_ be equal to _"unknown"_.
 > 1. If _isMain_ is _true_ then,
 >    1. Set _format_ to _"commonjs"_.
@@ -698,6 +666,30 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Set _format_ to _"json"_.
 > 1. Otherwise if _resolved_ ends with _".node"_ then,
 >    1. Set _format_ to _"addon"_.
-> 1. If _realpath_ then,
->    1. Set _resolved_ to the real path of _resolved_.
+> 1. Set _resolved_ to the real path of _resolved_ within _packagePath_.
 > 1. Return the object with properties _{ resolved, format }_.
+
+> **LEGACY_FILE_RESOLVE(path: String)**
+> 1. Assert _path_ is a valid file path.
+> 1. If _path_ ends with the character _"/"_ then,
+>    1. Return _path_.
+> 1. Otherwise if the file at _path_ exists,
+>    1. Return _path_.
+> 1. Return _LEGACY_EXTENSION_RESOLVE(path)_.
+
+> **LEGACY_EXTENSION_RESOLVE(path: String)**
+> 1. If the file at _path + ".js"_ exists,
+>    1. Return _path + ".js"_.
+> 1. Otherwise if the file at _path + ".json"_ exists,
+>    1. Return _path + ".json"_.
+> 1. Otherwise if the file at _path + ".node"_ exists,
+>    1. Return _path + ".node"_.
+> 1. Return _undefined_.
+
+> **LEGACY_DIR_RESOLVE(path: String, main: String | Undefined)**
+> 1. If _main_ is a String then,
+>    1. Let _resolved_ be _LEGACY_FILE_RESOLVE(path + "/" + main)_.
+>    1. If _resolved_ is _undefined_ then,
+>       1. Set _resolved_ to _LEGACY_EXTENSION_RESOLVE(path + "/" + main + "/index")_.
+>    1. If _resolved_ is not _undefined_, return _resolved_.
+> 1. Return _LEGACY_EXTENSION_RESOLVE(path + "/index")_.
