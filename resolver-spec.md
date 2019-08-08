@@ -291,15 +291,6 @@ To convert a package between these forms, the following methods are defined:
 >    1. Throw an _Invalid Specifier_ error.
 > 1. Return the object with values _{ packageName, packageSubpath }_.
 
-> **PARSE_PACKAGE_CANONICAL(canonical: String): { name: String, path: String }**
-> 1. Let _name_ be the unique substring of _name_ starting from the first index, that satisfies the package name regular expression.
-> 1. If _name_ is _undefined_ then,
->    1. Return _undefined_.
-> 1. Let _path_ be the substring of _canonical_ starting from the index of the length of _name_.
-> 1. If _path_ is not the empty string and does not start with _"/"_
->    1. Return _undefined_.
-> 1. Return the object with values _{ name, path }_.
-
 > **PARSE_PACKAGE_PATH(path: String, jspmProjectPath: String): { name: String, path: String }**
 > 1. Let _jspmPackagesPath_ be the path _"jspm_packages/"_ resolved to directory _jspmProjectPath_, including a trailing separator.
 > 1. If _path_ does not start with the string _jspmPackagesPath_ then,
