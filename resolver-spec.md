@@ -22,38 +22,38 @@ Packages in the ESM mode get no automatic extensions. If no package.json main is
 
 Instead, map configuration is designed to allow customizing internal package resolutions.
 
-In addition, jspm does not implement the real path lookup for modules loaded. This allows globally and locally linked packages to be scoped to the project they are loaded in, so the entire resolution for the project is managed through a single jspm configuration file despite many packages possibly being linked in.
+In addition, jspm does not implement the real path lookup for modules loaded. This allows globally and locally linked packages to be scoped to the project they are loaded in, so the entire resolution for the project is managed through a single jspm configuration file despite many packages possibly being linked together.
 
 ### Plain Names
 
-`plain names` or `bare names` as they are referred to in the WhatWG loader specification are module names
+`plain names` or `bare names` as they are referred to in the WHATWG loader specification are module names
 that do not start with `/` or `./` or `../` and do not parse as valid URLs.
 
-Plain names are the module names that run through multiple remapping phases, although absolute URL names can be remapped as well through contextual relative map configuration.
+Plain names are the module names that run through local map, jspm project resolution and exports resolution phases.
 
 ### Package Scopes
 
 jspm projects have two levels of package scopes - the base-level project scope containing the package.json and jspm.json file, and the dependency package scopes, denoted by their jspm_packages/package@version paths.
 
-Within a jspm project, only the package.json and files in these two levels are read and used by jspm to influence resolution, and these are the only files that influence resolution in combination with the jspm.json resolutions.
+When resolving into a package, the local package.json's `"main"` and other entries are used along with `"exports"`, `"map"` and `"type"` configuration.
 
-The only time intermediate package.json files are used is when interpreting the module format mode of a file.
+When resolving a new package, the `jspm.json` the local package.json `"map"` is checked followed by the jspm file of the project base for the package resolution.
 
 #### jspm Project Scopes
 
-The detection of the jspm project for a given path is based on checking if the current path matches a jspm_packages dependency path, and if so using that scope, or otherwise checking for a jspm.json file down the folder hierarchy until one is found.
+The detection of the jspm project for a given path is based on taking the base folder containing the `"jspm_packages"` if any, or alternatively checking for a `jspm.json` configuration file. Both operations stop on the first `"jspm_packages"` or `"node_modules"` segment hit.
 
-If a jspm_packages match is made without there being a corresponding jspm.json file, an error is thrown. If a package.json file is not found along with the jspm.json file, an error is also thrown.
+If a `jspm_packages` match is made without there being a corresponding jspm.json file, an _Invalid Configuration_ error is thrown.
 
-If hitting a node_modules path segment, or reaching the root of the file system, the above check immediately stops and treats the project scope as a non-jspm package scope, and matching the first package.json file instead.
+If no project is found, special treatment is given to resolutions made "without a jspm project", by falling back to `node_modules` resolution for compatibility.
 
 #### Module Format Handling
 
 Each package scope is interpreted based on its "type" being either "commonjs" or "module".
 
-By default jspm treats all package scopes as `"type": "module"` unless (a) they are explicitly `"type": "commonjs"` or (b) they are packages located in a node_modules path.
+By default jspm treats all packages within a jspm project as `"type": "module"` unless they explicitly contain `"type": "commonjs"`.
 
-Custom assets can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
+Custom assets and paths (via a trailing slash) can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
 
 ### Package Configuration
 
@@ -223,7 +223,7 @@ The following properties are the only ones which affect the jspm resolution of a
 Where the above types are defined by:
 
 * `PlainName`: A string `s` satisfying `isPlainName(s)`.
-* `ExactPackageName`: A string `s` satisfying the package name regular expression.
+* `ExactPackageName`: A string `s` satisfying the package name canonical validation.
 
 When these configuration type assertions are broken, the configuration is considered invalid, and the entire resolution will abort on the assertion error.
 
@@ -231,32 +231,26 @@ When these configuration type assertions are broken, the configuration is consid
 
 Any error in any operation, including assertion errors, should be fully propagated as a top-level resolve error abrupt completion.
 
-### Plain Name Detection
+### Package and Path Parsing
 
-This detection is exactly as in the [WhatWG module resolution detection](https://html.spec.whatwg.org/multipage/webappapis.html#resolve-a-module-specifier):
+Plain or bare specifier detection is exactly as in the [WHATWG module resolution detection](https://html.spec.whatwg.org/multipage/webappapis.html#resolve-a-module-specifier):
 
 > **IS_PLAIN(name: String): boolean**
 > 1. If _name_ parses as a valid URL then return _false_.
 > 1. Otherwise if _name_ begins with _"/"_, _"./"_ or _"../"_ then return _false_.
 > 1. Otherwise return _true_.
 
-### Package Name Detection
+Package names are of the form `name` or `@scope/name`.
 
-Package names in canonical form are names of the form `registry:package@version`.
+Canonical package names are of the form `registry:name@version`.
 
-Valid package names satisfy the JS regular expression:
+Valid package names satisfy the JS regular expression `/^((@[^/\\%]+\/)?[^./\\%][^/\\%]*)$/`.
 
-```js
-/^[a-z]+:(@[-a-zA-Z\d][-_\.a-zA-Z\d]*\/)?[-a-zA-Z\d][-_\.a-zA-Z\d]*@[^@<>:"/\|?*^\u0000-\u001F]+$/
-```
+The registry in the canonical form must satisfy the regular expression `/^[a-z]+:$/`.
 
-Package names must consist of either one or two path segments with a version - `registry:x@version` or `registry:@base/x@version`. The `@` prefix is required for two-segment package names in order to ensure the package scope remains statically determinable for any project path.
+The version in the canonical form must satisfy the regular expression `/^@[^/\]+$`.
 
-For compatibility with cross-platform file paths, the following character classes are not permitted in versions: `[@<>:"/\|?*^\u0000-\u001F]`.
-
-The convention encouraged for versions that contain these characters is to encode these characters when used in unambiguous inputs, such that they are replaced by their URI percent encoding.
-
-So that for example, `jspm install x@a/b` is sanitized as an input into the canonical name `x@a%2F`, which is the form used in the jspm configuration files and file paths thereafter.
+Because versions permit percent-encoding special care must be taken when resolving them, as they should not be URI decoded.
 
 A package called `registry:package@version` in jspm is stored in `/path/to/jspm_packages/registry/package@version/`.
 
@@ -287,11 +281,9 @@ To convert a package between these forms, the following methods are defined:
 >    _packageName_ then,
 >    1. Set _packageSubpath_ to _"."_ concatenated with the substring of
 >       _specifier_ from the position at the length of _packageName_.
-> 1. If _packageSubpath_ contains any _"."_ or _".."_ segments,
->    1. Throw an _Invalid Specifier_ error.
 > 1. Return the object with values _{ packageName, packageSubpath }_.
 
-> **PARSE_PACKAGE_PATH(path: String, jspmProjectPath: String): { name: String, path: String }**
+> **PARSE_PACKAGE_PATH(path: String, jspmProjectPath: String): { packageName: String, packageSubpath: String }**
 > 1. Let _jspmPackagesPath_ be the path _"jspm_packages/"_ resolved to directory _jspmProjectPath_, including a trailing separator.
 > 1. If _path_ does not start with the string _jspmPackagesPath_ then,
 >    1. Return _undefined_.
@@ -300,62 +292,35 @@ To convert a package between these forms, the following methods are defined:
 > 1. _If _registrySep_ is not defined then,
 >    1. Return _undefined_.
 > 1. Let _canonical_ be the result of replacing the character at _registrySep_ in _relPackagePath_ with _":"_.
-> 1. If _canonical_ does not contain a zero-indexed substring matching the package name regular expression then,
->    1. Return _undefined_.
-> 1. Let _name_ be the unique substring of _canonical_ starting from the first character, matched against the package name regular expression.
-> 1. Let _path_ be the substring of _canonical_ from the index of the length of _name_.
-> 1. If _path_ is string of non-zero length and _path_ does not start with _"/"_ then,
->    1. Return _undefined_.
-> 1. Return the object with values _{ name, path }_.
+> 1. Let _packageName_ and _packageSubpath_ be the destructured result of _PARSE_PACKAGE(canonical)_, returning _undefined_ on abrupt completion.
+> 1. Return the object with values _{ packageName, packageSubpath }_.
 
 > **PACKAGE_TO_PATH(name: String, jspmProjectPath: String): String**
 > 1. Let _jspmPackagesPath_ be the path _"jspm_packages/"_ resolved to directory _jspmProjectPath_, including a trailing separator.
-> 1. Assert _name_ satisfies the valid package name regular expression.
-> 1. Replace in _name_ the first _":"_ character with _"/"_.
-> 1. Return the result of the path resolution of _"${name}"_ within parent _jspmPackagesPath_.
+> 1. Replace in _name_ the first _":"_ character with _"/"_, throwing an _Invalid Configuration Error_ if none is found.
+> 1. Return the result of the path resolution of _name_ within parent _jspmPackagesPath_.
 
-The parse functions return undefined if not a valid package canonical name form, while the package to URL function must
-always be called against a valid package canonical name form.
+### Reading Project and Package Configuration
 
-### Reading Package and Project Configuration
-
-Package configuration is read based on checking the jspm project scopes and returning the corresponding package.json
-configuration for a path.
-
-Given a file path, we can determine the base project folder with the following algorithm:
+Given any file path, we can determine the base jspm project folder with the following algorithm:
 
 > **GET_JSPM_PROJECT_PATH(modulePath: String)**
-> 1. Let _checkPath_ be set to _modulePath_.
-> 1. Loop:
->    1. Set _checkPath_ to the parent folder of _checkPath_.
->    1. If _checkPath_ is the root of the file system or if the last path segment of _checkPath_ is equal to _"node_modules"_ then,
->       1. Return _undefined_.
->    1. If the last path segment of _checkPath_ contains a _"@"_ character then,
->       1. If _checkPath_ contains a last _"jspm_packages"_ path segment with no _"node_modules"_ segment after it then,
->          1. Let _packagePath_ be the path segements of _checkPath_ from the last _"jspm_packages"_ path segment.
->          1. If _packagePath_ matches the package name regular expression then,
->             1. Let _jspmProjectPath_ be the substring _checkPath_ before the last _"jspm_packages"_ path segment.
->             1. Return _jspmProjectPath_.
->    1. If the file _"jspm.json"_ exists in the folder _checkPath_ then,
->       1. Return _checkPath_.
-
-> **READ_JSPM_CONFIG(projectPath: String)**
-> 1. If the file at _"${packagePath}/jspm.json"_ does not exist then,
->    1. Return _undefined_.
-> 1. Return parsed contents of _"${packagePath}/jspm.json"_, throwing a _Configuration Error_ on invalid JSON.
-
-The return value of the above method is an object of the form `{ projectPath, jspmConfig, packageConfig }`.
-
-This algorithm only needs to be applied once per given path, and can cache all file system checks.
-
-### Reading Package Configuration
+> 1. Let _jspmPackagesIndex_ be the index of the last _"jspm_packages"_ segment in _modulePath_ if any.
+> 1. If there is a _"node_modules"_ path segment after _jspmPackagesIndex_, set _jspmPackagesIndex_ to _undefined_.
+> 1. If _jspmPackagesIndex_ is not _undefined_ then.
+>    1. Note: any missing _"jspm.json"_ error can be thrown here as an _"Invalid Configuration"_ error or later in the resolver too.
+>    1. Return the substring of _modulePath_ of the length of _jspmPackagesIndex_.
+> 1. For each parent path _projectPath_ of _modulePath_,
+>    1. If the last segment of _projectPath_ is a _"node_modules"_ segment, return _undefined_.
+>    1. If the file _"jspm.json"_ exists in the folder _projectPath_, return _projectPath_.
+> 1. Return _undefined_.
 
 The process of reading the package.json configuration for a given package path is based on the following algorithms:
 
 > **READ_PACKAGE_JSON(packagePath: String)**
-> 1. If the file at _"${packagePath}/package.json"_ does not exist then,
+> 1. If the file at _packagePath + "/package.json"_ does not exist then,
 >    1. Return _undefined_.
-> 1. Let _source_ be the contents of the file _"${packagePath}/package.json"_
+> 1. Let _source_ be the contents of the file _packagePath + "/package.json"_
 > 1. Let _pjson_ be set to the cached output of the JSON parser applied to _source_, throwing a _Configuration Error_ on invalid JSON.
 > 1. If _pjson.jspm_ is an Object, then,
 >    1. Let _overrides_ be the keys of _pjson.jspm_.
@@ -400,7 +365,7 @@ The process of reading the package.json configuration for a given package path i
 > 1. Let _scope_ be _modulePath_.
 > 1. While _scope_ is not the file system root,
 >    1. If the last path segment of _scope_ is _"node_modules"_ or _"jspm_packages"_, return _undefined_.
->    1. If the file at _"${scope}/package.json_ exists then,
+>    1. If the file at _scope + "/package.json"_ exists then,
 >       1. Return _scope_.
 >    1. Set _scope_ to the parent path of _scope_.
 > 1. Return _undefined_.
@@ -480,12 +445,14 @@ The process of reading the package.json configuration for a given package path i
 > 1. Note: If _subpath_ starts with _"/"_ that indicates a possible direct package subpath resolution.
 >    which will invalidate any matched target that is not a direct package name without a subpath.
 > 1. If _target_ is a String then,
->    1. If _target_ is a valid package name then,
+>    1. If _target_ is a valid package name then (as determined by _PARSE_PACKAGE_ below),
 >       1. Let _packageSubpath_ be the destructured property of _PARSE_PACKAGE(target)_.
 >       1. If _subpath_ starts with _"/"_ then,
 >          1. If _packageSubpath_ has non-zero length, throw a _Module Not Found_ error.
->          1. Return the concatenation of _target_, _"/"_ and _subpath_.
+>          1. Return the concatenation of _target_, _"/"_ and _URI_DECODE(subpath)_.
 >       1. If _subpath_ has non-zero length and _target_ does not end in _"/"_, throw a _Module Not Found_ error.
+>       1. Set _target_ to _URI_DECODE(target)_.
+>       1. Set _subpath_ to _URI_DECODE(subpath)_.
 >       1. Return the concatenation of _target_ and _subpath_.
 >    1. Otherwise,
 >       1. If _subpath_ starts with _"/"_, throw a _Module Not Found_ error.
@@ -513,12 +480,6 @@ The process of reading the package.json configuration for a given package path i
 
 Module resolution is always based on resolving `resolve(name, parentPath)` where `name` is the optional unresolved name to resolve and `parentPath` is an absolute file path to resolve relative to.
 
-The resolver is based on two main parts - plain name resolution, and relative resolution.
-
-Plain name resolution first checks plain package maps, then the jspm dependency resolution, then the global jspm resolution (top-level jspm installs) before falling back to delegating entirely to the `node_modules` NodeJS resolution. If no plain resolution is in the NodeJS resolution, an error is thrown.
-
-Relative resolution is applied after jspm plain configuration, based on detecting if the parent path is the base project or a package path, and then resolving the relative parent path using the package relative map configuration.
-
 When handling conditional resolution, the environment conditional state is required to be known, an array of matched conditions in the following order:
 
 ```js
@@ -533,17 +494,13 @@ When handling conditional resolution, the environment conditional state is requi
 ]
 ```
 
-Where the first match in order will be picked from conditional branches in resolution configuration.
+where the first match in order will be picked from conditional branches in resolution configuration.
 
 All NodeJS builtins are accepted as plain name resolutions, corresponding to `{ resolved: builtinName, format: "builtin" }` from the resolver.
 
-`@empty` is a jspm-specific builtin providing an empty module object with an empty object as its default export.
+`@empty` is a jspm-specific builtin providing an empty module object with an empty object as its default export, and is treated as another builtin module in all builtin module checks.
 
 The resolver will either return a resolved path string, or throw a _Module Not Found_, _Invalid Module Name_ or _Invalid Configuration_ error.
-
-Absolute paths, URLs, URL-encoding, and relative segments are not supported in the parent path.
-
-_Note that most of the complexity of the resolver comes from handling legacy CJS package type fallbacks properly. For example, we support CommonJS packages within jspm_packages for legacy linking workflows which perform a hybrid resolution which is carefully defined just for this edge case yet unnecessary in the bulk of workflows._
 
 The resolution algorithm breaks down into the following high-level process to get the fully resolved path:
 
@@ -565,11 +522,10 @@ The resolution algorithm breaks down into the following high-level process to ge
 >          1. Return _CJS_FINALIZE_RESOLVE(resolved, realpath, isMain)_.
 >       1. Return _FINALIZE_RESOLVE(resolved, true, isMain)_.
 >    1. Otherwise, set _name_ to _mapped_.
-> 1. Let _resolved_ to the result of _JSPM_PROJECT_RESOLVE(name, parentScope, parentConfig, jspmProjectPath, cjsResolve, isMain)_.
-> 1. If _resolved_ is not equal to _undefined_, return _resolved_.
-> 1. If _name_ is a builtin module or _"@empty"_ then,
->    1.  Return the object _{ resolved: name, format: "builtin" }_.
-> 1. Throw a _Module Not Found_ error.
+> 1. If _jspmProjectPath_ is not _undefined_ then,
+>    1. Return the result of _JSPM_PROJECT_RESOLVE(name, parentScope, parentConfig, jspmProjectPath, cjsResolve, isMain)_.
+> 1. Otherwise,
+>    1. Return the result of _NODE_MODULES_RESOLVE(name, parentPath, cjsResolve, isMain)_.
 
 > **RELATIVE_RESOLVE(name: String, parentPath: String, jspmProjectPath: String, cjsResolve: Boolean, isMain)**
 > 1. Let _resolved_ be _undefined_.
@@ -590,32 +546,43 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _cjsResolve_ is equal to _true_ then,
 >    1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
 >    1. If _scope_ is not _undefined_ then,
->       1. Let _pjson_ be the result of _READ_PACKAGE_JSON("${scope}/package.json")_.
->    1. Return _NODE_PACKAGE_RESOLVE(resolved, false, jspmProject, scope, pjson, isMain)_.
+>       1. Let _pjson_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_.
+>    1. Return _CJS_FINALIZE_RESOLVE(resolved, scope, isMain)_.
 > 1. Return _FINALIZE_RESOLVE(resolved, jspmProject, isMain)_.
 
 > **JSPM_PROJECT_RESOLVE(name: String, parentScope: String, parentConfig: String, jspmProjectPath: String, cjsResolve: Boolean, isMain: Boolean)**
-> 1. Let _jspmConfig_ be the result of _READ_JSPM_CONFIG(jspmProjectPath)_.
-> 1. If _jspmConfig_ is _undefined_ then,
->    1. Return _undefined_.
+> 1. Let _jspmConfig_ be the parsed contents of _"jspm.json"_ in _jspmProjectPath_, throwing a _Configuration Error_ for not found or invalid JSON.
 > 1. Let _parentPackage_ be _PARSE_PACKAGE_PATH(parentScope)_ if _parentScope_ is not _undefined_.
 > 1. Let _packageName_ and _packageSubpath_ be the destructured properties of _PARSE_PACKAGE(name)_, throwing on abrupt completion.
 > 1. Let _packageResolution_ be _undefined_.
-> 1. If _parentPackage.package_ is not _undefined_ then,
->    1. Set _packageResolution_ to _jspmConfig.dependencies[parentPackage.name]?.resolve[packageName]_.
+> 1. If _parentPackage?.packageName_ is not _undefined_ then,
+>    1. Set _packageResolution_ to _jspmConfig.dependencies[parentPackage.packageName]?.resolve[packageName]_.
 > 1. If _packageResolution_ is _undefined_ then,
->    1. If _parentPackage.package_ is _undefined_ or _name_ is a match of _parentConfig.peerDependencies_ then,
+>    1. If _parentPackage?.packageName_ is _undefined_ or _name_ is a match of _parentConfig.peerDependencies_ then,
 >         1. Set _packageResolution_ to _jspmConfig.resolve[packageName]_.
-> 1. If _packageResolution_ is _undefined_, return _undefined_.
-> 1. If _packageResolution_ is not a valid exact package name, throw an _Invalid Configuration_ error.
+> 1. If _packageResolution_ is _undefined_ then,
+>    1. If _name_ is a builtin module, return _{ resolved: name, format: "builtin" }_.
+>    1. Throw a _Module Not Found_ error.
 > 1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(packageResolution, jspmProjectPath)_.
 > 1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
 > 1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig)_.
 > 1. If _cjsResolve_ is *true* then,
 >    1. Return the result of _CJS_FINALIZE_RESOLVE(resolved, packagePath, isMain)_.
 > 1. Otherwise,
->    1. Let _jspmProject_ be the boolean indicating if _jspmProjectPath_ is not _undefined_.
->    1. Return the result of _FINALIZE_RESOLVE(resolved, jspmProject, isMain)_.
+>    1. Return the result of _FINALIZE_RESOLVE(resolved, true, isMain)_.
+
+> **NODE_MODULES_RESOLVE(name: String, parentPath: String, cjsResolve: Boolean, isMain: Boolean)**
+> 1. If _name_ is a builtin module, return _{ resolved: name, format: "builtin" }_.
+> 1. Let _packageName_ and _packageSubpath_ be the destructured values of _PARSE_PACKAGE(specifier)_, throwing on abrupt completion.
+> 1. While _parentPath_ is not the file system root,
+>    1. Let _packagePath_ be the resolution of _"node_modules/"_ concatenated with _name_, relative to _parentPath_.
+>    1. Set _parentPath_ to the parent folder of _parentPath_.
+>    1. If the folder at _packagePath_ does not exist, then
+>       1. Set _parentPath_ to the parent path of _parentPath_.
+>       1. Continue the next loop iteration.
+>    1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
+>    1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig)_.
+> 1. Throw a _Module Not Found_ error.
 
 > **FINALIZE_RESOLVE(resolved: String, jspmProject: Boolean, isMain: Boolean)**
 > 1. If _resolved_ ends with the character _"/"_ then,
@@ -631,7 +598,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Return _{ resolved, format: "unknown" }_.
 > 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
 > 1. If _scope_ is not _undefined_ then,
->    1. Let _pjson_ be the result of _READ_PACKAGE_JSON("${scope}/package.json")_.
+>    1. Let _pjson_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_.
 > 1. Let _cjs_ be _true_ if _jspmProject_ is false.
 > 1. If _pjson?.type_ is equal to _"commonjs"_ then,
 >    1. Set _cjs_ to _true_.
