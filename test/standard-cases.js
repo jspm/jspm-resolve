@@ -13,7 +13,7 @@ const pkgPath = `${sfPath}jspm_packages/ra/pkg@version/`;
 const pkg2Path = `${sfPath}jspm_packages/ra/pkg@version2/`;
 const nmPath = fixturesPath + 'node_modules/test/';
 
-suite('Standard Cases', () => {
+suite.skip('Standard Cases', () => {
   const cache = {};
 
   test('Legacy Extension cases', async () => {
@@ -251,7 +251,7 @@ suite('Standard Cases', () => {
   });
 });
 
-suite('Standard Cases', () => {
+suite.skip('Standard Cases Sync', () => {
   const cache = {};
 
   test('Legacy Extension cases', async () => {

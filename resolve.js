@@ -48,22 +48,21 @@ function throwInvalidConfig (msg) {
 }
 
 const packageRegEx = /^((?:@[^/\\%]+\/)?[^./\\%][^/\\%]*)(\/.*)?$/;
-function parsePackage (name) {
-  let [, name, path = ''] = name.match(packageRegEx) || [];
+function parsePackage (specifier) {
+  let [, name, path = ''] = specifier.match(packageRegEx) || [];
   if (path.length)
     path = '.' + path;
   return { name, path };
 }
-function parsepkgPath (path, jspmProjectPath) {
+function parsePkgPath (path, jspmProjectPath) {
   const jspmPackagesPath = jspmProjectPath + '/jspm_packages';
   if (!path.startsWith(jspmPackagesPath) || path[jspmPackagesPath.length] !=='/' && path.length !== jspmPackagesPath.length)
     return;
-  const registrySep = path.slice(jspmPackagesPath.length + 1).indexOf('/');
+  const registrySep = path.indexOf('/', jspmPackagesPath.length + 1);
   if (registrySep === -1) return;
-  const canonical = path.sliceing(jspmPackagesPath.length + 1, registrySep) + ':' + path.slice(registrySep + 1);
-  const { name, path } = parsePackage(canonical);
+  const { name } = parsePackage(path.slice(registrySep + 1));
   if (!name) return;
-  return { name, path };
+  return path.substring(jspmPackagesPath.length + 1, registrySep) + ':' + name;
 }
 function packageToPath (pkgName, jspmProjectPath) {
   const registryIndex = pkgName.indexOf(':');
@@ -76,7 +75,7 @@ function uriToPath (path) {
     throwInvalidModuleName(`${path} cannot be URI decoded as it contains an unsafe percent-encoding.`);
   if (path.indexOf('%') !== -1)
     path = decodeURIComponent(path);
-  if (path.indexOF('\\') !== -1)
+  if (path.indexOf('\\') !== -1)
     path = path.replace(winSepRegEx, '/');
   return path;
 }
@@ -117,7 +116,7 @@ function resolvePath (path, parent) {
     // busy reading a segment - only terminate on '/'
     if (segmentIndex !== -1) {
       if (path[i] === '/') {
-        const nextSegment = { segment: path.sliceing(segmentIndex, i + 1), next: undefined, prev: curSegment };
+        const nextSegment = { segment: path.substring(segmentIndex, i + 1), next: undefined, prev: curSegment };
         curSegment.next = nextSegment;
         curSegment = nextSegment;
         segmentIndex = -1;
@@ -189,6 +188,7 @@ function hasWinDrivePrefix (name) {
   return charCode > 64 && charCode < 90 || charCode > 96 && charCode < 123;
 }
 
+const seenCache = new WeakMap();
 function initCache (cache) {
   if (cache.jspmConfigCache === undefined)
     cache.jspmConfigCache = Object.create(null);
@@ -244,7 +244,7 @@ const defaultBuiltins = new Set([
   'zlib'
 ]);
 
-async function resolve (specifier, parentPath, {
+async function resolve (specifier, parentPath = process.cwd() + '/', {
   targets = defaultTargets,
   cache = undefined,
   cjsResolve = false,
@@ -262,12 +262,12 @@ async function resolve (specifier, parentPath, {
   const relativeResolved = relativeResolve.call(fs, specifier, parentPath);
   if (relativeResolved) {
     if (cjsResolve)
-      return cjsFinalizeResolve.call(fs, resolved, parentPath, jspmProjectPath, cache);
-    return await finalizeResolve.call(fs, resolved, parentPath, jspmProjectPath, isMain, cache);
+      return cjsFinalizeResolve.call(fs, relativeResolved, parentPath, jspmProjectPath, cache);
+    return await finalizeResolve.call(fs, relativeResolved, parentPath, jspmProjectPath, isMain, cache);
   }
   
-  const parentScope = await getPackageScope.call(this, parentPath, cache);
-  const parentConfig = parentScope && await readPkgConfig.call(this, parentPath, cache);
+  const parentScope = await getPackageScope.call(fs, parentPath, cache);
+  const parentConfig = parentScope && await readPkgConfig.call(fs, parentPath, cache);
 
   if (parentConfig && parentConfig.map) {
     const mapped = resolveMap(specifier, parentConfig.map, parentScope, parentPath, targets, builtins);
@@ -277,8 +277,8 @@ async function resolve (specifier, parentPath, {
       }
       else {
         if (cjsResolve)
-          return cjsFinalizeResolve.call(fs, resolved, parentPath, jspmProjectPath, cache);
-        return await finalizeResolve.call(fs, resolved, parentPath, jspmProjectPath, isMain, cache);
+          return cjsFinalizeResolve.call(fs, mapped, parentPath, jspmProjectPath, cache);
+        return await finalizeResolve.call(fs, mapped, parentPath, jspmProjectPath, isMain, cache);
       }
     }
   }
@@ -289,7 +289,7 @@ async function resolve (specifier, parentPath, {
     return nodeModulesResolve.call(fs, specifier, parentPath, cjsResolve, isMain, targets, builtins, cache);
 }
 
-function resolveSync (specifier, parentPath, {
+function resolveSync (specifier, parentPath = process.cwd() + '/', {
   targets = defaultTargets,
   cache = undefined,
   cjsResolve = false,
@@ -307,12 +307,12 @@ function resolveSync (specifier, parentPath, {
   const relativeResolved = relativeResolve.call(fs, specifier, parentPath);
   if (relativeResolved) {
     if (cjsResolve)
-      return cjsFinalizeResolve.call(fs, resolved, parentPath, jspmProjectPath, cache);
-    return finalizeResolveSync.call(fs, resolved, parentPath, jspmProjectPath, isMain, cache);
+      return cjsFinalizeResolve.call(fs, relativeResolved, parentPath, jspmProjectPath, cache);
+    return finalizeResolveSync.call(fs, relativeResolved, parentPath, jspmProjectPath, isMain, cache);
   }
   
-  const parentScope = getPackageScopeSync.call(this, parentPath, cache);
-  const parentConfig = parentScope && readPkgConfigSync.call(this, parentPath, cache);
+  const parentScope = getPackageScopeSync.call(fs, parentPath, cache);
+  const parentConfig = parentScope && readPkgConfigSync.call(fs, parentPath, cache);
 
   if (parentConfig && parentConfig.map) {
     const mapped = resolveMap(specifier, parentConfig.map, parentScope, parentPath, targets, builtins);
@@ -322,8 +322,8 @@ function resolveSync (specifier, parentPath, {
       }
       else {
         if (cjsResolve)
-          return cjsFinalizeResolve.call(fs, resolved, parentPath, jspmProjectPath, cache);
-        return finalizeResolveSync.call(fs, resolved, parentPath, jspmProjectPath, isMain, cache);
+          return cjsFinalizeResolve.call(fs, mapped, parentPath, jspmProjectPath, cache);
+        return finalizeResolveSync.call(fs, mapped, parentPath, jspmProjectPath, isMain, cache);
       }
     }
   }
@@ -371,15 +371,15 @@ function relativeResolve (name, parentPath) {
 
 async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsResolve, isMain, targets, builtins, cache) {
   const jspmConfig = await readJspmConfig.call(this, jspmProjectPath, cache);
-  const parentPkg = parsepkgPath(parentPath);
+  const parentPkg = parsePkgPath(parentPath, jspmProjectPath);
   const { name, path } = parsePackage(specifier);
   if (!name)
     throwInvalidPackageName(specifier + ' is not a valid package name, imported from ' + parentPath);
 
   let pkgResolution;
-  if (parentPkg && parentPkg.packageName) {
-    const parentDeps = jspmConfig.dependencies[parentPkg.packageName];
-    pkgResolution = parentDeps && parentDeps[name] || jspmConfig.resolvePeer[name];
+  if (parentPkg) {
+    const parentDeps = jspmConfig.dependencies[parentPkg];
+    pkgResolution = parentDeps && parentDeps.resolve && parentDeps.resolve[name] || jspmConfig.resolvePeer[name];
   }
   else {
     pkgResolution = jspmConfig.resolve[name] || jspmConfig.resolvePeer[name];
@@ -393,23 +393,23 @@ async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsRe
   const pkgPath = packageToPath(pkgResolution, jspmProjectPath);
   const pkgConfig = await readPkgConfig.call(this, pkgPath, cache);
 
-  const resolved = resolvePackage(pkgPath, path, parentPath, pkgConfig, targets, builtins);
+  const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, targets, builtins, cache);
 
   if (cjsResolve)
-    return cjsFinalizeResolve.call(this, resolved, parentPath, undefined, cache);
-  return await finalizeResolve.call(this, resolved, parentPath, undefined, isMain, cache);
+    return cjsFinalizeResolve.call(this, resolved, parentPath, jspmProjectPath, cache);
+  return await finalizeResolve.call(this, resolved, parentPath, jspmProjectPath, isMain, cache);
 }
 
 function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsResolve, isMain, targets, builtins, cache) {
   const jspmConfig = readJspmConfigSync.call(this, jspmProjectPath, cache);
-  const parentPkg = parsepkgPath(parentPath);
+  const parentPkg = parsePkgPath(parentPath, jspmProjectPath);
   const { name, path } = parsePackage(specifier);
   if (!name)
     throwInvalidPackageName(specifier + ' is not a valid package name, imported from ' + parentPath);
 
   let pkgResolution;
-  if (parentPkg && parentPkg.packageName) {
-    const parentDeps = jspmConfig.dependencies[parentPkg.packageName];
+  if (parentPkg) {
+    const parentDeps = jspmConfig.dependencies[parentPkg];
     pkgResolution = parentDeps && parentDeps[name] || jspmConfig.resolvePeer[name];
   }
   else {
@@ -424,18 +424,18 @@ function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsReso
   const pkgPath = packageToPath(pkgResolution, jspmProjectPath);
   const pkgConfig = readPkgConfigSync.call(this, pkgPath, cache);
 
-  const resolved = resolvePackage(pkgPath, path, parentPath, pkgConfig, targets, builtins);
+  const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, targets, builtins, cache);
 
   if (cjsResolve)
-    return cjsFinalizeResolve.call(this, resolved, parentPath, undefined, cache);
-  return finalizeResolveSync.call(this, resolved, parentPath, undefined, isMain, cache);
+    return cjsFinalizeResolve.call(this, resolved, parentPath, jspmProjectPath, cache);
+  return finalizeResolveSync.call(this, resolved, parentPath, jspmProjectPath, isMain, cache);
 }
 
 function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, builtins, cache) {
   if (builtins[name])
     return { resolved: name, format: 'builtin' };
   let curParentPath = parentPath;
-  let separatorIndex;
+  let separatorIndex, path;
   ({ name, path } = parsePackage(name));
   if (!name)
     throwInvalidModuleName("Invalid package name '" + name + "', loaded from " + parentPath);  
@@ -444,8 +444,8 @@ function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, buil
     curParentPath = curParentPath.slice(0, separatorIndex);
     const pkgPath = curParentPath + '/node_modules/' + name;
     if (this.isDirSync(pkgPath, cache)) {
-      const pkgConfig = readPkgConfigSync.call(this, pkgPath, cache) || {};
-      const resolved = resolvePackage(pkgPath, resolved.slice(pkgPath.length), parentPath, pkgConfig, targets, builtins);
+      const pkgConfig = readPkgConfigSync.call(this, pkgPath, cache);
+      const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, targets, builtins, cache);
       if (cjsResolve)
         return cjsFinalizeResolve.call(this, resolved, parentPath, undefined, cache);
       return finalizeResolveSync.call(this, resolved, parentPath, undefined, isMain, cache);
@@ -458,6 +458,11 @@ async function finalizeResolve (path, parentPath, jspmProjectPath, isMain, cache
   const scope = await getPackageScope.call(this, path, cache);
   const scopeConfig = scope && await readPkgConfig.call(this, scope, cache);
   const resolved = await this.realpath(path, jspmProjectPath ? scope : undefined, cache);
+  if (resolved && resolved[resolved.length - 1] === '/') {
+    if (!(await this.isDir(resolved, cache)))
+      throwModuleNotFound(path, parentPath);
+    return { resolved, format: 'unknown' };
+  }
   if (!resolved || !(await this.isFile(resolved, cache)))
     throwModuleNotFound(path, parentPath);
   if (resolved.endsWith('.mjs'))
@@ -466,15 +471,20 @@ async function finalizeResolve (path, parentPath, jspmProjectPath, isMain, cache
     return { resolved, format: 'addon' };
   if (resolved.endsWith('.json'))
     return { resolved, format: 'json' };
-  if (!isMain && !resolved.endsWith('.js') || resolved.endsWith('/'))
+  if (!isMain && !resolved.endsWith('.js'))
     return { resolved, format: 'unknown' };
   return { resolved, format: scopeConfig && scopeConfig.type || 'commonjs' };
 }
 
-function finalizeResolveSync (resolved, parentPath, jspmProjectPath, isMain, cache) {
+function finalizeResolveSync (path, parentPath, jspmProjectPath, isMain, cache) {
   const scope = getPackageScopeSync.call(this, path, cache);
   const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
   const resolved = this.realpathSync(path, jspmProjectPath ? scope : undefined, cache);
+  if (resolved && resolved[resolved.length - 1] === '/') {
+    if (!this.isDirSync(resolved, cache))
+      throwModuleNotFound(path, parentPath);
+    return { resolved, format: 'unknown' };
+  }
   if (!resolved || !this.isFileSync(resolved, cache))
     throwModuleNotFound(path, parentPath);
   if (resolved.endsWith('.mjs'))
@@ -483,7 +493,7 @@ function finalizeResolveSync (resolved, parentPath, jspmProjectPath, isMain, cac
     return { resolved, format: 'addon' };
   if (resolved.endsWith('.json'))
     return { resolved, format: 'json' };
-  if (!isMain && !resolved.endsWith('.js') || resolved.endsWith('/'))
+  if (!isMain && !resolved.endsWith('.js'))
     return { resolved, format: 'unknown' };
   return { resolved, format: scopeConfig && scopeConfig.type || 'commonjs' };
 }
@@ -526,11 +536,19 @@ function legacyDirResolve (path, main, cache) {
 function cjsFinalizeResolve (path, parentPath, jspmProjectPath, cache) {
   const scope = getPackageScopeSync.call(this, path, cache);
   const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
-  let resolved = legacyFileResolve.call(this, path, cache) || legacyDirResolve.call(this, path, scopeConfig && scopeConfig.entries.main, cache);
-  if (resolved)
-    resolved = this.realpathSync(path, jspmProjectPath ? scope : undefined, cache);
+  let resolved;
+  if (path[path.length - 1] === '/') {
+    if (this.isDirSync(path, cache))
+      resolved = path;
+  }
+  else {
+    resolved = legacyFileResolve.call(this, path, cache) || legacyDirResolve.call(this, path, scopeConfig && scopeConfig.entries.main, cache);
+  }
   if (!resolved)
-    throwModuleNotFound(resolved, parentPath);
+    throwModuleNotFound(path, parentPath);
+  resolved = this.realpathSync(path, jspmProjectPath ? scope : undefined, cache);
+  if (resolved[resolved.length - 1] === '/')
+    return { resolved, format: 'unknown' };
   if (resolved.endsWith('.mjs') || resolved.endsWith('.js') && scopeConfig && scopeConfig.type === 'module')
     throwInvalidModuleName(`Cannot load ".mjs" module ${resolved} from CommonJS module ${parentPath}.`);
   if (resolved.endsWith('.json'))
@@ -725,19 +743,6 @@ async function readPkgConfig (pkgPath, cache) {
 
   const processed = processPkgConfig(pjson);
 
-  for (const entry of pjson.entries) {
-    if (pcfg.type === 'module') {
-      pjson.entries[entry] = uriToPath(pjson.entries[entry]);
-      if (!this.isFileSync(pkgPath + '/' + pjson.entries[entry], cache))
-        delete pjson.entries[entry];
-    }
-    else {
-      pjson.entries[entry] = legacyDirResolve.call(this, pkgPath, uriToPath(pjson.entries[entry]), cache);
-      if (!pjson.entries[entry])
-        delete pjson.entries[entry];
-    }
-  }
-
   if (cache)
     cache.pjsonConfigCache[pkgPath] = processed;
 
@@ -846,8 +851,10 @@ const fsUtils = {
     return stats;
   },
 
-  async realpath (path, realpathBase, cache, seen = new Set()) {
+  async realpath (path, realpathBase = path.slice(0, path.indexOf('/')), cache, seen = new Set()) {
     const trailingSlash = path[path.length - 1] === '/';
+    if (trailingSlash)
+      path = path.slice(0, -1);
     if (seen.has(path))
       throw new Error('Recursive symlink resolving ' + path);
     seen.add(path);
@@ -855,18 +862,20 @@ const fsUtils = {
     if (symlink) {
       const resolved = resolvePath(symlink, path);
       if (realpathBase && !pathContains(realpathBase, resolved))
-        return path;
+        return path + (trailingSlash ? '/' : '');
       return this.realpath(resolved + (trailingSlash ? '/' : ''), realpathBase, cache, seen);
     }
     else {
-      const parentPath = resolvePath('../', path);
-      if (realpathBase && parentPath === realpathBase)
-        return path;
-      return (await this.realpath(parentPath, parent, cache, seen)) + '/' + path.slice(parentPath.length + 1);
+      const parent = resolvePath('.', path);
+      if (realpathBase && !pathContains(realpathBase, parent))
+        return path + (trailingSlash ? '/' : '');
+      return (await this.realpath(parent, realpathBase, cache, seen)) + '/' + path.slice(parent.length) + (trailingSlash ? '/' : '');
     }
   },
-  realpathSync (path, realpathBase, cache, seen = new Set()) {
+  realpathSync (path, realpathBase = path.slice(0, path.indexOf('/')), cache, seen = new Set()) {
     const trailingSlash = path[path.length - 1] === '/';
+    if (trailingSlash)
+      path = path.slice(0, -1);
     if (seen.has(path))
       throw new Error('Recursive symlink resolving ' + path);
     seen.add(path);
@@ -874,14 +883,14 @@ const fsUtils = {
     if (symlink) {
       const resolved = resolvePath(symlink, path);
       if (realpathBase && !pathContains(realpathBase, resolved))
-        return path;
+        return path + (trailingSlash ? '/' : '');
       return this.realpathSync(resolved + (trailingSlash ? '/' : ''), realpathBase, cache, seen);
     }
     else {
-      const parentPath = resolvePath('../', path);
-      if (realpathBase && parentPath === realpathBase)
-        return path;
-      return this.realpathSync(parentPath, parent, cache, seen) + '/' + path.slice(parentPath.length + 1);
+      const parent = resolvePath('.', path);
+      if (realpathBase && !pathContains(realpathBase, parent))
+        return path + (trailingSlash ? '/' : '');
+      return this.realpathSync(parent, parent, cache, seen) + '/' + path.slice(parent.length) + (trailingSlash ? '/' : '');
     }
   },
 
@@ -973,7 +982,7 @@ function processPkgConfig (pjson) {
     type = pjson.type;
 
   for (const key of Object.keys(pjson)) {
-    const value = pjson[key];
+    let value = pjson[key];
     if (typeof value === 'string') {
       if (value.startsWith('./')) value = value.slice(2);
       if (value.endsWith('/')) value = value.slice(0, value.length - 1);
@@ -1063,7 +1072,9 @@ function getTargetsMatch (obj, targets) {
   }
 }
 
-function resolvePackage (pkgPath, subpath, parentPath, pcfg, targets, builtins) {
+const emptyPcfg = Object.create(null);
+function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets, builtins, cache) {
+  pcfg = pcfg || emptyPcfg;
   if (subpath) {
     if (pcfg.exports === undefined || pcfg.exports === null)
       return resolvePath(uriToPath(subpath), pkgPath + '/');
@@ -1086,9 +1097,17 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, targets, builtins) 
     throwExportsNotFound(pkgPath, subpath, parentPath);
   }
   else {
-    const entry = getTargetsMatch(pcfg.entries, targets);
-    if (entry)
-      return resolvePath(uriToPath(pcfg.entries[entry]), pkgPath + '/');
+    const entry = pcfg.entries && getTargetsMatch(pcfg.entries, targets);
+    if (entry) {
+      const resolved = resolvePath(uriToPath(pcfg.entries[entry]), pkgPath + '/');
+      if (this.isFileSync(resolved, cache))
+        return resolved;
+    }
+    if (pcfg.type !== 'module' || cjsResolve === true) {
+      const resolved = legacyDirResolve.call(this, pkgPath, pcfg.main, cache);
+      if (resolved)
+        return resolved;
+    }
     throwMainNotFound(pkgPath, parentPath);
   }
 }
@@ -1099,7 +1118,7 @@ function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targe
       const resolvedTarget = resolvePath(uriToPath(subpath), pkgPath + '/');
       if (resolvedTarget.startsWith(pkgPath + '/')) {
         const resolved = resolvePath(uriToPath(subpath), resoledTarget);
-        if (resolved.startsWith(pkgPath + '/'))
+        if (resolved.startsWith(resolvedTarget + '/'))
           return resolved;
       }
     }
@@ -1159,8 +1178,9 @@ function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets,
         throwNoMapTarget(pkgPath, match + subpath, match, parentPath);
       const resolvedTarget = resolvePath(uriToPath(target), pkgPath + '/');
       if (resolvedTarget.startsWith(pkgPath + '/')) {
+        if (!subpath) return resolvedTarget;
         const resolved = resolvePath(uriToPath(subpath), resolvedTarget);
-        if (resolved.startsWith(pkgPath + '/'))
+        if (resolved.startsWith(resolvedTarget + '/'))
           return resolved;
       }
     }
