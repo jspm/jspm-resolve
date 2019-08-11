@@ -287,9 +287,10 @@ To convert a package between these forms, the following methods are defined:
 > 1. Let _registrySep_ be the index of _"/"_ in _relPackagePath_.
 > 1. _If _registrySep_ is not defined then,
 >    1. Return _undefined_.
-> 1. Let _canonical_ be the result of replacing the character at _registrySep_ in _relPackagePath_ with _":"_.
-> 1. Let _packageName_ be the destructured result of _PARSE_PACKAGE(canonical)_, returning _undefined_ on abrupt completion.
-> 1. Return the object with values __packageName_.
+> 1. Let _registry_ be the substring of _relPackagePath_ of the length of _registrySep_.
+> 1. Let _namePath_ be the substring of _relPackagePath_ starting at the index after _registrySep_.
+> 1. Let _packageName_ be the destructured result of _PARSE_PACKAGE(namePath)_, returning _undefined_ on abrupt completion.
+> 1. Return the concatenation of _registry_, _":"_ and _packageName_.
 
 > **PACKAGE_TO_PATH(name: String, jspmProjectPath: String): String**
 > 1. Let _jspmPackagesPath_ be the path _"jspm_packages/"_ resolved to directory _jspmProjectPath_, including a trailing separator.
@@ -605,8 +606,9 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
 > 1. If _path_ ends with the character _"/"_ then,
 >    1. If _path_ does not point to an existing directory, throw a _Module Not Found_ error.
+>    1. Let _resolved_ be _path_.
 > 1. Otherwise,
->    1. Set _resolved_ to _LEGACY_FILE_RESOLVE(path)_.
+>    1. Let _resolved_ be _LEGACY_FILE_RESOLVE(path)_.
 >    1. If _resolved_ is _undefined_ then,
 >       1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path, scopeConfig?.main)_.
 >    1. If _resolved_ is _undefined_ then,
