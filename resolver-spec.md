@@ -288,8 +288,8 @@ To convert a package between these forms, the following methods are defined:
 > 1. _If _registrySep_ is not defined then,
 >    1. Return _undefined_.
 > 1. Let _canonical_ be the result of replacing the character at _registrySep_ in _relPackagePath_ with _":"_.
-> 1. Let _packageName_ and _packageSubpath_ be the destructured result of _PARSE_PACKAGE(canonical)_, returning _undefined_ on abrupt completion.
-> 1. Return the object with values _{ packageName, packageSubpath }_.
+> 1. Let _packageName_ be the destructured result of _PARSE_PACKAGE(canonical)_, returning _undefined_ on abrupt completion.
+> 1. Return the object with values __packageName_.
 
 > **PACKAGE_TO_PATH(name: String, jspmProjectPath: String): String**
 > 1. Let _jspmPackagesPath_ be the path _"jspm_packages/"_ resolved to directory _jspmProjectPath_, including a trailing separator.
@@ -372,7 +372,7 @@ The process of reading the package.json configuration for a given package path i
 
 ### Entries, Exports and Map Resolution
 
-> **RESOLVE_PACKAGE(packagePath: String, subpath: String, pcfg: Object)**
+> **RESOLVE_PACKAGE(packagePath: String, subpath: String, pcfg: Object, cjsResolve: Boolean)**
 > 1. Assert: _subpath_ is the empty String or starts with _"./"_.
 > 1. If _subpath_ is the empty String then,
 >    1. Let _match_ be the first matching environment condition in _pcfg.entries_ in condition priority order.
@@ -382,9 +382,9 @@ The process of reading the package.json configuration for a given package path i
 >       1. Set _target_ to _URI_DECODE(target)_.
 >       1. Let _resolved_ be the resolution of _packagePath + "/" + target_.
 >       1. If the file at _resolved_ exists, return _resolved_.
->       1. If _pcfg.type_ is equal to _"module"_, throw a _Module Not Found_ error.
->       1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath + "/", pcfg.main)_.
->       1. If _resolved_ is not _undefined_, return _resolved_.
+>    1. If _pcfg.type_ is equal to _"module"_ and _cjsResolve_ is _false_, throw a _Module Not Found_ error.
+>    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath + "/", pcfg.main)_.
+>    1. If _resolved_ is not _undefined_, return _resolved_.
 >    1. Throw a _Module Not Found_ error.
 > 1. If _pcfg.exports_ is _undefined_ or _null_ then,
 >    1. Set _subpath_ to _URI_DECODE(subpath)_.
@@ -414,7 +414,7 @@ The process of reading the package.json configuration for a given package path i
 >    1. Let _resolvedTarget_ be the resolution of _packagePath_ and _target_.
 >    1. If _resolvedTarget_ is contained in _packagePath_ then,
 >       1. Let _resolved_ be the resolution of _subpath_ and _resolvedTarget_.
->       1. If _resolved_ is contained in _packagePath_, return _resolved_.
+>       1. If _resolved_ is contained in _resolvedTarget_, return _resolved_.
 > 1. Otherwise, if _target_ is an Array then,
 >    1. For each item _targetValue_ of _target_,
 >       1. If _targetValue_ is not a String or Object, continue the loop.
@@ -459,7 +459,7 @@ The process of reading the package.json configuration for a given package path i
 >       1. Let _resolvedTarget_ be the resolution of _packagePath_ and _target_.
 >       1. If _resolvedTarget_ is contained in _packagePath_ then,
 >          1. Let _resolved_ be the resolution of _subpath_ and _resolvedTarget_.
->          1. If _resolved_ is contained in _packagePath_, return _"./"_ concatenated with the substring of _resolved_ from the length of _packagePath_.
+>          1. If _resolved_ is contained in _resolvedTarget_, return _"./"_ concatenated with the substring of _resolved_ from the length of _packagePath_.
 > 1. Otherwise, if _target_ is an Array then,
 >    1. For each item _targetValue_ of _target_,
 >       1. If _targetValue_ is not a String or Object, continue the loop.
@@ -545,8 +545,8 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Let _parentPackage_ be _PARSE_PACKAGE_PATH(parentPath)_ if _parentPath_ is not _undefined_.
 > 1. Let _packageName_ and _packageSubpath_ be the destructured properties of _PARSE_PACKAGE(name)_, throwing on abrupt completion.
 > 1. Let _packageResolution_ be _undefined_.
-> 1. If _parentPackage?.packageName_ is not _undefined_ then,
->    1. Set _packageResolution_ to _jspmConfig.dependencies[parentPackage.packageName]?.resolve[packageName]_.
+> 1. If _parentPackage_ is not _undefined_ then,
+>    1. Set _packageResolution_ to _jspmConfig.dependencies[parentPackage]?.resolve[packageName]_.
 > 1. Otherwise,
 >    1. Set _packageResolution_ to _jspmConfig.resolve[packageName]_.
 > 1. If _packageResolution_ is _undefined_ then,
@@ -556,7 +556,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Throw a _Module Not Found_ error.
 > 1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(packageResolution, jspmProjectPath)_.
 > 1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
-> 1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig)_.
+> 1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig, cjsResolve)_.
 > 1. If _cjsResolve_ is *true* then,
 >    1. Return the result of _CJS_FINALIZE_RESOLVE(resolved, jspmProjectPath)_.
 > 1. Otherwise,
@@ -572,7 +572,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Set _parentPath_ to the parent path of _parentPath_.
 >       1. Continue the next loop iteration.
 >    1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
->    1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig)_.
+>    1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig, cjsResolve)_.
 >    1. If _cjsResolve_ then,
 >       1. Return the result of _CJS_FINALIZE_RESOLVE(resolved, undefined)_.
 >    1. Otherwise,
