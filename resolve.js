@@ -331,7 +331,7 @@ function resolveSync (specifier, parentPath = process.cwd() + '/', {
   if (jspmProjectPath)
     return jspmProjectResolveSync.call(fs, specifier, parentPath, jspmProjectPath, cjsResolve, isMain, targets, builtins, cache);
   else
-    return nodeModulesResolveSync.call(fs, specifier, parentPath, cjsResolve, isMain, targets, builtins, cache);
+    return nodeModulesResolve.call(fs, specifier, parentPath, cjsResolve, isMain, targets, builtins, cache);
 }
 
 function relativeResolve (name, parentPath) {
@@ -385,7 +385,7 @@ async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsRe
     pkgResolution = jspmConfig.resolve[name] || jspmConfig.resolvePeer[name];
   }
   if (!pkgResolution) {
-    if (builtins[name])
+    if (builtins.has(name))
       return { resolved: name, format: 'builtin' };
     throwModuleNotFound(specifier, parentPath);
   }
@@ -410,13 +410,13 @@ function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsReso
   let pkgResolution;
   if (parentPkg) {
     const parentDeps = jspmConfig.dependencies[parentPkg];
-    pkgResolution = parentDeps && parentDeps[name] || jspmConfig.resolvePeer[name];
+    pkgResolution = parentDeps && parentDeps.resolve && parentDeps.resolve[name] || jspmConfig.resolvePeer[name];
   }
   else {
     pkgResolution = jspmConfig.resolve[name] || jspmConfig.resolvePeer[name];
   }
   if (!pkgResolution) {
-    if (builtins[name])
+    if (builtins.has(name))
       return { resolved: name, format: 'builtin' };
     throwModuleNotFound(specifier, parentPath);
   }
@@ -432,7 +432,7 @@ function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsReso
 }
 
 function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, builtins, cache) {
-  if (builtins[name])
+  if (builtins.has(name))
     return { resolved: name, format: 'builtin' };
   let curParentPath = parentPath;
   let separatorIndex, path;
@@ -515,7 +515,7 @@ function legacyDirResolve (path, main, cache) {
   if (!this.isDirSync(path, cache))
     return;
   if (main) {
-    const resolved = legacyFileResolve(path + '/' + main);
+    const resolved = legacyFileResolve.call(this, path + '/' + main, cache);
     if (resolved)
       return resolved;
     if (this.isFileSync(path + '/' + main + '/index.js', cache))
@@ -546,7 +546,7 @@ function cjsFinalizeResolve (path, parentPath, jspmProjectPath, cache) {
   }
   if (!resolved)
     throwModuleNotFound(path, parentPath);
-  resolved = this.realpathSync(path, jspmProjectPath ? scope : undefined, cache);
+  resolved = this.realpathSync(resolved, jspmProjectPath ? scope : undefined, cache);
   if (resolved[resolved.length - 1] === '/')
     return { resolved, format: 'unknown' };
   if (resolved.endsWith('.mjs') || resolved.endsWith('.js') && scopeConfig && scopeConfig.type === 'module')
@@ -896,7 +896,7 @@ const fsUtils = {
 
   async readlink (path, cache) {
     if (cache) {
-      const cached = cache.symlinkCache.get(path);
+      const cached = cache.symlinkCache[path];
       if (cached !== undefined)
         return cached;
     }
@@ -904,7 +904,7 @@ const fsUtils = {
       const fsLink = await new Promise((resolve, reject) => fs.readlink(path, (err, link) => err ? reject(err) : resolve(link)));
       const link = resolvePath(fsLink, path);
       if (cache) {
-        cache.symlinkCache.set(path, link);
+        cache.symlinkCache[path] = link;
         const stats = cache.statCache.get(path);
         if (stats)
           cache.statCache.set(link, stats);
@@ -915,20 +915,20 @@ const fsUtils = {
       if (e.code !== 'EINVAL' && e.code !== 'ENOENT' && e.code !== 'UNKNOWN')
         throw e;
       if (cache)
-        cache.symlinkCache.set(path, null);
+        cache.symlinkCache[path] = null;
       return null;
     }
   },
   readlinkSync (path, cache) {
     if (cache) {
-      const cached = cache.symlinkCache.get(path);
+      const cached = cache.symlinkCache[path];
       if (cached !== undefined)
         return cached;
     }
     try {
       const link = resolvePath(fs.readlinkSync(path), path);
       if (cache) {
-        cache.symlinkCache.set(path, link);
+        cache.symlinkCache[path] = link;
         const stats = cache.statCache.get(path);
         if (stats)
           cache.statCache.set(link, stats);
@@ -939,7 +939,7 @@ const fsUtils = {
       if (e.code !== 'EINVAL' && e.code !== 'ENOENT' && e.code !== 'UNKNOWN')
         throw e;
       if (cache)
-        cache.symlinkCache.set(path, null);
+        cache.symlinkCache[path] = null;
       return null;
     }
   },
@@ -1005,36 +1005,20 @@ function processPkgConfig (pjson) {
       if (typeof target !== 'string') continue;
       if (key.startsWith('./')) {
         if (target.startsWith('./')) target = target.slice(2);
-        if (entries.main && entries.main.startsWith(key)) {
+        if (entries.main && entries.main.startsWith(key.slice(2))) {
           const extra = key.slice(entries.main.length);
           if (extra === '' || extra === '.js' || extra === '.json' || extra === '.node' || extra === '/index.js' || extra === '/index.json' || extra === '/index.node')
             entries.browser = target;
         }
-        if (Object.hasOwnProperty.call(exports, key) === false) {
+        if (!exports || Object.hasOwnProperty.call(exports, key) === false) {
+          if (!exports)
+            exports = { './': './' };
           exports[key] = { browser: target, main: key };
         }
       }
       else if (Object.hasOwnProperty.call(map, key) === false) {
         map[key] = { browser: target, main: key };
       }
-    }
-    if (!pcfg.map)
-      pcfg.map = {};
-    for (let p in pjson.browser) {
-      let mapping = pjson.browser[p];
-      if (mapping === false)
-        mapping = '@empty';
-      if (p[0] === '.' && p[1] === '/' && !p.endsWith('.js'))
-        p += '.js';
-      if (mainMap && pcfg.map[p] === mainMap) {
-        mainMap.browser = mapping;
-        continue;
-      }
-      if (pcfg.map[p] !== undefined)
-        continue;
-      pcfg.map[p] = {
-        browser: mapping
-      };
     }
   }
 
@@ -1067,7 +1051,7 @@ function throwNoMapTarget (pkgPath, specifier, match, parentPath) {
 
 function getTargetsMatch (obj, targets) {
   for (const target of targets) {
-    if (target in obj)
+    if (Object.hasOwnProperty.call(obj, target))
       return target;
   }
 }
@@ -1076,14 +1060,16 @@ const emptyPcfg = Object.create(null);
 function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets, builtins, cache) {
   pcfg = pcfg || emptyPcfg;
   if (subpath) {
+    if (subpath === './')
+      return pkgPath + '/';
     if (pcfg.exports === undefined || pcfg.exports === null)
       return resolvePath(uriToPath(subpath), pkgPath + '/');
     if (typeof pcfg.exports !== 'object')
       throwExportsNotFound(pkgPath, subpath, parentPath);
-    if (subpath in pcfg)
+    if (Object.hasOwnProperty.call(pcfg.exports, subpath))
       return resolveExportsTarget(pkgPath, pcfg.exports[subpath], '', parentPath, subpath, targets, builtins);
 
-    let dirMatch;
+    let dirMatch = '';
     for (const candidateKey of Object.keys(pcfg.exports)) {
       if (candidateKey[candidateKey.length - 1] !== '/')
         continue;
@@ -1091,20 +1077,21 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
         dirMatch = candidateKey;
     }
   
-    if (dirMatch !== undefined)
+    if (dirMatch)
       return resolveExportsTarget(pkgPath,  pcfg.exports[dirMatch], subpath.slice(dirMatch.length), parentPath, dirMatch, targets, builtins);
 
     throwExportsNotFound(pkgPath, subpath, parentPath);
   }
   else {
     const entry = pcfg.entries && getTargetsMatch(pcfg.entries, targets);
+    const entryValue = entry && pcfg.entries[entry];
     if (entry) {
-      const resolved = resolvePath(uriToPath(pcfg.entries[entry]), pkgPath + '/');
+      const resolved = resolvePath(uriToPath(entryValue), pkgPath + '/');
       if (this.isFileSync(resolved, cache))
         return resolved;
     }
     if (pcfg.type !== 'module' || cjsResolve === true) {
-      const resolved = legacyDirResolve.call(this, pkgPath, pcfg.main, cache);
+      const resolved = legacyDirResolve.call(this, pkgPath, entryValue, cache);
       if (resolved)
         return resolved;
     }
@@ -1115,10 +1102,12 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
 function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targets, builtins) {
   if (typeof target === 'string') {
     if (target.startsWith('./') && (subpath.length === 0 || target.endsWith('/'))) {
-      const resolvedTarget = resolvePath(uriToPath(subpath), pkgPath + '/');
+      const resolvedTarget = resolvePath(uriToPath(target), pkgPath + '/');
       if (resolvedTarget.startsWith(pkgPath + '/')) {
-        const resolved = resolvePath(uriToPath(subpath), resoledTarget);
-        if (resolved.startsWith(resolvedTarget + '/'))
+        if (!subpath)
+          return resolvedTarget;
+        const resolved = resolvePath(uriToPath(subpath), resolvedTarget);
+        if (resolved.startsWith(resolvedTarget))
           return resolved;
       }
     }
@@ -1148,7 +1137,7 @@ function resolveMap (specifier, map, pkgPath, parentPath, targets, builtins) {
   if (map[specifier])
     return resolveMapTarget(pkgPath, map[specifier], '', parentPath, specifier, targets, builtins);
 
-  let dirMatch;
+  let dirMatch = '';
   for (const candidateKey of Object.keys(map)) {
     if (candidateKey[candidateKey.length - 1] !== '/' && specifier[candidateKey.length] !== '/')
       continue;
@@ -1156,8 +1145,8 @@ function resolveMap (specifier, map, pkgPath, parentPath, targets, builtins) {
       dirMatch = candidateKey;
   }
 
-  if (dirMatch !== undefined)
-    return resolveMapTarget(pkgPath,  map[dirMatch], subpath.slice(dirMatch.length), parentPath, dirMatch, targets, builtins);
+  if (dirMatch)
+    return resolveMapTarget(pkgPath,  map[dirMatch], specifier.slice(dirMatch.length), parentPath, dirMatch, targets, builtins);
 }
 
 function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets, builtins) {
@@ -1167,7 +1156,7 @@ function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets,
       if (subpath[0] === '/') {
         if (path.length)
           throwNoMapTarget(pkgPath, match + subpath, match, parentPath);
-        return target + '/' + subpath;
+        return target + subpath;
       }
       if (subpath.length && target[target.length - 1] !== '/')
         throwNoMapTarget(pkgPath, match + subpath, match, parentPath);
@@ -1178,15 +1167,18 @@ function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets,
         throwNoMapTarget(pkgPath, match + subpath, match, parentPath);
       const resolvedTarget = resolvePath(uriToPath(target), pkgPath + '/');
       if (resolvedTarget.startsWith(pkgPath + '/')) {
-        if (!subpath) return resolvedTarget;
+        if (!subpath)
+          return resolvedTarget;
         const resolved = resolvePath(uriToPath(subpath), resolvedTarget);
-        if (resolved.startsWith(resolvedTarget + '/'))
+        if (resolved.startsWith(resolvedTarget))
           return resolved;
       }
     }
     if (target.startsWith('./') && (subpath.length === 0 || target.endsWith('/'))) {
       const resolvedTarget = resolvePath(uriToPath(subpath), pkgPath + '/');
       if (resolvedTarget.startsWith(pkgPath + '/')) {
+        if (!subpath)
+          return resolvedTarget;
         const resolved = resolvePath(uriToPath(subpath), resolvedTarget);
         if (resolved.startsWith(pkgPath + '/'))
           return resolved;

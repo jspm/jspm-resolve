@@ -387,6 +387,7 @@ The process of reading the package.json configuration for a given package path i
 >    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath + "/", pcfg.main)_.
 >    1. If _resolved_ is not _undefined_, return _resolved_.
 >    1. Throw a _Module Not Found_ error.
+> 1. If _subpath_ is equal to _"./"_ return _packagePath + "/"_.
 > 1. If _pcfg.exports_ is _undefined_ or _null_ then,
 >    1. Set _subpath_ to _URI_DECODE(subpath)_.
 >    1. Return the resolution of _subpath_ in _packagePath_.

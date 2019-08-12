@@ -3,6 +3,9 @@
     "pkg": "ra:pkg@version",
     "pkg2": "ra:pkg@version2"
   },
+  "resolvePeer": {
+    "pkg": "ra:pkg@version"
+  },
   "dependencies": {
     "ra:pkg@version": {
       "resolve": {

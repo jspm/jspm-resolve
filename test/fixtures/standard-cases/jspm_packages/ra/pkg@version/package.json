@@ -2,12 +2,16 @@
   "main": "index.js",
   "map": {
     "x": "./y.js",
-    "./z": "./a",
     "p": "pkg2",
     "c": {
       "browser": "./c-browser.js",
       "node": "./c-node.js"
     }
+  },
+  "exports": {
+    "./a/": "./a/",
+    "./custom.ext": "./custom.ext",
+    "./z/": "./a/"
   },
   "browser": {
     "./index": "./c-browser"

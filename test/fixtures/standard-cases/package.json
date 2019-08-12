@@ -3,14 +3,17 @@
   "type": "commonjs",
   "main": "./lib.js",
   "map": {
-    "a": "./b",
-    "a/c": "./b",
-    "./rel": "./d",
+    "a": "./b.js",
+    "a/": "./b/",
+    "a/c/": "./b/",
     "p": "pkg",
-    "./fail": "fail",
     "c": {
-      "browser": "./c-browser",
-      "node": "./c-node"
+      "browser": "./c-browser.js",
+      "node": "./c-node.js"
+    },
+    "c/": {
+      "browser": "./c-browser/",
+      "node": "./c-node/"
     }
   }
 }
