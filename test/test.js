@@ -3,12 +3,13 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { promises as fsPromises } from 'fs';
 
-const { readdir, symlink } = fsPromises;
+const { mkdir, readdir, symlink } = fsPromises;
 
 (async () => {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
   try {
+    await mkdir(__dirname + '/fixtures/project-boundaries/jspm_packages/link');
     await symlink('../../../standard-cases', __dirname + '/fixtures/project-boundaries/jspm_packages/link/standard-cases@master', 'junction');
   }
   catch (e) {
