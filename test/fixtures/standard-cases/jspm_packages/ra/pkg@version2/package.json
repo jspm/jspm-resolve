@@ -1,12 +1,10 @@
 {
   "main": "a.js",
-  "map": {
+  "exports": {
+    "./": "./",
     "./a.js": {
-      "default": "./b.js"
+      "main": "./b.js"
     }
   },
-  "type": "module",
-  "peerDependencies": {
-    "pkg": "1.2.3"
-  }
+  "type": "module"
 }
