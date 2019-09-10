@@ -455,9 +455,9 @@ function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, buil
 }
 
 async function finalizeResolve (path, parentPath, jspmProjectPath, isMain, cache) {
-  const scope = await getPackageScope.call(this, path, cache);
+  const resolved = await this.realpath(path, jspmProjectPath ? (parsePkgPath(path) || jspmProjectPath) : undefined, cache);
+  const scope = await getPackageScope.call(this, resolved, cache);
   const scopeConfig = scope && await readPkgConfig.call(this, scope, cache);
-  const resolved = await this.realpath(path, jspmProjectPath ? scope : undefined, cache);
   if (resolved && resolved[resolved.length - 1] === '/') {
     if (!(await this.isDir(resolved, cache)))
       throwModuleNotFound(path, parentPath);
@@ -477,9 +477,9 @@ async function finalizeResolve (path, parentPath, jspmProjectPath, isMain, cache
 }
 
 function finalizeResolveSync (path, parentPath, jspmProjectPath, isMain, cache) {
-  const scope = getPackageScopeSync.call(this, path, cache);
+  const resolved = this.realpathSync(path, jspmProjectPath ? (parsePkgPath(path) || jspmProjectPath) : undefined, cache);
+  const scope = getPackageScopeSync.call(this, resolved, cache);
   const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
-  const resolved = this.realpathSync(path, jspmProjectPath ? scope : undefined, cache);
   if (resolved && resolved[resolved.length - 1] === '/') {
     if (!this.isDirSync(resolved, cache))
       throwModuleNotFound(path, parentPath);
@@ -534,19 +534,23 @@ function legacyDirResolve (path, main, cache) {
 }
 
 function cjsFinalizeResolve (path, parentPath, jspmProjectPath, cache) {
-  const scope = getPackageScopeSync.call(this, path, cache);
-  const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
   let resolved;
   if (path[path.length - 1] === '/') {
     if (this.isDirSync(path, cache))
       resolved = path;
   }
   else {
-    resolved = legacyFileResolve.call(this, path, cache) || legacyDirResolve.call(this, path, scopeConfig && scopeConfig.entries.main, cache);
+    resolved = legacyFileResolve.call(this, path, cache);
+    if (!resolved) {
+      const pjson = readPkgConfigSync.call(this, path + '/package.json', cache);
+      resolved = legacyDirResolve.call(this, path, pjson && pjson.entries.main, cache);
+    }
   }
   if (!resolved)
     throwModuleNotFound(path, parentPath);
-  resolved = this.realpathSync(resolved, jspmProjectPath ? scope : undefined, cache);
+  resolved = this.realpathSync(resolved, jspmProjectPath ? (parsePkgPath(path) || jspmProjectPath) : undefined, cache);
+  const scope = getPackageScopeSync.call(this, resolved, cache);
+  const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
   if (resolved[resolved.length - 1] === '/')
     return { resolved, format: 'unknown' };
   if (resolved.endsWith('.mjs') || resolved.endsWith('.js') && scopeConfig && scopeConfig.type === 'module')
