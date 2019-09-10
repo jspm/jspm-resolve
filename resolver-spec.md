@@ -582,10 +582,10 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Throw a _Module Not Found_ error.
 
 > **FINALIZE_RESOLVE(path: String, jspmProjectPath: String | undefined, isMain: Boolean)**
-> 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(path)_.
-> 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
-> 1. Let _realpathBase_ be _scope_ if _jspmProjectPath_ is defined, and _undefined_ otherwise.
+> 1. Let _realpathBase_ be the value of _PACKAGE_TO_PATH(path)_ or _jspmProjectPath_ if _jspmProjectPath_ is defined, and _undefined_ otherwise.
 > 1. Set _resolved_ to the real path of _path_ within _realpathBase_.
+> 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
+> 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
 > 1. If _resolved_ ends with the character _"/"_ then,
 >    1. If _resolved_ does not point to an existing directory, throw a _Module Not Found_ error.
 >    1. Return _{ resolved, format: "unknown" }_.
@@ -603,19 +603,20 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Return _{ resolved, format: "commonjs" }_.
 
 > **CJS_FINALIZE_RESOLVE(path: String, jspmProjectPath: String | undefined)**
-> 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(path)_.
-> 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
 > 1. If _path_ ends with the character _"/"_ then,
 >    1. If _path_ does not point to an existing directory, throw a _Module Not Found_ error.
 >    1. Let _resolved_ be _path_.
 > 1. Otherwise,
 >    1. Let _resolved_ be _LEGACY_FILE_RESOLVE(path)_.
 >    1. If _resolved_ is _undefined_ then,
->       1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path, scopeConfig?.main)_.
+>       1. Let _pjson_ be the value of _READ_PACKAGE_JSON(path)_.
+>       1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path, pjson?.main)_.
 >    1. If _resolved_ is _undefined_ then,
 >       1. Throw a _Module Not Found_ error.
 > 1. Let _realpathBase_ be _scope_ if _jspmProjectPath_ is defined, and _undefined_ otherwise.
 > 1. Set _resolved_ to the real path of _resolved_ within _realpathBase_.
+> 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
+> 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
 > 1. If _resolved_ ends in _"/"_ then,
 >    1. Return _{ resolved, format: "unknown" }_.
 > 1. If _resolved_ ends with _".mjs"_ or _resolved_ ends with _".js"_ and _scopeConfig?.type_ is equal to _"module"_ then,
