@@ -334,14 +334,18 @@ The process of reading the package.json configuration for a given package path i
 > 1. For each _condition_ of _conditions_, do
 >    1. If _pjson[condition]_ is a String then,
 >       1. Let _target_ be _pjson[condition]_.
->       1. If _target_ starts with _"./"_ then,
->          1. Set _target_ to the substring of _target_ after _"./"_.
+>       1. If _target_ does not start with _"./"_ then,
+>          1. Set _target_ to _"./"_ concatenated with _target_.
 >       1. Set _entries[condition]_ to _target_.
+> 1. If _pjson.exports_ is a String or Array then,
+>    1. Set _entries.main_ to _pjson.exports_.
 > 1. Let _exports_ be _undefined_.
 > 1. If _pjson.exports_ is not _null_ or _undefined_ then,
 >    1. Set _exports_ to an empty _Object_.
 > 1. If _pjson.exports_ is an _Object_ then,
 >    1. Set _exports_ to _pjson.exports_.
+>    1. If _exports_ has a _"."_ property then,
+>       1. Set _entries.main_ to _exports["."]_.
 > 1. Let _map_ be set to the value of _pjson.map_ if an Object or an empty object otherwise.
 > 1. If _pjson.browser_ is an _Object_ then,
 >    1. For each key _name_ in _pjson.browser_ do,
@@ -350,8 +354,8 @@ The process of reading the package.json configuration for a given package path i
 >          1. Set _target_ to _"@empty"_.
 >       1. Ff _target_ is not a String, continue the loop.
 >       1. If _name_ starts with _"./"_ then,
->          1. If _target_ starts with _"./"_ then,
->             1. Set _target_ to the substring of _target_ after _"./"_.
+>          1. If _target_ does not start with _"./"_ then,
+>             1. Set _target_ to _"./"_ concatenated with _target_.
 >          1. If _entries.main_ starts with _name_ then,
 >             1. Let _extra_ be the substring of _name_ starting at the length of _entries.main_.
 >             1. If _extra_ is equal to _""_, _".js"_, _".json"_, _".node"_, _"/index.js"_, _"/index.json"_, _"/index.node"_ then,
@@ -377,14 +381,13 @@ The process of reading the package.json configuration for a given package path i
 > 1. Assert: _subpath_ is the empty String or starts with _"./"_.
 > 1. If _subpath_ is the empty String then,
 >    1. Let _match_ be the first matching environment condition in _pcfg.entries_ in condition priority order.
+>    1. Let _resolvedEntry_ be _undefined_.
 >    1. If _match_ is not _undefined_ then,
->       1. Let _target_ be _pcfg.entries[match]_.
->       1. Assert: _target_ is a String.
->       1. Set _target_ to _URI_DECODE(target)_.
->       1. Let _resolved_ be the resolution of _packagePath + "/" + target_.
->       1. If the file at _resolved_ exists, return _resolved_.
+>       1. Set _resolvedEntry_ to the result of _RESOLVE_EXPORTS_TARGET(packagePath, _pcfg.entries[match]_, "")_.
+>       1. If the file at _resolvedEntry_ exists, return _resolvedEntry_.
 >    1. If _pcfg.type_ is equal to _"module"_ and _cjsResolve_ is _false_, throw a _Module Not Found_ error.
->    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath + "/", pcfg.main)_.
+>    1. Let _entryDir_ be the substring of _resolvedEntry_ of the lenth of _packagePath_ plus one.
+>    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath + "/", entryDir)_.
 >    1. If _resolved_ is not _undefined_, return _resolved_.
 >    1. Throw a _Module Not Found_ error.
 > 1. If _subpath_ is equal to _"./"_ return _packagePath + "/"_.
@@ -613,7 +616,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path, pjson?.main)_.
 >    1. If _resolved_ is _undefined_ then,
 >       1. Throw a _Module Not Found_ error.
-> 1. Let _realpathBase_ be _scope_ if _jspmProjectPath_ is defined, and _undefined_ otherwise.
+> 1. Let _realpathBase_ be the value of _PACKAGE_TO_PATH(path)_ or _jspmProjectPath_ if _jspmProjectPath_ is defined, and _undefined_ otherwise.
 > 1. Set _resolved_ to the real path of _resolved_ within _realpathBase_.
 > 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
 > 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
