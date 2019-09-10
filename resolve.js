@@ -988,7 +988,7 @@ function processPkgConfig (pjson) {
   for (const key of Object.keys(pjson)) {
     let value = pjson[key];
     if (typeof value === 'string') {
-      if (value.startsWith('./')) value = value.slice(2);
+      if (!value.startsWith('./')) value = './' + value;
       if (value.endsWith('/')) value = value.slice(0, value.length - 1);
       entries[key] = value;
     }
@@ -1008,8 +1008,8 @@ function processPkgConfig (pjson) {
       if (target === false) target = '@empty';
       if (typeof target !== 'string') continue;
       if (key.startsWith('./')) {
-        if (target.startsWith('./')) target = target.slice(2);
-        if (entries.main && entries.main.startsWith(key.slice(2))) {
+        if (!target.startsWith('./')) target = './' + target;
+        if (entries.main && entries.main.startsWith(key)) {
           const extra = key.slice(entries.main.length);
           if (extra === '' || extra === '.js' || extra === '.json' || extra === '.node' || extra === '/index.js' || extra === '/index.json' || extra === '/index.node')
             entries.browser = target;
@@ -1089,13 +1089,14 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
   else {
     const entry = pcfg.entries && getTargetsMatch(pcfg.entries, targets);
     const entryValue = entry && pcfg.entries[entry];
+    let resolvedEntry;
     if (entry) {
-      const resolved = resolvePath(uriToPath(entryValue), pkgPath + '/');
-      if (this.isFileSync(resolved, cache))
-        return resolved;
+      resolvedEntry = resolveExportsTarget(pkgPath, entryValue, '', parentPath, '.', targets, builtins);
+      if (this.isFileSync(resolvedEntry, cache))
+        return resolvedEntry;
     }
     if (pcfg.type !== 'module' || cjsResolve === true) {
-      const resolved = legacyDirResolve.call(this, pkgPath, entryValue, cache);
+      const resolved = legacyDirResolve.call(this, pkgPath, resolvedEntry && resolvedEntry.slice(pkgPath.length + 1), cache);
       if (resolved)
         return resolved;
     }
