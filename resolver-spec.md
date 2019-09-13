@@ -424,6 +424,8 @@ The process of reading the package.json configuration for a given package path i
 >    1. For each item _targetValue_ of _target_,
 >       1. If _targetValue_ is not a String or Object, continue the loop.
 >       1. Return the result of _RESOLVE_EXPORTS_TARGET(packagePath, targetValue, subpath)_, continuing the loop on a _Module Not Found_ error.
+> 1. Otherwise, if _target_ is Null then,
+>    1. Throw a _Module Not Found_ error.
 > 1. Otherwise, if _target_ is an Object then,
 >    1. For each environment condition _condition_ in priority order,
 >       1. If _condition is a valid key of _target_ then,

@@ -553,8 +553,9 @@ function cjsFinalizeResolve (path, parentPath, jspmProjectPath, cache) {
   const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
   if (resolved[resolved.length - 1] === '/')
     return { resolved, format: 'unknown' };
-  if (resolved.endsWith('.mjs') || resolved.endsWith('.js') && scopeConfig && scopeConfig.type === 'module')
-    throwInvalidModuleName(`Cannot load ".mjs" module ${resolved} from CommonJS module ${parentPath}.`);
+  if (resolved.endsWith('.mjs') || resolved.endsWith('.js') && scopeConfig && scopeConfig.type === 'module') {
+    throwInvalidModuleName(`Cannot load ES module ${resolved} from CommonJS module ${parentPath}.`);
+  }
   if (resolved.endsWith('.json'))
     return { resolved, format: 'json' };
   if (resolved.endsWith('.node'))
@@ -1016,7 +1017,7 @@ function processPkgConfig (pjson) {
         }
         if (!exports || Object.hasOwnProperty.call(exports, key) === false) {
           if (!exports)
-            exports = { './': './' };
+            exports = { './': [{ browser: null }, './'] };
           exports[key] = { browser: target, main: key };
         }
       }
@@ -1129,6 +1130,9 @@ function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targe
           throw e;
       }
     }
+  }
+  else if (target === null) {
+    throwNoExportsTarget(pkgPath, match + subpath, match, parentPath);
   }
   else if (typeof target === 'object') {
     const targetMatch = getTargetsMatch(target, targets);
