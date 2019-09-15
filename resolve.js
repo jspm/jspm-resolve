@@ -178,6 +178,8 @@ function resolvePath (path, parent) {
   while (curSegment = curSegment.next)
     outStr += curSegment.segment;
 
+  if (!path.endsWith('/') && outStr.endsWith('/'))
+    outStr = outStr.slice(0, -1);
   return outStr;
 }
 
