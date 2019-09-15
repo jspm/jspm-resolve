@@ -912,7 +912,7 @@ const fsUtils = {
       const link = resolvePath(fsLink, path);
       if (cache) {
         cache.symlinkCache[path] = link;
-        const stats = cache.statCache.get(path);
+        const stats = cache.statCache[path];
         if (stats)
           cache.statCache.set(link, stats);
       }
@@ -936,7 +936,7 @@ const fsUtils = {
       const link = resolvePath(fs.readlinkSync(path), path);
       if (cache) {
         cache.symlinkCache[path] = link;
-        const stats = cache.statCache.get(path);
+        const stats = cache.statCache[path];
         if (stats)
           cache.statCache.set(link, stats);
       }
@@ -971,6 +971,8 @@ resolve.cjsResolve = function (request, parent) {
   if (request[request.length - 1] === '/')
     request = request.slice(0, request.length - 1);
   const { resolved } = resolveSync(request, parent && parent.filename, { cjsResolve: true, cache: parent && parent.cache });
+  if (resolved.match(/\/\//))
+    console.log(resolved + ' has double slash');
   return resolved;
 };
 
