@@ -876,7 +876,7 @@ const fsUtils = {
       const parent = resolvePath('.', path);
       if (realpathBase && !pathContains(realpathBase, parent))
         return path + (trailingSlash ? '/' : '');
-      return (await this.realpath(parent, realpathBase, cache, seen)) + '/' + path.slice(parent.length) + (trailingSlash ? '/' : '');
+      return (await this.realpath(parent, realpathBase, cache, seen)) + path.slice(parent.length) + (trailingSlash ? '/' : '');
     }
   },
   realpathSync (path, realpathBase = path.slice(0, path.indexOf('/')), cache, seen = new Set()) {
@@ -897,7 +897,7 @@ const fsUtils = {
       const parent = resolvePath('.', path);
       if (realpathBase && !pathContains(realpathBase, parent))
         return path + (trailingSlash ? '/' : '');
-      return this.realpathSync(parent, parent, cache, seen) + '/' + path.slice(parent.length) + (trailingSlash ? '/' : '');
+      return this.realpathSync(parent, parent, cache, seen) + path.slice(parent.length) + (trailingSlash ? '/' : '');
     }
   },
 
@@ -971,8 +971,6 @@ resolve.cjsResolve = function (request, parent) {
   if (request[request.length - 1] === '/')
     request = request.slice(0, request.length - 1);
   const { resolved } = resolveSync(request, parent && parent.filename, { cjsResolve: true, cache: parent && parent.cache });
-  if (resolved.match(/\/\//))
-    console.log(resolved + ' has double slash');
   return resolved;
 };
 

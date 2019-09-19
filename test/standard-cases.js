@@ -85,8 +85,13 @@ suite('Standard Cases', () => {
     var { resolved } = await jspmResolve('../', pkgPath + 'sub/path.js', { cache });
     assert.equal(resolved, pkgPath);
 
-    var { resolved } = await jspmResolve('..', pkgPath + 'sub/path.js', { cache: cache });
-    assert.equal(resolved, pkgPath);
+    try {
+      await jspmResolve('..', pkgPath + 'sub/path.js', { cache: cache });
+      assert.fail();
+    }
+    catch (e) {
+      assert.ok(e);
+    }
   });
 
   test.skip('Package scope-relative loading', async () => {
@@ -301,8 +306,13 @@ suite('Standard Cases Sync', () => {
     var { resolved } = jspmResolve.sync('../', pkgPath + 'sub/path.js', { cache });
     assert.equal(resolved, pkgPath);
 
-    var { resolved } = jspmResolve.sync('..', pkgPath + 'sub/path.js', { cache: cache });
-    assert.equal(resolved, pkgPath);
+    try {
+      jspmResolve.sync('..', pkgPath + 'sub/path.js', { cache: cache });
+      assert.fail();
+    }
+    catch (e) {
+      assert.ok(e);
+    }
   });
 
   test.skip('Package scope-relative loading', () => {
