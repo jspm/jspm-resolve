@@ -27,6 +27,5 @@
   "files": [
     "resolve.js",
     "loader.mjs"
-  ],
-  "type": "commonjs"
+  ]
 }

@@ -51,7 +51,7 @@ If no project is found, special treatment is given to resolutions made "without 
 
 Each package scope is interpreted based on its "type" being either "commonjs" or "module".
 
-By default jspm treats all packages within a jspm project as `"type": "module"` unless they explicitly contain `"type": "commonjs"`.
+By default jspm treats all packages within a jspm project as `"type": "commonjs"` unless they explicitly contain `"type": "module"`, just like Node.js does.
 
 Custom assets and paths (via a trailing slash) can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
 
