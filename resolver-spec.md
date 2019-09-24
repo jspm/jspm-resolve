@@ -51,7 +51,7 @@ If no project is found, special treatment is given to resolutions made "without 
 
 Each package scope is interpreted based on its "type" being either "commonjs" or "module".
 
-By default jspm treats all packages within a jspm project as `"type": "module"` unless they explicitly contain `"type": "commonjs"`.
+By default jspm treats all packages within a jspm project as `"type": "commonjs"` unless they explicitly contain `"type": "module"`, just like Node.js does.
 
 Custom assets and paths (via a trailing slash) can also be resolved through the jspm resolver, which will return `"format": "unknown"`.
 
@@ -375,36 +375,7 @@ The process of reading the package.json configuration for a given package path i
 >    1. Set _scope_ to the parent path of _scope_.
 > 1. Return _undefined_.
 
-### Entries, Exports and Map Resolution
-
-> **RESOLVE_PACKAGE(packagePath: String, subpath: String, pcfg: Object, cjsResolve: Boolean)**
-> 1. Assert: _subpath_ is the empty String or starts with _"./"_.
-> 1. If _subpath_ is the empty String then,
->    1. Let _match_ be the first matching environment condition in _pcfg.entries_ in condition priority order.
->    1. Let _resolvedEntry_ be _undefined_.
->    1. If _match_ is not _undefined_ then,
->       1. Set _resolvedEntry_ to the result of _RESOLVE_EXPORTS_TARGET(packagePath, _pcfg.entries[match]_, "")_.
->       1. If the file at _resolvedEntry_ exists, return _resolvedEntry_.
->    1. If _pcfg.type_ is equal to _"module"_ and _cjsResolve_ is _false_, throw a _Module Not Found_ error.
->    1. Let _entryDir_ be the substring of _resolvedEntry_ of the lenth of _packagePath_ plus one.
->    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath + "/", entryDir)_.
->    1. If _resolved_ is not _undefined_, return _resolved_.
->    1. Throw a _Module Not Found_ error.
-> 1. If _subpath_ is equal to _"./"_ return _packagePath + "/"_.
-> 1. If _pcfg.exports_ is _undefined_ or _null_ then,
->    1. Set _subpath_ to _URI_DECODE(subpath)_.
->    1. Return the resolution of _subpath_ in _packagePath_.
-> 1. If _pcfg.exports_ is not an _Object_ then,
->    1. Throw a _Module Not Found_ error.
-> 1. If _subpath_ is a key of _pcfg.exports_ then,
->    1. Return the result of _RESOLVE_EXPORTS_TARGET(packagePath, pcfg.exports[subpath], "")_.
-> 1. For each entry _export_ of the keys of _pcfg.exports_ sorted by length descending,
->    1. If _export_ does not end in _"/"_, continue the loop.
->    1. If _subpath_ begins with _export_ then,
->       1. Let _target_ be _pcfg.exports[export]_.
->       1. Let _exportSubpath_ be the substring of _subpath_ starting at the length of _export_.
->       1. Return _RESOLVE_EXPORTS_TARGET(packagePath, target, exportSubpath)_.
-> 1. Throw a _Module Not Found_ error.
+### Exports and Map Resolution Helpers
 
 > **RESOLVE_EXPORTS_TARGET(packagePath; String, target: Any, subpath: String)**
 > 1. If _target_ is a String then,
@@ -517,11 +488,11 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. If _mapped_ is not _undefined_ then,
 >    1. If _mapped_ does not start with _parentScope_ then,
 >       1. Set _name_ to _mapped_.
->    1. If _cjsResolve_ is equal to _true_ then,
->       1. Return _CJS_FINALIZE_RESOLVE(mapped, jspmProjectPath)_.
->    1. Otherwise
->       1. Return _FINALIZE_RESOLVE(mapped, jspmProjectPath, isMain)_.
->    1. Otherwise, set _name_ to _mapped_.
+>    1. Otherwise,
+>       1. If _cjsResolve_ is equal to _true_ then,
+>          1. Return _CJS_FINALIZE_RESOLVE(CJS_FILE_RESOLVE(mapped), jspmProjectPath)_.
+>       1. Otherwise
+>          1. Return _FINALIZE_RESOLVE(mapped, jspmProjectPath, isMain)_.
 > 1. If _jspmProjectPath_ is not _undefined_ then,
 >    1. Return the result of _JSPM_PROJECT_RESOLVE(name, parentPath, jspmProjectPath, cjsResolve, isMain)_.
 > 1. Otherwise,
@@ -543,7 +514,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Throw an _Invalid Module Name_ error.
 >    1. Set _resolved_ to the absolute file system path of the file URL _name_.
 > 1. If _cjsResolve_ is equal to _true_ then,
->    1. Return _CJS_FINALIZE_RESOLVE(resolved, jspmProjectPath)_.
+>    1. Return _CJS_FINALIZE_RESOLVE(CJS_FILE_RESOLVE(resolved), jspmProjectPath)_.
 > 1. Otherwise,
 >    1. Return _FINALIZE_RESOLVE(resolved, jspmProjectPath, isMain)_.
 
@@ -564,10 +535,10 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(packageResolution, jspmProjectPath)_.
 > 1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
 > 1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig, cjsResolve)_.
-> 1. If _cjsResolve_ is *true* then,
->    1. Return the result of _CJS_FINALIZE_RESOLVE(resolved, jspmProjectPath)_.
-> 1. Otherwise,
->    1. Return the result of _FINALIZE_RESOLVE(resolved, jspmProjectPath, isMain)_.
+> 1. If _cjsResolve_ then,
+>    1. Return _CJS_FINALIZE_RESOLVE(resolved, jspmProjectPath)_.
+> 1. Otherwise
+>    1. Return _FINALIZE_RESOLVE(resolved, jspmProjectPath, isMain)_.
 
 > **NODE_MODULES_RESOLVE(name: String, parentPath: String, cjsResolve: Boolean, isMain: Boolean)**
 > 1. If _name_ is a builtin module, return _{ resolved: name, format: "builtin" }_.
@@ -579,16 +550,45 @@ The resolution algorithm breaks down into the following high-level process to ge
 >       1. Set _parentPath_ to the parent path of _parentPath_.
 >       1. Continue the next loop iteration.
 >    1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
->    1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig, cjsResolve)_.
+>    1. Return the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig, cjsResolve)_.
+> 1. Throw a _Module Not Found_ error.
+
+> **RESOLVE_PACKAGE(packagePath: String, subpath: String, pcfg: Object, cjsResolve: Boolean)**
+> 1. Assert: _subpath_ is the empty String or starts with _"./"_.
+> 1. If _subpath_ is the empty String then,
+>    1. Let _match_ be the first matching environment condition in _pcfg.entries_ in condition priority order.
+>    1. Let _resolvedEntry_ be _undefined_.
+>    1. If _match_ is not _undefined_ then,
+>       1. Set _resolvedEntry_ to the result of _RESOLVE_EXPORTS_TARGET(packagePath, _pcfg.entries[match]_, "")_.
+>       1. If the file at _resolvedEntry_ exists, return _resolvedEntry_.
+>    1. If _pcfg.type_ is equal to _"module"_ and _cjsResolve_ is _false_, throw a _Module Not Found_ error.
+>    1. Let _entryDir_ be the substring of _resolvedEntry_ of the length of _packagePath_ plus one.
+>    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(packagePath + "/", entryDir)_.
+>    1. If _resolved_ is not _undefined_, return _resolved_.
+>    1. Throw a _Module Not Found_ error.
+> 1. If _subpath_ is equal to _"./"_ return _packagePath + "/"_.
+> 1. If _pcfg.exports_ is _undefined_ or _null_ then,
+>    1. Set _subpath_ to _URI_DECODE(subpath)_.
+>    1. Let _resolved_ be the resolution of _subpath_ in _packagePath_.
 >    1. If _cjsResolve_ then,
->       1. Return the result of _CJS_FINALIZE_RESOLVE(resolved, undefined)_.
+>       1. Return _CJS_FILE_RESOLVE(resolved)_.
 >    1. Otherwise,
->       1. Return the result of _FINALIZE_RESOLVE(resolved, undefined, isMain)_.
+>       1. Return _resolved__.
+> 1. If _pcfg.exports_ is not an _Object_ then,
+>    1. Throw a _Module Not Found_ error.
+> 1. If _subpath_ is a key of _pcfg.exports_ then,
+>    1. Return the result of _RESOLVE_EXPORTS_TARGET(packagePath, pcfg.exports[subpath], "")_.
+> 1. For each entry _export_ of the keys of _pcfg.exports_ sorted by length descending,
+>    1. If _export_ does not end in _"/"_, continue the loop.
+>    1. If _subpath_ begins with _export_ then,
+>       1. Let _target_ be _pcfg.exports[export]_.
+>       1. Let _exportSubpath_ be the substring of _subpath_ starting at the length of _export_.
+>       1. Return _RESOLVE_EXPORTS_TARGET(packagePath, target, exportSubpath)_.
 > 1. Throw a _Module Not Found_ error.
 
 > **FINALIZE_RESOLVE(path: String, jspmProjectPath: String | undefined, isMain: Boolean)**
 > 1. Let _realpathBase_ be the value of _PACKAGE_TO_PATH(path)_ or _jspmProjectPath_ if _jspmProjectPath_ is defined, and _undefined_ otherwise.
-> 1. Set _resolved_ to the real path of _path_ within _realpathBase_.
+> 1. Let _resolved_ be the real path of _path_ within _realpathBase_.
 > 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
 > 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
 > 1. If _resolved_ ends with the character _"/"_ then,
@@ -608,22 +608,10 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Return _{ resolved, format: "commonjs" }_.
 
 > **CJS_FINALIZE_RESOLVE(path: String, jspmProjectPath: String | undefined)**
-> 1. If _path_ ends with the character _"/"_ then,
->    1. If _path_ does not point to an existing directory, throw a _Module Not Found_ error.
->    1. Let _resolved_ be _path_.
-> 1. Otherwise,
->    1. Let _resolved_ be _LEGACY_FILE_RESOLVE(path)_.
->    1. If _resolved_ is _undefined_ then,
->       1. Let _pjson_ be the value of _READ_PACKAGE_JSON(path)_.
->       1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path, pjson?.main)_.
->    1. If _resolved_ is _undefined_ then,
->       1. Throw a _Module Not Found_ error.
 > 1. Let _realpathBase_ be the value of _PACKAGE_TO_PATH(path)_ or _jspmProjectPath_ if _jspmProjectPath_ is defined, and _undefined_ otherwise.
-> 1. Set _resolved_ to the real path of _resolved_ within _realpathBase_.
+> 1. Let _resolved_ be the real path of _path_ within _realpathBase_.
 > 1. Let _scope_ be the result of _GET_PACKAGE_SCOPE(resolved)_.
 > 1. Let _scopeConfig_ be the result of _READ_PACKAGE_JSON(scope + "/package.json")_, if _scope_ is defined.
-> 1. If _resolved_ ends in _"/"_ then,
->    1. Return _{ resolved, format: "unknown" }_.
 > 1. If _resolved_ ends with _".mjs"_ or _resolved_ ends with _".js"_ and _scopeConfig?.type_ is equal to _"module"_ then,
 >    1. Throw a _Invalid Module Name_ error.
 > 1. If _resolved_ ends in _".node"_ then,
@@ -632,11 +620,18 @@ The resolution algorithm breaks down into the following high-level process to ge
 >    1. Return _{ resolved, format: "json" }_.
 > 1. Return _{ resolved, format: "commonjs" }_.
 
+> **CJS_FILE_RESOLVE(path: String)**
+> 1. Let _resolved_ be _LEGACY_FILE_RESOLVE(path)_.
+> 1. If _resolved_ is _undefined_ then,
+>    1. Let _pjson_ be the value of _READ_PACKAGE_JSON(path)_.
+>    1. Set _resolved_ to _LEGACY_DIR_RESOLVE(path, pjson?.main)_.
+> 1. If _resolved_ is _undefined_ then,
+>    1. Throw a _Module Not Found_ error.
+> 1. Return _resolved_.
+
 > **LEGACY_FILE_RESOLVE(path: String)**
 > 1. Assert _path_ is a valid file path.
-> 1. If _path_ ends with the character _"/"_ then,
->    1. Return _path_.
-> 1. Otherwise if the file at _path_ exists,
+> 1. If the file at _path_ exists,
 >    1. Return _path_.
 > 1. Return _LEGACY_EXTENSION_RESOLVE(path)_.
 
