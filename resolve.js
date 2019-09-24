@@ -962,6 +962,8 @@ const winPathRegEx = /^[a-z]:\//i;
 resolve.cjsResolve = function (request, parent) {
   if (request.match(winPathRegEx))
     request = '/' + request;
+  if (request.endsWith('/'))
+    request = request.slice(0, request.length - 1);
   return resolveSync(request, parent && parent.filename, { cjsResolve: true, cache: parent && parent.cache }).resolved;
 };
 
