@@ -302,18 +302,23 @@ To convert a package between these forms, the following methods are defined:
 Given any file path, we can determine the base jspm project folder with the following algorithm:
 
 > **GET_JSPM_PROJECT_PATH(modulePath: String)**
+> 1. Let _basePackagePath_ be _undefined_.
 > 1. Let _jspmPackagesIndex_ be the index of the last _"jspm_packages"_ segment in _modulePath_ if any.
-> 1. If there is a _"node_modules"_ path segment after _jspmPackagesIndex_, set _jspmPackagesIndex_ to _undefined_.
-> 1. If _jspmPackagesIndex_ is not _undefined_ then.
->    1. Let _projectPath_ be the substring of _modulePath_ of the length of _jspmPackagesIndex_.
->    1. If the file _"jspm.json"_ does not exist in the folder _projectPath_ throw an _Invalid Configuration_ error.
->    1. Return _projectPath_.
+> 1. If there is not a _"node_modules"_ path segment after _jspmPackagesIndex_ and _jspmPackagesIndex_ it not _undefined_ then,
+>    1. Let _baseProjectPath_ be the substring of _modulePath_ of the length of _jspmPackagesIndex_.
+>    1. Let _packageName_ be the result of PARSE_PACKAGE_PATH(modulePath, baseProjectPath).
+>    1. If _packageName_ is not _undefined_ then,
+>       1. Set _basePackagePath_ to _PACKAGE_TO_PATH(packageName, baseProjectPath)_.
+>       1. If the file _"jspm.json"_ in _basePackagePath_ does not exist then,
+>          1. Set _basePackagePath_ to _undefined_.
 > 1. For each parent path _projectPath_ of _modulePath_,
->    1. If the last segment of _projectPath_ is a _"node_modules"_ segment, return _undefined_.
->    1. If the file _"jspm.json"_ exists in the folder _projectPath_ then, 
->       1. If the file _"package.json"_ does not exist in the folder _projectPath_ throw an _Invalid Configuration_ error.
+>    1. If _projectPath_ is equal to _basePackagePath_, continue.
+>    1. If the last segment of _projectPath_ is a _"node_modules"_ segment, return.
+>    1. If the file _"jspm.json"_ exists in the folder _projectPath_ then,
 >       1. Return _projectPath_.
 > 1. Return _undefined_.
+
+The above algorithm is based on a jspm.json lookup, while ensuring that jspm projects linked into other projects use the base project for resolution.
 
 The process of reading the package.json configuration for a given package path is based on the following algorithms:
 
@@ -520,7 +525,7 @@ The resolution algorithm breaks down into the following high-level process to ge
 
 > **JSPM_PROJECT_RESOLVE(name: String, parentPath: String, jspmProjectPath: String, cjsResolve: Boolean, isMain: Boolean)**
 > 1. Let _jspmConfig_ be the parsed contents of _"jspm.json"_ in _jspmProjectPath_, throwing a _Configuration Error_ for not found or invalid JSON.
-> 1. Let _parentPackage_ be _PARSE_PACKAGE_PATH(parentPath)_ if _parentPath_ is not _undefined_.
+> 1. Let _parentPackage_ be _PARSE_PACKAGE_PATH(parentPath, jspmProjectPath)_ if _parentPath_ is not _undefined_.
 > 1. Let _packageName_ and _packageSubpath_ be the destructured properties of _PARSE_PACKAGE(name)_, throwing on abrupt completion.
 > 1. Let _packageResolution_ be _undefined_.
 > 1. If _parentPackage_ is not _undefined_ then,

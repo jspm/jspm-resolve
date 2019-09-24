@@ -559,12 +559,14 @@ function cjsFinalizeResolve (path, parentPath, jspmProjectPath, cache) {
 }
 
 async function getJspmProjectPath (modulePath, cache) {
+  let basePackagePath;
   const jspmPackagesIndex = modulePath.lastIndexOf('/jspm_packages/');
   if (jspmPackagesIndex !== -1 && modulePath.lastIndexOf('/node_modules/', jspmPackagesIndex) === -1) {
-    const projectPath = modulePath.slice(0, jspmPackagesIndex);
-    if (!(await this.isFile(projectPath + '/jspm.json', cache)))
-      throwInvalidConfig('jspm project path ' + dir + ' is missing a jspm.json file.');
-    return projectPath;
+    const baseProjectPath = modulePath.slice(0, jspmPackagesIndex);
+    const pkgName = parsePkgPath(modulePath, baseProjectPath);
+    basePackagePath = pkgName && packageToPath(pkgName, baseProjectPath);
+    if (basePackagePath && !(await this.isFile(basePackagePath + '/jspm.json', cache)))
+      basePackagePath = undefined;
   }
   let separatorIndex = modulePath.lastIndexOf('/');
   const rootSeparatorIndex = modulePath.indexOf('/');
@@ -572,32 +574,31 @@ async function getJspmProjectPath (modulePath, cache) {
     const dir = modulePath.slice(0, separatorIndex);
     if (dir.endsWith('/node_modules'))
       return;
-
-    if (await this.isFile(dir + '/jspm.json', cache)) {
-      if (!(await this.isFile(dir + '/package.json', cache)))
-       throwInvalidConfig('jspm project path ' + dir + ' is missing a package.json file.');
+    if (dir !== basePackagePath && await this.isFile(dir + '/jspm.json', cache))
       return dir;
-    }
-
     separatorIndex = modulePath.lastIndexOf('/', separatorIndex - 1);
   }
   while (separatorIndex > rootSeparatorIndex);
 }
 
 function getJspmProjectPathSync (modulePath, cache) {
+  let basePackagePath;
   const jspmPackagesIndex = modulePath.lastIndexOf('/jspm_packages/');
-  if (jspmPackagesIndex !== -1 && modulePath.lastIndexOf('/node_modules/', jspmPackagesIndex) === -1)
-    return modulePath.slice(0, jspmPackagesIndex);
+  if (jspmPackagesIndex !== -1 && modulePath.lastIndexOf('/node_modules/', jspmPackagesIndex) === -1) {
+    const baseProjectPath = modulePath.slice(0, jspmPackagesIndex);
+    const pkgName = parsePkgPath(modulePath, baseProjectPath);
+    basePackagePath = pkgName && packageToPath(pkgName, baseProjectPath);
+    if (basePackagePath && !(this.isFileSync(basePackagePath + '/jspm.json', cache)))
+      basePackagePath = undefined;
+  }
   let separatorIndex = modulePath.lastIndexOf('/');
   const rootSeparatorIndex = modulePath.indexOf('/');
   do {
     const dir = modulePath.slice(0, separatorIndex);
     if (dir.endsWith('/node_modules'))
-      return;
-
-    if (this.statSync(dir + '/jspm.json', cache))
+      return basePackagePath;
+    if (dir !== basePackagePath && this.isFileSync(dir + '/jspm.json', cache))
       return dir;
-
     separatorIndex = modulePath.lastIndexOf('/', separatorIndex - 1);
   }
   while (separatorIndex > rootSeparatorIndex);
@@ -961,10 +962,7 @@ const winPathRegEx = /^[a-z]:\//i;
 resolve.cjsResolve = function (request, parent) {
   if (request.match(winPathRegEx))
     request = '/' + request;
-  if (request[request.length - 1] === '/')
-    request = request.slice(0, request.length - 1);
-  const { resolved } = resolveSync(request, parent && parent.filename, { cjsResolve: true, cache: parent && parent.cache });
-  return resolved;
+  return resolveSync(request, parent && parent.filename, { cjsResolve: true, cache: parent && parent.cache }).resolved;
 };
 
 module.exports = resolve;
