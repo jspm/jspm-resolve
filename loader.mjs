@@ -30,6 +30,8 @@ export async function resolve (name, parentUrl) {
   if (name[name.length - 1] === '/')
     name = name.substr(0, name.length - 1);
   let { resolved, format } = await jspmResolve(name, parentUrl ? decodeURIComponent(parentUrl).substr(filePrefix.length) : process.cwd() + '/', { cache, isMain: !parentUrl });
+  if (!parentUrl && format === 'unknown')
+    format = 'commonjs';
   if (format === 'unknown')
     throw new Error(`Unable to load ${resolved}, as it does not have a valid module format file extension.`);
   
