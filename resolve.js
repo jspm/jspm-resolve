@@ -545,6 +545,7 @@ function cjsFileResolve (path, parentPath, cache) {
 }
 
 function cjsFinalizeResolve (path, parentPath, jspmProjectPath, cache) {
+  // console.log(path);
   const resolved = this.realpathSync(path, jspmProjectPath ? (parsePkgPath(path) || jspmProjectPath) : undefined, cache);
   const scope = getPackageScopeSync.call(this, resolved, cache);
   const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
@@ -908,7 +909,7 @@ const fsUtils = {
         cache.symlinkCache[path] = link;
         const stats = cache.statCache[path];
         if (stats)
-          cache.statCache.set(link, stats);
+          cache.statCache[link] = stats;
       }
       return link;
     }
