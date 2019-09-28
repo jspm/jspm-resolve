@@ -24,7 +24,7 @@ const winSepRegEx = /\\/g;
 const encodedSepRegEx = /%(2E|2F|5C)/gi;
 
 function throwModuleNotFound (name, parent) {
-  const e = new Error(`Cannot find module ${name}${parent ? ` from ${parent}` : ''}.`);
+  const e = new Error(`Cannot find module ${name}${parent ? ` from ${parent}` : ''}`);
   e.code = 'MODULE_NOT_FOUND';
   throw e;
 }
