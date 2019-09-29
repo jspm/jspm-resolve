@@ -266,7 +266,9 @@ To convert a package between these forms, the following methods are defined:
 > 1. Let _packageSubpath_ be *undefined*.
 > 1. If _specifier_ is an empty string then,
 >    1. Throw an _Invalid Specifier_ error.
-> 1. If _specifier_ does not start with _"@"_ then,
+> 1. If _specifier is equal to _"@"_ or starts with _"@/"_ then,
+>    1. Set _packageName_ to _"@"_.
+> 1. Otherwise, if _specifier_ does not start with _"@"_ then,
 >    1. Set _packageName_ to the substring of _specifier_ until before the first _"/"_ separator or the end of the string.
 > 1. Otherwise,
 >    1. If _specifier_ does not contain a _"/"_ separator then,
@@ -331,6 +333,7 @@ The process of reading the package.json configuration for a given package path i
 >    1. Let _overrides_ be the keys of _pjson.jspm_.
 >    1. For each _override_ of _overrides_, do
 >       1. Set _pjson[override]_ to _pjson.jspm[override]_.
+> 1. Let _name_ be the value of _pjson.name_ if it is a string.
 > 1. Let _type_ be set to _undefined_.
 > 1. If _pjson.type_ is equal to _"commonjs"_ or _"module"_ then,
 >    1. Set _type_ to _pjson.type_.
@@ -369,7 +372,7 @@ The process of reading the package.json configuration for a given package path i
 >             1. Set _exports[name]_ to the object _{ browser: target, main: name }_.
 >       1. Otherwise, if _map[name]_ is not defined then,
 >          1. Set _map[name] to the object _{ browser: target, main: name }_.
-> 1. Return the object with properties _{ type, entries, exports, map }_.
+> 1. Return the object with properties _{ name, type, entries, exports, map }_.
 
 > **GET_PACKAGE_SCOPE(modulePath: String)**
 > 1. Let _scope_ be _modulePath_.
@@ -382,7 +385,7 @@ The process of reading the package.json configuration for a given package path i
 
 ### Exports and Map Resolution Helpers
 
-> **RESOLVE_EXPORTS_TARGET(packagePath; String, target: Any, subpath: String)**
+> **RESOLVE_EXPORTS_TARGET(packagePath: String, target: Any, subpath: String)**
 > 1. If _target_ is a String then,
 >    1. If _subpath_ has non-zero length and _target_ does not end with _"/"_, throw a _Module Not Found_ error.
 >    1. If _target_ does not start with _"./"_ then,
@@ -527,17 +530,23 @@ The resolution algorithm breaks down into the following high-level process to ge
 > 1. Let _jspmConfig_ be the parsed contents of _"jspm.json"_ in _jspmProjectPath_, throwing a _Configuration Error_ for not found or invalid JSON.
 > 1. Let _parentPackage_ be _PARSE_PACKAGE_PATH(parentPath, jspmProjectPath)_ if _parentPath_ is not _undefined_.
 > 1. Let _packageName_ and _packageSubpath_ be the destructured properties of _PARSE_PACKAGE(name)_, throwing on abrupt completion.
-> 1. Let _packageResolution_ be _undefined_.
-> 1. If _parentPackage_ is not _undefined_ then,
->    1. Set _packageResolution_ to _jspmConfig.dependencies[parentPackage]?.resolve[packageName]_.
+> 1. Let _packagePath_ be _undefined_.
+> 1. If _packageName_ is equal to _"@"_ then,
+>    1. Set _packagePath_ to _PACKAGE_TO_PATH(parentPackage, jspmProjectPath)_.
+> 1. Otherwise, if _packageName_ corresponds to the name part of _parentPackage_, excluding the registry and version then,
+>    1. Set _packagePath_ to _PACKAGE_TO_PATH(parentPackage, jspmProjectPath)_.
 > 1. Otherwise,
->    1. Set _packageResolution_ to _jspmConfig.resolve[packageName]_.
-> 1. If _packageResolution_ is _undefined_ then,
->    1. Set _packageResolution_ to _jspmConfig.resolvePeer?[packageName]_.
-> 1. If _packageResolution_ is _undefined_ then,
->    1. If _name_ is a builtin module, return _{ resolved: name, format: "builtin" }_.
->    1. Throw a _Module Not Found_ error.
-> 1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(packageResolution, jspmProjectPath)_.
+>    1. Let _packageResolution_ be _undefined_.
+>    1. If _parentPackage_ is not _undefined_ then,
+>       1. Set _packageResolution_ to _jspmConfig.dependencies[parentPackage]?.resolve[packageName]_.
+>    1. Otherwise,
+>       1. Set _packageResolution_ to _jspmConfig.resolve[packageName]_.
+>    1. If _packageResolution_ is _undefined_ then,
+>       1. Set _packageResolution_ to _jspmConfig.resolvePeer?[packageName]_.
+>    1. If _packageResolution_ is _undefined_ then,
+>       1. If _name_ is a builtin module, return _{ resolved: name, format: "builtin" }_.
+>       1. Throw a _Module Not Found_ error.
+>    1. Let _packagePath_ be the result of _PACKAGE_TO_PATH(packageResolution, jspmProjectPath)_.
 > 1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
 > 1. Let _resolved_ be the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig, cjsResolve)_.
 > 1. If _cjsResolve_ then,
@@ -548,6 +557,11 @@ The resolution algorithm breaks down into the following high-level process to ge
 > **NODE_MODULES_RESOLVE(name: String, parentPath: String, cjsResolve: Boolean, isMain: Boolean)**
 > 1. If _name_ is a builtin module, return _{ resolved: name, format: "builtin" }_.
 > 1. Let _packageName_ and _packageSubpath_ be the destructured values of _PARSE_PACKAGE(specifier)_, throwing on abrupt completion.
+> 1. If _packageName_ is equal to _"@"_ then,
+>    1. Let _packagePath_ be the result of _GET_PACKAGE_SCOPE(parentPath)_.
+>    1. If _packagePath_ is _undefined_, throw a _Module Not Found_ error.
+>    1. Let _packageConfig_ be the result of _READ_PACKAGE_JSON(packagePath)_.
+>    1. Return the result of _RESOLVE_PACKAGE(packagePath, packageSubpath, packageConfig, cjsResolve)_.
 > 1. While _parentPath_ is not the file system root,
 >    1. Let _packagePath_ be the resolution of _"node_modules/"_ concatenated with _name_, relative to _parentPath_.
 >    1. Set _parentPath_ to the parent folder of _parentPath_.
