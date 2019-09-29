@@ -63,6 +63,14 @@ suite('Standard Cases', () => {
     assert.equal(resolved, `${pPath}ra/pkg@version/a/a.js`);
   });
 
+  test('Self import', async () => {
+    var { resolved } = await jspmResolve('@', pkgPath, { cache });
+    assert.equal(resolved, `${pPath}ra/pkg@version/index.js`);
+
+    var { resolved } = await jspmResolve('@/custom.ext', pkgPath, { cache });
+    assert.equal(resolved, `${pPath}ra/pkg@version/custom.ext`);
+  });
+
   test('Package-relative loading', async () => {
     var { resolved } = await jspmResolve('./a.json', pkgPath, { cache });
     assert.equal(resolved, `${pkgPath}a.json`);
@@ -94,18 +102,18 @@ suite('Standard Cases', () => {
     }
   });
 
-  test.skip('Package scope-relative loading', async () => {
-    var { resolved } = await jspmResolve('~', sfPath, { cache });
+  test('Package scope-relative loading', async () => {
+    var { resolved } = await jspmResolve('@', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = await jspmResolve('~/lib.js', sfPath, { cache });
+    var { resolved } = await jspmResolve('@/lib.js', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = await jspmResolve('~/lib.js', sfPath, { cache });
+    var { resolved } = await jspmResolve('@/lib.js', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = await jspmResolve('~/rel', sfPath, { cache, cjsResolve: true });
-    assert.equal(resolved, sfPath + 'd');
+    var { resolved } = await jspmResolve('@/rel', sfPath, { cache, cjsResolve: true });
+    assert.equal(resolved, sfPath + 'd/index.js');
   });
 
   test('Custom extensions', async () => {
@@ -284,6 +292,17 @@ suite('Standard Cases Sync', () => {
     assert.equal(resolved, `${pPath}ra/pkg@version/a/a.js`);
   });
 
+  test('Self import', () => {
+    var { resolved } = jspmResolve.sync('@', pkgPath, { cache });
+    assert.equal(resolved, `${pPath}ra/pkg@version/index.js`);
+
+    var { resolved } = jspmResolve.sync('@/custom.ext', pkgPath, { cache });
+    assert.equal(resolved, `${pPath}ra/pkg@version/custom.ext`);
+
+    var { resolved } = jspmResolve.sync('pkg/', pkgPath, { cache });
+    assert.equal(resolved, `${pPath}ra/pkg@version/`);
+  });
+
   test('Package-relative loading', () => {
     var { resolved } = jspmResolve.sync('./a.json', pkgPath, { cache });
     assert.equal(resolved, `${pkgPath}a.json`);
@@ -315,18 +334,18 @@ suite('Standard Cases Sync', () => {
     }
   });
 
-  test.skip('Package scope-relative loading', () => {
-    var { resolved } = jspmResolve.sync('~', sfPath, { cache });
+  test('Package scope-relative loading', () => {
+    var { resolved } = jspmResolve.sync('@', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = jspmResolve.sync('~/lib.js', sfPath, { cache });
+    var { resolved } = jspmResolve.sync('@/lib.js', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = jspmResolve.sync('~/lib.js', sfPath, { cache });
+    var { resolved } = jspmResolve.sync('@/lib.js', sfPath, { cache });
     assert.equal(resolved, sfPath + 'lib.js');
 
-    var { resolved } = jspmResolve.sync('~/rel', sfPath, { cache, cjsResolve: true });
-    assert.equal(resolved, sfPath + 'd');
+    var { resolved } = jspmResolve.sync('@/rel', sfPath, { cache, cjsResolve: true });
+    assert.equal(resolved, sfPath + 'd/index.js');
   });
 
   test('Custom extensions', () => {

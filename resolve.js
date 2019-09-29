@@ -380,7 +380,10 @@ async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsRe
 
   let pkgPath;
   if (name === '@') {
-    pkgPath = packageToPath(parentPkg);
+    if (parentPkg)
+      pkgPath = packageToPath(parentPkg, jspmProjectPath);
+    else if (!(pkgPath = await getPackageScope.call(this, parentPath, cache)))
+      throwModuleNotFound(specifier, parentPath);
   }
   else {
     let pkgResolution;
@@ -392,9 +395,12 @@ async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsRe
       pkgResolution = jspmConfig.resolve[name] || jspmConfig.resolvePeer[name];
     }
     if (!pkgResolution) {
-      if (builtins.has(name))
+      if (parentPkg && name === parentPkg.substring(parentPkg.indexOf(':') + 1, parentPkg.lastIndexOf('@')))
+        pkgPath = packageToPath(parentPkg, jspmProjectPath);
+      else if (builtins.has(name))
         return { resolved: name, format: 'builtin' };
-      throwModuleNotFound(specifier, parentPath);
+      else
+        throwModuleNotFound(specifier, parentPath);
     }
     pkgPath = packageToPath(pkgResolution, jspmProjectPath);
   }
@@ -416,7 +422,10 @@ function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsReso
 
   let pkgPath;
   if (name === '@') {
-    pkgPath = packageToPath(parentPkg);
+    if (parentPkg)
+      pkgPath = packageToPath(parentPkg, jspmProjectPath);
+    else if (!(pkgPath = getPackageScopeSync.call(this, parentPath, cache)))
+      throwModuleNotFound(specifier, parentPath);
   }
   else {
     let pkgResolution;
@@ -428,9 +437,12 @@ function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsReso
       pkgResolution = jspmConfig.resolve[name] || jspmConfig.resolvePeer[name];
     }
     if (!pkgResolution) {
-      if (builtins.has(name))
+      if (parentPkg && name === parentPkg.substring(parentPkg.indexOf(':') + 1, parentPkg.lastIndexOf('@')))
+        pkgPath = packageToPath(parentPkg, jspmProjectPath);
+      else if (builtins.has(name))
         return { resolved: name, format: 'builtin' };
-      throwModuleNotFound(specifier, parentPath);
+      else 
+        throwModuleNotFound(specifier, parentPath);
     }
     pkgPath = packageToPath(pkgResolution, jspmProjectPath);
   }
@@ -453,7 +465,7 @@ function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, buil
     throwInvalidModuleName("Invalid package name '" + name + "', loaded from " + parentPath);
 
   if (name === '@') {
-    const pkgPath = getPackageScope(parentPath);
+    const pkgPath = getPackageScopeSync.call(this, parentPath, cache);
     if (!pkgPath)
       throwModuleNotFound(name, parentPath);
     const pkgConfig = readPkgConfigSync.call(this, pkgPath, cache);
@@ -479,7 +491,7 @@ function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, buil
 }
 
 async function finalizeResolve (path, parentPath, jspmProjectPath, isMain, cache) {
-  const resolved = await this.realpath(path, jspmProjectPath ? (parsePkgPath(path) || jspmProjectPath) : undefined, cache);
+  const resolved = await this.realpath(path, jspmProjectPath ? (parsePkgPath(path, jspmProjectPath) || jspmProjectPath) : undefined, cache);
   const scope = await getPackageScope.call(this, resolved, cache);
   const scopeConfig = scope && await readPkgConfig.call(this, scope, cache);
   if (resolved && resolved[resolved.length - 1] === '/') {
@@ -501,7 +513,7 @@ async function finalizeResolve (path, parentPath, jspmProjectPath, isMain, cache
 }
 
 function finalizeResolveSync (path, parentPath, jspmProjectPath, isMain, cache) {
-  const resolved = this.realpathSync(path, jspmProjectPath ? (parsePkgPath(path) || jspmProjectPath) : undefined, cache);
+  const resolved = this.realpathSync(path, jspmProjectPath ? (parsePkgPath(path, jspmProjectPath) || jspmProjectPath) : undefined, cache);
   const scope = getPackageScopeSync.call(this, resolved, cache);
   const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
   if (resolved && resolved[resolved.length - 1] === '/') {
@@ -993,17 +1005,13 @@ resolve.cjsResolve = function (request, parent) {
 module.exports = resolve;
 
 function processPkgConfig (pjson) {
-  let name = undefined,
-      type = undefined,
+  let type = undefined,
       entries = Object.create(null),
       exports = undefined,
       map = undefined;
 
   if (typeof pjson.jspm === 'object')
     Object.assign(pjson, pjson.jspm);
-
-  if (typeof pjson.name === 'string')
-    name = pjson.name;
 
   if (pjson.type === 'commonjs' || pjson.type === 'module')
     type = pjson.type;
@@ -1049,7 +1057,7 @@ function processPkgConfig (pjson) {
     }
   }
 
-  return { name, type, entries, exports, map };
+  return { type, entries, exports, map };
 }
 
 function throwMainNotFound (pkgPath, parentPath) {

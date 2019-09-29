@@ -2,6 +2,10 @@
   "name": "standard-case",
   "type": "commonjs",
   "main": "./lib.js",
+  "exports": {
+    "./": "./",
+    "./rel": "./d"
+  },
   "map": {
     "a": "./b.js",
     "a/": "./b/",
