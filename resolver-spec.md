@@ -115,7 +115,7 @@ Trailing slashes can be used to map folders, but require the target to also use 
 
 #### Package Map
 
-The `package.json` file `"map"` property can be used to configure mappings for both installed dependencies and the local project, with the followinng structure:
+The `package.json` file `"map"` property can be used to configure mappings for both installed dependencies and the local project, with the following structure:
 
 `package.json`:
 ```js
@@ -337,22 +337,30 @@ The process of reading the package.json configuration for a given package path i
 > 1. If _pjson.type_ is equal to _"commonjs"_ or _"module"_ then,
 >    1. Set _type_ to _pjson.type_.
 > 1. Let _entries_ be an empty _Object_.
-> 1. Let _conditions_ be the list of string environment conditions in priority order.
-> 1. For each _condition_ of _conditions_, do
->    1. If _pjson[condition]_ is a String then,
->       1. Let _target_ be _pjson[condition]_.
->       1. If _target_ does not start with _"./"_ then,
->          1. Set _target_ to _"./"_ concatenated with _target_.
->       1. Set _entries[condition]_ to _target_.
-> 1. If _pjson.exports_ is a String or Array then,
->    1. Set _entries.main_ to _pjson.exports_.
 > 1. Let _exports_ be _undefined_.
 > 1. If _pjson.exports_ is not _null_ or _undefined_ then,
 >    1. Set _exports_ to an empty _Object_.
+> 1. If _pjson.exports_ is a String or Array then,
+>    1. Set _entries.default_ to _pjson.exports_.
 > 1. If _pjson.exports_ is an _Object_ then,
 >    1. Set _exports_ to _pjson.exports_.
 >    1. If _exports_ has a _"."_ property then,
->       1. Set _entries.main_ to _exports["."]_.
+>       1. If _exports["."]_ is a String or Array then,
+>          1. Set _entries_ to _{ default: exports["."] }_.
+>       1. Otherwise, if _exports["."]_ is an Object then,
+>          1. Set _entries_ to _exports["."]_.
+> 1. If _pjson.main_ is a String then and _entries.default_ does not exist,
+>    1. Let _target_ be _pjson.main_.
+>    1. If _target_ does not start with _"./"_ then,
+>       1. Set _target_ to _"./"_ concatenated with _target_.
+>    1. Remove any trailing _"/"_ from _target_.
+>    1. Set _entries.default_ to _target_.
+> 1. If _pjson.module_ is a String then and _entries.module_ does not exist,
+>    1. Let _target_ be _pjson.main_.
+>    1. If _target_ does not start with _"./"_ then,
+>       1. Set _target_ to _"./"_ concatenated with _target_.
+>    1. Remove any trailing _"/"_ from _target_.
+>    1. Set _entries.module_ to _{ browser: target }_.
 > 1. Let _map_ be set to the value of _pjson.map_ if an Object or an empty object otherwise.
 > 1. If _pjson.browser_ is an _Object_ then,
 >    1. For each key _name_ in _pjson.browser_ do,
@@ -363,14 +371,14 @@ The process of reading the package.json configuration for a given package path i
 >       1. If _name_ starts with _"./"_ then,
 >          1. If _target_ does not start with _"./"_ then,
 >             1. Set _target_ to _"./"_ concatenated with _target_.
->          1. If _entries.main_ starts with _name_ then,
->             1. Let _extra_ be the substring of _name_ starting at the length of _entries.main_.
+>          1. If _entries.default_ starts with _name_ then,
+>             1. Let _extra_ be the substring of _name_ starting at the length of _entries.default_.
 >             1. If _extra_ is equal to _""_, _".js"_, _".json"_, _".node"_, _"/index.js"_, _"/index.json"_, _"/index.node"_ then,
 >                1. Set _entries.browser_ to _target_.
 >          1. If _exports[name] is _undefined_ then,
->             1. Set _exports[name]_ to the object _{ browser: target, main: name }_.
+>             1. Set _exports[name]_ to the object _{ browser: target, default: name }_.
 >       1. Otherwise, if _map[name]_ is not defined then,
->          1. Set _map[name] to the object _{ browser: target, main: name }_.
+>          1. Set _map[name] to the object _{ browser: target, default: name }_.
 > 1. Return the object with properties _{ type, entries, exports, map }_.
 
 > **GET_PACKAGE_SCOPE(modulePath: String)**
@@ -408,7 +416,7 @@ The process of reading the package.json configuration for a given package path i
 >    1. For each environment condition _condition_ in priority order,
 >       1. If _condition is a valid key of _target_ then,
 >          1. Let _targetValue_ be _target[condition]_.
->          1. Return the result of _RESOLVE_EXPORTS_TARGET(packagePath, targetValue, subpath)_, propagating any error.
+>          1. Return the result of _RESOLVE_EXPORTS_TARGET(packagePath, targetValue, subpath)_, continuing the loop on validation errors.
 > 1. Throw a _Module Not Found_ error.
 
 > **RESOLVE_MAP(name: String, packagePath: String, pcfg: Object)**

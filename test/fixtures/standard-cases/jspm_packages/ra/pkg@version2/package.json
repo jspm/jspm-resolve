@@ -3,7 +3,7 @@
   "exports": {
     "./": "./",
     "./a.js": {
-      "main": "./b.js"
+      "default": "./b.js"
     }
   },
   "type": "module"

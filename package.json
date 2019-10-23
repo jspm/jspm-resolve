@@ -6,6 +6,7 @@
   "scripts": {
     "test": "jspm test/test.js"
   },
+  "type": "commonjs",
   "repository": {
     "type": "git",
     "url": "git://git@github.com/jspm/resolve.git"

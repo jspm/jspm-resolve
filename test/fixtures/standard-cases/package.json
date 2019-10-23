@@ -13,11 +13,11 @@
     "p": "pkg",
     "c": {
       "browser": "./c-browser.js",
-      "node": "./c-node.js"
+      "default": "./c-node.js"
     },
     "c/": {
       "browser": "./c-browser/",
-      "node": "./c-node/"
+      "default": "./c-node/"
     }
   }
 }

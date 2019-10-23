@@ -204,7 +204,7 @@ function initCache (cache) {
   seenCache.set(cache, true);
 }
 
-const defaultTargets = ['node', 'dev', 'esmodule', 'main'];
+const defaultTargets = ['module', 'default'];
 
 const defaultBuiltins = new Set([
   '@empty',
@@ -571,7 +571,7 @@ function cjsFileResolve (path, parentPath, cache) {
   let resolved = legacyFileResolve.call(this, path, cache);
   if (!resolved) {
     const pjson = readPkgConfigSync.call(this, path + '/package.json', cache);
-    resolved = legacyDirResolve.call(this, path, pjson && pjson.entries.main, cache);
+    resolved = legacyDirResolve.call(this, path, pjson && pjson.entries.default, cache);
   }
   if (!resolved)
     throwModuleNotFound(path, parentPath);
@@ -1006,7 +1006,7 @@ module.exports = resolve;
 
 function processPkgConfig (pjson) {
   let type = undefined,
-      entries = Object.create(null),
+      entries = {},
       exports = undefined,
       map = undefined;
 
@@ -1016,17 +1016,35 @@ function processPkgConfig (pjson) {
   if (pjson.type === 'commonjs' || pjson.type === 'module')
     type = pjson.type;
 
-  for (const key of Object.keys(pjson)) {
-    let value = pjson[key];
-    if (typeof value === 'string') {
-      if (!value.startsWith('./')) value = './' + value;
-      if (value.endsWith('/')) value = value.slice(0, value.length - 1);
-      entries[key] = value;
+  if (typeof pjson.exports === 'object' && pjson.exports !== null) {
+    exports = pjson.exports;
+    if (exports['.']) {
+      if (typeof exports['.'] === 'string')
+        entries = { "default": exports['.'] };
+      else if (exports['.'] instanceof Array)
+        entries = { "default": exports['.'] };
+      else if (typeof exports['.'] === 'object')
+        entries = exports['.'];
+      delete exports['.'];
     }
   }
+  else if (typeof pjson.exports === 'string' || pjson.exports instanceof Array) {
+    entries = { default: pjson.exports };
+  }
 
-  if (typeof pjson.exports === 'object' && pjson.exports !== null)
-    exports = pjson.exports;
+  if (typeof pjson.main === 'string' && !Object.hasOwnProperty.call(entries, 'default')) {
+    let entry = pjson.main;
+    if (!entry.startsWith('./')) entry = './' + entry;
+    if (entry.endsWith('/')) entry = entry.slice(0, entry.length - 1);
+    entries.default = entry;
+  }
+
+  if (typeof pjson.module === 'string' && !Object.hasOwnProperty.call(entries, 'module')) {
+    let entry = pjson.module;
+    if (!entry.startsWith('./')) entry = './' + entry;
+    if (entry.endsWith('/')) entry = entry.slice(0, entry.length - 1);
+    entries.module = { "browser": entry };
+  }
 
   if (typeof pjson.map === 'object' && pjson.map !== null)
     map = pjson.map;
@@ -1040,19 +1058,18 @@ function processPkgConfig (pjson) {
       if (typeof target !== 'string') continue;
       if (key.startsWith('./')) {
         if (!target.startsWith('./')) target = './' + target;
-        if (entries.main && entries.main.startsWith(key)) {
-          const extra = key.slice(entries.main.length);
+        if (entries.default && entries.default.startsWith(key)) {
+          const extra = key.slice(entries.default.length);
           if (extra === '' || extra === '.js' || extra === '.json' || extra === '.node' || extra === '/index.js' || extra === '/index.json' || extra === '/index.node')
             entries.browser = target;
         }
         if (!exports || Object.hasOwnProperty.call(exports, key) === false) {
-          if (!exports)
-            exports = { './': [{ browser: null }, './'] };
-          exports[key] = { browser: target, main: key };
+          if (!exports) exports = { './': './' };
+          exports[key] = { browser: target, default: key };
         }
       }
       else if (Object.hasOwnProperty.call(map, key) === false) {
-        map[key] = { browser: target, main: key };
+        map[key] = { browser: target, default: key };
       }
     }
   }
@@ -1084,13 +1101,6 @@ function throwNoMapTarget (pkgPath, specifier, match, parentPath) {
   throw e;
 }
 
-function getTargetsMatch (obj, targets) {
-  for (const target of targets) {
-    if (Object.hasOwnProperty.call(obj, target))
-      return target;
-  }
-}
-
 const emptyPcfg = Object.create(null);
 function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets, builtins, cache) {
   pcfg = pcfg || emptyPcfg;
@@ -1120,14 +1130,23 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
     throwExportsNotFound(pkgPath, subpath, parentPath);
   }
   else {
-    const entry = pcfg.entries && getTargetsMatch(pcfg.entries, targets);
-    const entryValue = entry && pcfg.entries[entry];
     let resolvedEntry;
-    if (entry) {
-      resolvedEntry = resolveExportsTarget(pkgPath, entryValue, '', parentPath, '.', targets, builtins);
-      if (this.isFileSync(resolvedEntry, cache))
-        return resolvedEntry;
-    }
+    if (pcfg.entries)
+      for (const target of targets) {
+        if (!Object.hasOwnProperty.call(pcfg.entries, target))
+          continue;
+        const entryValue = pcfg.entries[target];
+        try {
+          resolvedEntry = resolveExportsTarget(pkgPath, entryValue, '', parentPath, '.', targets, builtins);
+          break;
+        }
+        catch (e) {
+          if (e.code !== 'MODULE_NOT_FOUND')
+            throw e;
+        }
+      }
+    if (resolvedEntry && this.isFileSync(resolvedEntry, cache))
+      return resolvedEntry;
     if (pcfg.type !== 'module' || cjsResolve === true) {
       const resolved = legacyDirResolve.call(this, pkgPath, resolvedEntry && resolvedEntry.slice(pkgPath.length + 1), cache);
       if (resolved)
@@ -1167,9 +1186,17 @@ function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targe
     throwNoExportsTarget(pkgPath, match + subpath, match, parentPath);
   }
   else if (typeof target === 'object') {
-    const targetMatch = getTargetsMatch(target, targets);
-    if (targetMatch)
-      return resolveExportsTarget(pkgPath, target[targetMatch], subpath, parentPath, match, targets, builtins);
+    for (const targetName of targets) {
+      if (!Object.hasOwnProperty.call(target, targetName))
+        continue;
+      try {
+        return resolveExportsTarget(pkgPath, target[targetName], subpath, parentPath, match, targets, builtins);
+      }
+      catch (e) {
+        if (e.code !== 'MODULE_NOT_FOUND')
+          throw e;
+      }
+    }
   }
   throwNoExportsTarget(pkgPath, match + subpath, match, parentPath);
 }
@@ -1240,9 +1267,17 @@ function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets,
     }
   }
   else if (typeof target === 'object') {
-    const targetMatch = getTargetsMatch(target, targets);
-    if (targetMatch)
-      return resolveMapTarget(pkgPath, target[targetMatch], subpath, parentPath, match, targets, builtins);
+    for (const targetName of targets) {
+      if (!Object.hasOwnProperty.call(target, targetName))
+        continue;
+      try {
+        return resolveExportsTarget(pkgPath, target[targetName], subpath, parentPath, match, targets, builtins);
+      }
+      catch (e) {
+        if (e.code !== 'MODULE_NOT_FOUND')
+          throw e;
+      }
+    }
   }
   throwNoMapTarget(pkgPath, match + subpath, match, parentPath);
 }
