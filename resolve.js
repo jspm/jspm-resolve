@@ -600,8 +600,6 @@ async function getJspmProjectPath (modulePath, cache) {
     const baseProjectPath = modulePath.slice(0, jspmPackagesIndex);
     const pkgName = parsePkgPath(modulePath, baseProjectPath);
     basePackagePath = pkgName && packageToPath(pkgName, baseProjectPath);
-    if (basePackagePath && !(await this.isFile(basePackagePath + '/jspm.json', cache)))
-      basePackagePath = undefined;
   }
   let separatorIndex = modulePath.lastIndexOf('/');
   const rootSeparatorIndex = modulePath.indexOf('/');
@@ -623,8 +621,6 @@ function getJspmProjectPathSync (modulePath, cache) {
     const baseProjectPath = modulePath.slice(0, jspmPackagesIndex);
     const pkgName = parsePkgPath(modulePath, baseProjectPath);
     basePackagePath = pkgName && packageToPath(pkgName, baseProjectPath);
-    if (basePackagePath && !(this.isFileSync(basePackagePath + '/jspm.json', cache)))
-      basePackagePath = undefined;
   }
   let separatorIndex = modulePath.lastIndexOf('/');
   const rootSeparatorIndex = modulePath.indexOf('/');

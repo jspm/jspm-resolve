@@ -311,8 +311,6 @@ Given any file path, we can determine the base jspm project folder with the foll
 >    1. Let _packageName_ be the result of PARSE_PACKAGE_PATH(modulePath, baseProjectPath).
 >    1. If _packageName_ is not _undefined_ then,
 >       1. Set _basePackagePath_ to _PACKAGE_TO_PATH(packageName, baseProjectPath)_.
->       1. If the file _"jspm.json"_ in _basePackagePath_ does not exist then,
->          1. Set _basePackagePath_ to _undefined_.
 > 1. For each parent path _projectPath_ of _modulePath_,
 >    1. If _projectPath_ is equal to _basePackagePath_, continue.
 >    1. If the last segment of _projectPath_ is a _"node_modules"_ segment, return.
