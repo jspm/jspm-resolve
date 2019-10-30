@@ -136,14 +136,14 @@ suite('Standard Cases', () => {
     var { resolved } = await jspmResolve('c', sfPath, { cache });
     assert.equal(resolved, sfPath + 'c-node.js');
 
-    var { resolved } = await jspmResolve('c', sfPath, { cache, targets: ['browser', 'main'] });
+    var { resolved } = await jspmResolve('c', sfPath, { cache, env: ['browser', 'main'] });
     assert.equal(resolved, sfPath + 'c-browser.js');
 
-    var { resolved } = await jspmResolve('pkg', sfPath, { cache, targets: ['browser', 'main'] });
+    var { resolved } = await jspmResolve('pkg', sfPath, { cache, env: ['browser', 'main'] });
     assert.equal(resolved, pkgPath + 'c-browser.js');
 
     try {
-      var { resolved } = await jspmResolve('c', sfPath, { cache, env: { browser: false, node: false } });
+      var { resolved } = await jspmResolve('c', sfPath, { cache, env: ['default'] });
     }
     catch (e) {
       assert(e.message.indexOf('Cannot find module c') !== -1);
@@ -368,14 +368,14 @@ suite('Standard Cases Sync', () => {
     var { resolved } = jspmResolve.sync('c', sfPath, { cache });
     assert.equal(resolved, sfPath + 'c-node.js');
 
-    var { resolved } = jspmResolve.sync('c', sfPath, { cache, targets: ['browser', 'main'] });
+    var { resolved } = jspmResolve.sync('c', sfPath, { cache, env: ['browser', 'main'] });
     assert.equal(resolved, sfPath + 'c-browser.js');
 
-    var { resolved } = jspmResolve.sync('pkg', sfPath, { cache, targets: ['browser', 'main'] });
+    var { resolved } = jspmResolve.sync('pkg', sfPath, { cache, env: ['browser', 'main'] });
     assert.equal(resolved, pkgPath + 'c-browser.js');
 
     try {
-      var { resolved } = jspmResolve.sync('c', sfPath, { cache, env: { browser: false, node: false } });
+      var { resolved } = jspmResolve.sync('c', sfPath, { cache, env: ['default'] });
     }
     catch (e) {
       assert(e.message.indexOf('Cannot find module c') !== -1);

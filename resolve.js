@@ -204,7 +204,8 @@ function initCache (cache) {
   seenCache.set(cache, true);
 }
 
-const defaultTargets = ['module', 'default'];
+const defaultEnvModule = ['module', 'default'];
+const defaultEnvCjs = ['default'];
 
 const defaultBuiltins = new Set([
   '@empty',
@@ -247,13 +248,14 @@ const defaultBuiltins = new Set([
 ]);
 
 async function resolve (specifier, parentPath = process.cwd() + '/', {
-  targets = defaultTargets,
+  builtins = defaultBuiltins,
   cache = undefined,
   cjsResolve = false,
+  env,
   fs = fsUtils,
-  isMain = false,
-  builtins = defaultBuiltins
+  isMain = false
 } = {}) {
+  if (!env) env = cjsResolve ? defaultEnvModule : defaultEnvCjs;
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache && seenCache.has(cache) === false)
@@ -272,7 +274,7 @@ async function resolve (specifier, parentPath = process.cwd() + '/', {
   const parentConfig = parentScope && await readPkgConfig.call(fs, parentPath, cache);
 
   if (parentConfig && parentConfig.map) {
-    const mapped = resolveMap(specifier, parentConfig.map, parentScope, parentPath, targets, builtins);
+    const mapped = resolveMap(specifier, parentConfig.map, parentScope, parentPath, env, builtins);
     if (mapped) {
       if (!mapped.startsWith(parentScope + '/')) {
         specifier = mapped;
@@ -286,19 +288,20 @@ async function resolve (specifier, parentPath = process.cwd() + '/', {
   }
 
   if (jspmProjectPath)
-    return await jspmProjectResolve.call(fs, specifier, parentPath, jspmProjectPath, cjsResolve, isMain, targets, builtins, cache);
+    return await jspmProjectResolve.call(fs, specifier, parentPath, jspmProjectPath, cjsResolve, isMain, env, builtins, cache);
   else
-    return nodeModulesResolve.call(fs, specifier, parentPath, cjsResolve, isMain, targets, builtins, cache);
+    return nodeModulesResolve.call(fs, specifier, parentPath, cjsResolve, isMain, env, builtins, cache);
 }
 
 function resolveSync (specifier, parentPath = process.cwd() + '/', {
-  targets = defaultTargets,
+  builtins = defaultBuiltins,
   cache = undefined,
   cjsResolve = false,
+  env,
   fs = fsUtils,
-  isMain = false,
-  builtins = defaultBuiltins
+  isMain = false
 } = {}) {
+  if (!env) env = cjsResolve ? defaultEnvModule : defaultEnvCjs;
   if (parentPath.indexOf('\\') !== -1)
     parentPath = parentPath.replace(winSepRegEx, '/');
   if (cache && seenCache.has(cache) === false)
@@ -317,7 +320,7 @@ function resolveSync (specifier, parentPath = process.cwd() + '/', {
   const parentConfig = parentScope && readPkgConfigSync.call(fs, parentPath, cache);
 
   if (parentConfig && parentConfig.map) {
-    const mapped = resolveMap(specifier, parentConfig.map, parentScope, parentPath, targets, builtins);
+    const mapped = resolveMap(specifier, parentConfig.map, parentScope, parentPath, env, builtins);
     if (mapped) {
       if (!mapped.startsWith(parentScope + '/')) {
         specifier = mapped;
@@ -331,9 +334,9 @@ function resolveSync (specifier, parentPath = process.cwd() + '/', {
   }
 
   if (jspmProjectPath)
-    return jspmProjectResolveSync.call(fs, specifier, parentPath, jspmProjectPath, cjsResolve, isMain, targets, builtins, cache);
+    return jspmProjectResolveSync.call(fs, specifier, parentPath, jspmProjectPath, cjsResolve, isMain, env, builtins, cache);
   else
-    return nodeModulesResolve.call(fs, specifier, parentPath, cjsResolve, isMain, targets, builtins, cache);
+    return nodeModulesResolve.call(fs, specifier, parentPath, cjsResolve, isMain, env, builtins, cache);
 }
 
 function relativeResolve (name, parentPath) {
@@ -371,7 +374,7 @@ function relativeResolve (name, parentPath) {
   }
 }
 
-async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsResolve, isMain, targets, builtins, cache) {
+async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsResolve, isMain, env, builtins, cache) {
   const jspmConfig = await readJspmConfig.call(this, jspmProjectPath, cache);
   const parentPkg = parsePkgPath(parentPath, jspmProjectPath);
   const { name, path } = parsePackage(specifier);
@@ -406,14 +409,14 @@ async function jspmProjectResolve (specifier, parentPath, jspmProjectPath, cjsRe
   }
   
   const pkgConfig = await readPkgConfig.call(this, pkgPath, cache);
-  const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, targets, builtins, cache);
+  const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, env, builtins, cache);
 
   if (cjsResolve)
     return cjsFinalizeResolve.call(this, cjsFileResolve.call(this, resolved, parentPath, cache), parentPath, jspmProjectPath, cache);
   return await finalizeResolve.call(this, resolved, parentPath, jspmProjectPath, isMain, cache);
 }
 
-function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsResolve, isMain, targets, builtins, cache) {
+function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsResolve, isMain, env, builtins, cache) {
   const jspmConfig = readJspmConfigSync.call(this, jspmProjectPath, cache);
   const parentPkg = parsePkgPath(parentPath, jspmProjectPath);
   const { name, path } = parsePackage(specifier);
@@ -448,14 +451,14 @@ function jspmProjectResolveSync (specifier, parentPath, jspmProjectPath, cjsReso
   }
   
   const pkgConfig = readPkgConfigSync.call(this, pkgPath, cache);
-  const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, targets, builtins, cache);
+  const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, env, builtins, cache);
 
   if (cjsResolve)
     return cjsFinalizeResolve.call(this, cjsFileResolve.call(this, resolved, parentPath, cache), parentPath, jspmProjectPath, cache);
   return finalizeResolveSync.call(this, resolved, parentPath, jspmProjectPath, isMain, cache);
 }
 
-function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, builtins, cache) {
+function nodeModulesResolve (name, parentPath, cjsResolve, isMain, env, builtins, cache) {
   if (builtins.has(name))
     return { resolved: name, format: 'builtin' };
   let curParentPath = parentPath;
@@ -469,7 +472,7 @@ function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, buil
     if (!pkgPath)
       throwModuleNotFound(name, parentPath);
     const pkgConfig = readPkgConfigSync.call(this, pkgPath, cache);
-    const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, targets, builtins, cache);
+    const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, env, builtins, cache);
     if (cjsResolve)
       return cjsFinalizeResolve.call(this, cjsFileResolve.call(this, resolved, parentPath, cache), parentPath, undefined, cache);
     return finalizeResolveSync.call(this, resolved, parentPath, undefined, isMain, cache);
@@ -481,7 +484,7 @@ function nodeModulesResolve (name, parentPath, cjsResolve, isMain, targets, buil
     const pkgPath = curParentPath + '/node_modules/' + name;
     if (this.isDirSync(pkgPath, cache)) {
       const pkgConfig = readPkgConfigSync.call(this, pkgPath, cache);
-      const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, targets, builtins, cache);
+      const resolved = resolvePackage.call(this, pkgPath, path, parentPath, pkgConfig, cjsResolve, env, builtins, cache);
       if (cjsResolve)
         return cjsFinalizeResolve.call(this, cjsFileResolve.call(this, resolved, parentPath, cache), parentPath, undefined, cache);
       return finalizeResolveSync.call(this, resolved, parentPath, undefined, isMain, cache);
@@ -579,7 +582,6 @@ function cjsFileResolve (path, parentPath, cache) {
 }
 
 function cjsFinalizeResolve (path, parentPath, jspmProjectPath, cache) {
-  // console.log(path);
   const resolved = this.realpathSync(path, jspmProjectPath ? (parsePkgPath(path) || jspmProjectPath) : undefined, cache);
   const scope = getPackageScopeSync.call(this, resolved, cache);
   const scopeConfig = scope && readPkgConfigSync.call(this, scope, cache);
@@ -1035,6 +1037,13 @@ function processPkgConfig (pjson) {
     entries.default = entry;
   }
 
+  if (typeof pjson.browser === 'string' && !Object.hasOwnProperty.call(entries, 'browser')) {
+    let entry = pjson.browser;
+    if (!entry.startsWith('./')) entry = './' + entry;
+    if (entry.endsWith('/')) entry = entry.slice(0, entry.length - 1);
+    entries.browser = entry;
+  }
+
   if (typeof pjson.module === 'string' && !Object.hasOwnProperty.call(entries, 'module')) {
     let entry = pjson.module;
     if (!entry.startsWith('./')) entry = './' + entry;
@@ -1069,7 +1078,6 @@ function processPkgConfig (pjson) {
       }
     }
   }
-
   return { type, entries, exports, map };
 }
 
@@ -1098,7 +1106,7 @@ function throwNoMapTarget (pkgPath, specifier, match, parentPath) {
 }
 
 const emptyPcfg = Object.create(null);
-function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets, builtins, cache) {
+function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, env, builtins, cache) {
   pcfg = pcfg || emptyPcfg;
   if (subpath) {
     if (subpath === './')
@@ -1110,7 +1118,7 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
     if (typeof pcfg.exports !== 'object')
       throwExportsNotFound(pkgPath, subpath, parentPath);
     if (Object.hasOwnProperty.call(pcfg.exports, subpath))
-      return resolveExportsTarget(pkgPath, pcfg.exports[subpath], '', parentPath, subpath, targets, builtins);
+      return resolveExportsTarget(pkgPath, pcfg.exports[subpath], '', parentPath, subpath, env, builtins);
 
     let dirMatch = '';
     for (const candidateKey of Object.keys(pcfg.exports)) {
@@ -1121,19 +1129,19 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
     }
   
     if (dirMatch)
-      return resolveExportsTarget(pkgPath,  pcfg.exports[dirMatch], subpath.slice(dirMatch.length), parentPath, dirMatch, targets, builtins);
+      return resolveExportsTarget(pkgPath,  pcfg.exports[dirMatch], subpath.slice(dirMatch.length), parentPath, dirMatch, env, builtins);
 
     throwExportsNotFound(pkgPath, subpath, parentPath);
   }
   else {
     let resolvedEntry;
-    if (pcfg.entries)
-      for (const target of targets) {
+    if (pcfg.entries) {
+      for (const target of env) {
         if (!Object.hasOwnProperty.call(pcfg.entries, target))
           continue;
         const entryValue = pcfg.entries[target];
         try {
-          resolvedEntry = resolveExportsTarget(pkgPath, entryValue, '', parentPath, '.', targets, builtins);
+          resolvedEntry = resolveExportsTarget(pkgPath, entryValue, '', parentPath, '.', env, builtins);
           break;
         }
         catch (e) {
@@ -1141,6 +1149,7 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
             throw e;
         }
       }
+    }
     if (resolvedEntry && this.isFileSync(resolvedEntry, cache))
       return resolvedEntry;
     if (pcfg.type !== 'module' || cjsResolve === true) {
@@ -1152,7 +1161,7 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, targets
   }
 }
 
-function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targets, builtins) {
+function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, env, builtins) {
   if (typeof target === 'string') {
     if (target.startsWith('./') && (subpath.length === 0 || target.endsWith('/'))) {
       const resolvedTarget = resolvePath(uriToPath(target), pkgPath + '/');
@@ -1170,7 +1179,7 @@ function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targe
       if (typeof targetValue !== 'string' || typeof targetValue !== 'object' || Array.isArray(targetValue))
         continue;
       try {
-        return resolveExportsTarget(pkgPath, targetValue, subpath, parentPath, match, targets, builtins);
+        return resolveExportsTarget(pkgPath, targetValue, subpath, parentPath, match, env, builtins);
       }
       catch (e) {
         if (e.code !== 'MODULE_NOT_FOUND')
@@ -1182,11 +1191,11 @@ function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targe
     throwNoExportsTarget(pkgPath, match + subpath, match, parentPath);
   }
   else if (typeof target === 'object') {
-    for (const targetName of targets) {
+    for (const targetName of env) {
       if (!Object.hasOwnProperty.call(target, targetName))
         continue;
       try {
-        return resolveExportsTarget(pkgPath, target[targetName], subpath, parentPath, match, targets, builtins);
+        return resolveExportsTarget(pkgPath, target[targetName], subpath, parentPath, match, env, builtins);
       }
       catch (e) {
         if (e.code !== 'MODULE_NOT_FOUND')
@@ -1197,9 +1206,9 @@ function resolveExportsTarget(pkgPath, target, subpath, parentPath, match, targe
   throwNoExportsTarget(pkgPath, match + subpath, match, parentPath);
 }
 
-function resolveMap (specifier, map, pkgPath, parentPath, targets, builtins) {
+function resolveMap (specifier, map, pkgPath, parentPath, env, builtins) {
   if (map[specifier])
-    return resolveMapTarget(pkgPath, map[specifier], '', parentPath, specifier, targets, builtins);
+    return resolveMapTarget(pkgPath, map[specifier], '', parentPath, specifier, env, builtins);
 
   let dirMatch = '';
   for (const candidateKey of Object.keys(map)) {
@@ -1210,10 +1219,10 @@ function resolveMap (specifier, map, pkgPath, parentPath, targets, builtins) {
   }
 
   if (dirMatch)
-    return resolveMapTarget(pkgPath,  map[dirMatch], specifier.slice(dirMatch.length), parentPath, dirMatch, targets, builtins);
+    return resolveMapTarget(pkgPath,  map[dirMatch], specifier.slice(dirMatch.length), parentPath, dirMatch, env, builtins);
 }
 
-function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets, builtins) {
+function resolveMapTarget (pkgPath, target, subpath, parentPath, match, env, builtins) {
   if (typeof target === 'string') {
     const { name, path } = parsePackage(target);
     if (name) {
@@ -1254,7 +1263,7 @@ function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets,
       if (typeof targetValue !== 'string' || typeof targetValue !== 'object' || Array.isArray(targetValue))
         continue;
       try {
-        return resolveMapTarget(pkgPath, targetValue, subpath, parentPath, match, targets, builtins);
+        return resolveMapTarget(pkgPath, targetValue, subpath, parentPath, match, env, builtins);
       }
       catch (e) {
         if (e.code !== 'MODULE_NOT_FOUND')
@@ -1263,11 +1272,11 @@ function resolveMapTarget (pkgPath, target, subpath, parentPath, match, targets,
     }
   }
   else if (typeof target === 'object') {
-    for (const targetName of targets) {
+    for (const targetName of env) {
       if (!Object.hasOwnProperty.call(target, targetName))
         continue;
       try {
-        return resolveExportsTarget(pkgPath, target[targetName], subpath, parentPath, match, targets, builtins);
+        return resolveExportsTarget(pkgPath, target[targetName], subpath, parentPath, match, env, builtins);
       }
       catch (e) {
         if (e.code !== 'MODULE_NOT_FOUND')
