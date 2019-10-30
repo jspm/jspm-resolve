@@ -1044,13 +1044,6 @@ function processPkgConfig (pjson) {
     entries.browser = entry;
   }
 
-  if (typeof pjson.module === 'string' && !Object.hasOwnProperty.call(entries, 'module')) {
-    let entry = pjson.module;
-    if (!entry.startsWith('./')) entry = './' + entry;
-    if (entry.endsWith('/')) entry = entry.slice(0, entry.length - 1);
-    entries.module = { "browser": entry };
-  }
-
   if (typeof pjson.map === 'object' && pjson.map !== null)
     map = pjson.map;
   else
@@ -1082,25 +1075,25 @@ function processPkgConfig (pjson) {
 }
 
 function throwMainNotFound (pkgPath, parentPath) {
-  const e = new Error(`No package main defined for ${pkgPath}, imported from ${parentPath}`);
+  const e = new Error(`No package main found in ${pkgPath}/package.json, imported from ${parentPath}`);
   e.code = 'MODULE_NOT_FOUND';
   throw e;
 }
 
 function throwExportsNotFound (pkgPath, subpath, parentPath) {
-  const e = new Error(`No package exports defined for '${subpath}' in ${pkgPath}, imported from ${parentPath}`);
+  const e = new Error(`No package exports defined for '${subpath}' in ${pkgPath}/package.json, imported from ${parentPath}`);
   e.code = 'MODULE_NOT_FOUND';
   throw e;
 }
 
 function throwNoExportsTarget (pkgPath, specifier, match, parentPath) {
-  const e = new Error(`No valid package exports target for '${specifier}' matched to '${match}' in ${pkgPath}, imported from ${parentPath}`);
+  const e = new Error(`No valid package exports target for '${specifier}' matched to '${match}' in ${pkgPath}/package.json, imported from ${parentPath}`);
   e.code = 'MODULE_NOT_FOUND';
   throw e;
 }
 
 function throwNoMapTarget (pkgPath, specifier, match, parentPath) {
-  const e = new Error(`No valid package map target for '${specifier}' matched to '${match}' in ${pkgPath}, imported from ${parentPath}`);
+  const e = new Error(`No valid package map target for '${specifier}' matched to '${match}' in ${pkgPath}/package.json, imported from ${parentPath}`);
   e.code = 'MODULE_NOT_FOUND';
   throw e;
 }
@@ -1149,9 +1142,10 @@ function resolvePackage (pkgPath, subpath, parentPath, pcfg, cjsResolve, env, bu
             throw e;
         }
       }
+      if (resolvedEntry && this.isFileSync(resolvedEntry, cache))
+        return resolvedEntry;
     }
-    if (resolvedEntry && this.isFileSync(resolvedEntry, cache))
-      return resolvedEntry;
+    
     if (pcfg.type !== 'module' || cjsResolve === true) {
       const resolved = legacyDirResolve.call(this, pkgPath, resolvedEntry && resolvedEntry.slice(pkgPath.length + 1), cache);
       if (resolved)

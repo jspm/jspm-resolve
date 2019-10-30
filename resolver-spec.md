@@ -353,12 +353,12 @@ The process of reading the package.json configuration for a given package path i
 >       1. Set _target_ to _"./"_ concatenated with _target_.
 >    1. Remove any trailing _"/"_ from _target_.
 >    1. Set _entries.default_ to _target_.
-> 1. If _pjson.module_ is a String then and _entries.module_ does not exist,
+> 1. If _pjson.browser_ is a String then and _entries.browser_ does not exist,
 >    1. Let _target_ be _pjson.main_.
 >    1. If _target_ does not start with _"./"_ then,
 >       1. Set _target_ to _"./"_ concatenated with _target_.
 >    1. Remove any trailing _"/"_ from _target_.
->    1. Set _entries.module_ to _{ browser: target }_.
+>    1. Set _entries.browser_ to _target_.
 > 1. Let _map_ be set to the value of _pjson.map_ if an Object or an empty object otherwise.
 > 1. If _pjson.browser_ is an _Object_ then,
 >    1. For each key _name_ in _pjson.browser_ do,
