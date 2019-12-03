@@ -19,7 +19,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - name: npm install, build, and test
       run: |
-        npm install -D jspm
+        npm install -g jspm
         jspm install
         npm run build --if-present
         jspm run test
